@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PomoClock — Eye-Friendly, Research-Backed Pomodoro Study Timer</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description"
+    content="PomoClock is an ergonomic, distraction-free Pomodoro study timer featuring low-eye-strain color science and session tracking.">
+  <meta name="keywords"
+    content="pomodoro timer, pomoclock, study timer, productivity tool, eye-friendly timer, focus app, color science, ergonomic study tool">
+  <meta name="author" content="Leeon (blubumayo-82)">
+  <meta name="theme-color" content="#608066">
+
+  <!-- Open Graph Meta Tags (Social Sharing) -->
+  <meta property="og:title" content="PomoClock — Eye-Friendly, Research-Backed Pomodoro Study Timer">
+  <meta property="og:description"
+    content="PomoClock is an ergonomic, distraction-free Pomodoro study timer featuring low-eye-strain color science and session tracking.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PomoClock">
+  <meta property="og:url" content="https://github.com/blubumayo-82">
+
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="PomoClock — Eye-Friendly, Research-Backed Pomodoro Study Timer">
+  <meta name="twitter:description"
+    content="PomoClock is an ergonomic, distraction-free Pomodoro study timer featuring low-eye-strain color science and session tracking.">
+
+  <!-- Google Fonts: Outfit for sleek typography & JetBrains Mono for jitter-free timer digits -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>">
+</head>
+
+<body data-theme="matcha">
+
+  <!-- Top Ambient Glow -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <!-- Main Application Container -->
+  <div class="app-wrapper">
+
+    <!-- Navigation Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">🍅</div>
+        <div class="brand-text">
+          <h1>PomoClock</h1>
+          <span class="brand-tagline">Study & Deep Work</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Science & How to Use Trigger -->
+        <button id="openScienceModalHeaderBtn" class="header-text-btn" title="How it Works & Science"
+          aria-label="How it Works & Science">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"
+            height="16">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span class="header-btn-text">Science & Guide</span>
+        </button>
+
+        <!-- Audio Chime Mute/Unmute Toggle -->
+        <button id="soundToggleBtn" class="icon-btn" title="Toggle Sound (M)" aria-label="Toggle Sound">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path id="soundWave" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+
+        <!-- Theme Picker Modal Trigger -->
+        <button id="openThemeModalBtn" class="icon-btn" title="Customize Theme (T)" aria-label="Customize Theme">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+        </button>
+
+        <!-- Settings Modal Trigger -->
+        <button id="openSettingsModalBtn" class="icon-btn" title="Timer Settings" aria-label="Timer Settings">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z">
+            </path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="main-layout">
+
+      <!-- Timer Focus Section -->
+      <section class="timer-section card">
+
+        <!-- Task Goal Bar -->
+        <div class="task-bar">
+          <div class="task-input-wrapper">
+            <span class="task-icon">🎯</span>
+            <input type="text" id="currentTaskInput" class="task-input"
+              placeholder="What are you focusing on right now?" maxlength="80" aria-label="Current focus task">
+            <button id="clearTaskBtn" class="task-clear-btn" title="Clear task" aria-label="Clear task">&times;</button>
+          </div>
+        </div>
+
+        <!-- Mode Selector Tabs -->
+        <nav class="mode-tabs" aria-label="Timer Modes">
+          <button class="mode-tab active" data-mode="pomodoro" id="tabPomodoro">
+            <span>Pomodoro</span>
+            <span class="mode-duration-badge" id="badgePomodoro">25m</span>
+          </button>
+          <button class="mode-tab" data-mode="short_break" id="tabShortBreak">
+            <span>Short Break</span>
+            <span class="mode-duration-badge" id="badgeShortBreak">5m</span>
+          </button>
+          <button class="mode-tab" data-mode="long_break" id="tabLongBreak">
+            <span>Long Break</span>
+            <span class="mode-duration-badge" id="badgeLongBreak">15m</span>
+          </button>
+        </nav>
+
+        <!-- Circular Progress Timer Ring -->
+        <div class="timer-display-container">
+          <div class="progress-ring-wrapper">
+            <svg class="progress-ring" viewBox="0 0 320 320" width="320" height="320">
+              <defs>
+                <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="var(--accent-color)" />
+                  <stop offset="100%" stop-color="var(--accent-secondary, var(--accent-color))" />
+                </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="6" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+
+              <!-- Track background circle -->
+              <circle class="progress-ring__track" cx="160" cy="160" r="140" />
+              <!-- Animated dynamic stroke progress circle -->
+              <circle id="progressCircle" class="progress-ring__bar" cx="160" cy="160" r="140" />
+            </svg>
+
+            <!-- Center Content -->
+            <div class="timer-center-content">
+              <div class="status-pill" id="statusBadge">Ready to Focus</div>
+              <div class="time-display" id="timeDisplay" aria-live="polite">25:00</div>
+
+              <!-- Pomodoro Cycle Counter Dots -->
+              <div class="cycle-indicator" id="cycleIndicator" title="Pomodoros until long break">
+                <span class="cycle-dot active"></span>
+                <span class="cycle-dot"></span>
+                <span class="cycle-dot"></span>
+                <span class="cycle-dot"></span>
+              </div>
+              <div class="cycle-label" id="cycleLabel">Session 1 of 4</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timer Controls -->
+        <div class="timer-controls">
+          <!-- Reset Button -->
+          <button id="resetBtn" class="control-btn secondary-btn" title="Reset Timer (R)" aria-label="Reset Timer">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+            <span class="btn-text">Reset</span>
+          </button>
+
+          <!-- Primary Start/Pause Button -->
+          <button id="startPauseBtn" class="control-btn primary-btn" title="Start/Pause Timer (Space)"
+            aria-label="Start Timer">
+            <svg id="playIcon" class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 3 20 12 6 21 6 3"></polygon>
+            </svg>
+            <svg id="pauseIcon" class="btn-icon hidden" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+            </svg>
+            <span id="startPauseText" class="btn-text">Start</span>
+          </button>
+
+          <!-- Skip Button -->
+          <button id="skipBtn" class="control-btn secondary-btn" title="Skip Session (S)" aria-label="Skip Session">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"></line>
+            </svg>
+            <span class="btn-text">Skip</span>
+          </button>
+        </div>
+
+        <!-- Keyboard Hint -->
+        <div class="shortcuts-hint">
+          <span><kbd>Space</kbd> Start/Pause</span>
+          <span><kbd>R</kbd> Reset</span>
+          <span><kbd>S</kbd> Skip</span>
+          <span><kbd>T</kbd> Themes</span>
+        </div>
+
+      </section>
+
+      <!-- Productivity Analytics & Dashboard Section -->
+      <section class="dashboard-section">
+
+        <!-- Quick Stats Cards Grid -->
+        <div class="stats-grid">
+          <!-- Total Focus Hours -->
+          <div class="stat-card card">
+            <div class="stat-icon-wrap focus-icon">⏱️</div>
+            <div class="stat-info">
+              <span class="stat-label">Total Study Time</span>
+              <span class="stat-value" id="statTotalHours">0.0 <small>hrs</small></span>
+              <span class="stat-sub" id="statTotalMinutes">0 mins recorded</span>
+            </div>
+          </div>
+
+          <!-- Completed Pomodoros -->
+          <div class="stat-card card">
+            <div class="stat-icon-wrap pomodoro-icon">🍅</div>
+            <div class="stat-info">
+              <span class="stat-label">Completed Pomodoros</span>
+              <span class="stat-value" id="statCompletedCount">0</span>
+              <span class="stat-sub" id="statTotalSessions">0 total sessions</span>
+            </div>
+          </div>
+
+          <!-- Today's Focus -->
+          <div class="stat-card card">
+            <div class="stat-icon-wrap today-icon">📅</div>
+            <div class="stat-info">
+              <span class="stat-label">Today's Focus</span>
+              <span class="stat-value" id="statTodayMinutes">0 <small>min</small></span>
+              <span class="stat-sub" id="statTodaySessions">0 sessions today</span>
+            </div>
+          </div>
+
+          <!-- Streak -->
+          <div class="stat-card card">
+            <div class="stat-icon-wrap streak-icon">🔥</div>
+            <div class="stat-info">
+              <span class="stat-label">Study Streak</span>
+              <span class="stat-value" id="statStreakDays">0 <small>days</small></span>
+              <span class="stat-sub">Keep the momentum!</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7-Day Activity Chart Card -->
+        <div class="activity-card card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Weekly Focus Activity</h2>
+              <p class="card-subtitle">Daily focus minutes over the past 7 days</p>
+            </div>
+            <span class="chart-summary-badge" id="chartWeekTotal">0h this week</span>
+          </div>
+
+          <!-- Bar Chart Container -->
+          <div class="activity-chart" id="activityChart">
+            <!-- Rendered dynamically by script.js -->
+            <div class="chart-loading">Loading activity data...</div>
+          </div>
+        </div>
+
+        <!-- Recent Session History Card -->
+        <div class="history-card card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Recent Sessions</h2>
+              <p class="card-subtitle">Logged study and break intervals</p>
+            </div>
+            <button id="clearHistoryBtn" class="text-btn danger-text" title="Clear all history">Clear Logs</button>
+          </div>
+
+          <div class="history-table-wrapper">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Mode</th>
+                  <th>Task</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <tr>
+                  <td colspan="5" class="empty-state">No sessions recorded yet. Start your first focus timer!</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p class="footer-tagline">Built with love 💚 by Leeon • PomoClock</p>
+        <div class="footer-links">
+          <button id="openScienceModalFooterBtn" class="footer-link-btn" title="How it Works & Science">
+            <svg class="footer-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>How it Works & Science</span>
+          </button>
+          <span class="footer-separator" aria-hidden="true">•</span>
+          <a href="https://github.com/blubumayo-82" target="_blank" rel="noopener noreferrer" class="footer-link"
+            aria-label="GitHub Profile">
+            <svg class="footer-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+              <path
+                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+            </svg>
+            <span>GitHub</span>
+          </a>
+          <span class="footer-separator" aria-hidden="true">•</span>
+          <button id="openFeedbackModalBtn" class="footer-link-btn" title="Send Feedback or Feature Request">
+            <svg class="footer-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Feedback</span>
+          </button>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Theme Selector & Custom Color Picker              -->
+  <!-- ======================================================== -->
+  <div id="themeModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-labelledby="themeModalTitle">
+      <div class="modal-header">
+        <h2 id="themeModalTitle" class="modal-title">Customize Theme</h2>
+        <button class="close-modal-btn" id="closeThemeModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <h3 class="section-heading">Preset Themes</h3>
+
+        <div class="theme-presets-grid" id="themePresetsGrid">
+          <!-- 1. Matcha Dark (Default) -->
+          <button class="theme-card-btn active" data-preset="matcha">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #18221b 50%, #4ade80 50%);"></div>
+            <span class="theme-name">Matcha Dark</span>
+          </button>
+
+          <!-- 2. Cozy Coffee -->
+          <button class="theme-card-btn" data-preset="coffee">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #1e1713 50%, #f59e0b 50%);"></div>
+            <span class="theme-name">Cozy Coffee</span>
+          </button>
+
+          <!-- 3. Cyberpunk -->
+          <button class="theme-card-btn" data-preset="cyberpunk">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #090a10 50%, #00f0ff 50%);"></div>
+            <span class="theme-name">Cyberpunk</span>
+          </button>
+
+          <!-- 4. Midnight OLED -->
+          <button class="theme-card-btn" data-preset="midnight">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #000000 50%, #6366f1 50%);"></div>
+            <span class="theme-name">Midnight OLED</span>
+          </button>
+
+          <!-- 5. Pastel Sakura -->
+          <button class="theme-card-btn" data-preset="sakura">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #23161c 50%, #f472b6 50%);"></div>
+            <span class="theme-name">Pastel Sakura</span>
+          </button>
+
+          <!-- 6. Sage Focus -->
+          <button class="theme-card-btn" data-preset="sage">
+            <div class="theme-swatch"
+              style="background: linear-gradient(135deg, #F4F7F4 50%, #608066 50%); border-color: rgba(96,128,102,0.35);">
+            </div>
+            <span class="theme-name">Sage Focus</span>
+          </button>
+
+          <!-- 7. Calm Blush -->
+          <button class="theme-card-btn" data-preset="blush">
+            <div class="theme-swatch"
+              style="background: linear-gradient(135deg, #FAF5F5 50%, #C07D88 50%); border-color: rgba(192,125,136,0.35);">
+            </div>
+            <span class="theme-name">Calm Blush</span>
+          </button>
+
+          <!-- 8. Cerulean Serenity -->
+          <button class="theme-card-btn" data-preset="cerulean">
+            <div class="theme-swatch"
+              style="background: linear-gradient(135deg, #F0F4F8 50%, #5B82A6 50%); border-color: rgba(91,130,166,0.35);">
+            </div>
+            <span class="theme-name">Cerulean</span>
+          </button>
+        </div>
+
+        <h3 class="section-heading" style="margin-top: 1.5rem;">Custom Color Palette</h3>
+        <p class="section-desc">Create your own tailored focus aesthetic.</p>
+
+        <div class="custom-color-pickers">
+          <div class="color-picker-item">
+            <label for="customBgColor">Background</label>
+            <div class="picker-input-wrap">
+              <input type="color" id="customBgColor" value="#18221b">
+              <span class="color-hex-label" id="customBgHex">#18221b</span>
+            </div>
+          </div>
+
+          <div class="color-picker-item">
+            <label for="customCardColor">Card Surface</label>
+            <div class="picker-input-wrap">
+              <input type="color" id="customCardColor" value="#223027">
+              <span class="color-hex-label" id="customCardHex">#223027</span>
+            </div>
+          </div>
+
+          <div class="color-picker-item">
+            <label for="customAccentColor">Accent Color</label>
+            <div class="picker-input-wrap">
+              <input type="color" id="customAccentColor" value="#4ade80">
+              <span class="color-hex-label" id="customAccentHex">#4ade80</span>
+            </div>
+          </div>
+
+          <div class="color-picker-item">
+            <label for="customTextColor">Text Primary</label>
+            <div class="picker-input-wrap">
+              <input type="color" id="customTextColor" value="#f0fdf4">
+              <span class="color-hex-label" id="customTextHex">#f0fdf4</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="custom-theme-actions">
+          <button id="applyCustomThemeBtn" class="modal-btn primary">Apply Custom Colors</button>
+          <button id="resetDefaultThemeBtn" class="modal-btn secondary">Reset to Matcha Dark</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: How It Works & Cognitive Science Guide            -->
+  <!-- ======================================================== -->
+  <div id="scienceModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card modal-large" role="dialog" aria-labelledby="scienceModalTitle">
+      <div class="modal-header">
+        <div class="modal-header-text">
+          <h2 id="scienceModalTitle" class="modal-title">How PomoClock Works & The Science Behind It</h2>
+          <span class="modal-subtitle">Evidence-based productivity methodology & color ergonomics</span>
+        </div>
+        <button class="close-modal-btn" id="closeScienceModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body science-modal-content">
+        <article class="science-guide">
+          <section class="science-section">
+            <div class="science-badge">🧠 Focus Science</div>
+            <h3>The 25/5 Pomodoro Technique Protocol</h3>
+            <p>
+              The Pomodoro Technique, developed by Francesco Cirillo, aligns with human <strong>ultradian biological
+                rhythms</strong>. High-intensity cognitive performance naturally ebbs every 20 to 30 minutes due to
+              neurotransmitter depletion in the prefrontal cortex.
+            </p>
+            <div class="science-grid">
+              <div class="science-card">
+                <span class="science-card-icon">🎯</span>
+                <h4>25-Min Focus Sprint</h4>
+                <p>Single-tasking with zero context switching maximizes deep working memory and promotes flow state.</p>
+              </div>
+              <div class="science-card">
+                <span class="science-card-icon">☕</span>
+                <h4>5-Min Diffuse Break</h4>
+                <p>Allows the brain's Default Mode Network (DMN) to passively consolidate memories and solve complex
+                  problems.</p>
+              </div>
+              <div class="science-card">
+                <span class="science-card-icon">🌴</span>
+                <h4>15-Min Long Break</h4>
+                <p>Triggered every 4 cycles to reset mental fatigue and prevent burnout across extended study days.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="science-section">
+            <div class="science-badge">👁️ Color Ergonomics</div>
+            <h3>Low Visual Fatigue Theme Science</h3>
+            <p>
+              Standard digital screens often use stark `#000000` text on `#FFFFFF` backgrounds, which causes photopic
+              contrast glare, pupil spasms, and ocular fatigue over hours of continuous study.
+            </p>
+            <ul class="science-list">
+              <li>
+                <strong>Sage Focus (#F4F7F4 / #608066):</strong> Muted green wavelengths (520–560nm) fall directly at
+                the peak of human photopic sensitivity, reducing optical strain while subtly lowering sympathetic heart
+                rate.
+              </li>
+              <li>
+                <strong>Calm Blush (#FAF5F5 / #C07D88):</strong> Low-saturation warm rose tones reduce
+                blue-light-induced retinal stimulation and encourage parasympathetic relaxation during stressful study
+                periods.
+              </li>
+              <li>
+                <strong>Cerulean Serenity (#F0F4F8 / #5B82A6):</strong> Desaturated atmospheric sky-slate tones evoke
+                natural horizons, proven in environmental psychology to support analytical problem-solving and cognitive
+                stamina.
+              </li>
+            </ul>
+          </section>
+
+          <section class="science-section">
+            <div class="science-badge">⚡ Study Best Practices</div>
+            <div class="tips-box">
+              <p>💡 <strong>Pro Tip:</strong> During 5-minute short breaks, physically look away from all screens at an
+                object 20+ feet away (the 20-20-20 rule) and hydrate to refresh cognitive focus.</p>
+            </div>
+          </section>
+        </article>
+      </div>
+
+      <div class="modal-footer">
+        <button id="closeScienceModalBtnBottom" class="modal-btn primary">Got it, Let's Study!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Feedback & Feature Requests                       -->
+  <!-- ======================================================== -->
+  <div id="feedbackModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-labelledby="feedbackModalTitle">
+      <div class="modal-header">
+        <h2 id="feedbackModalTitle" class="modal-title">Share Your Feedback</h2>
+        <button class="close-modal-btn" id="closeFeedbackModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="section-desc">PomoClock is an open project crafted for productive studying. We'd love to hear your
+          thoughts, ideas, or feature requests!</p>
+
+        <form id="feedbackForm" onsubmit="event.preventDefault(); submitFeedback();">
+          <div class="input-field" style="margin-bottom: 1rem;">
+            <label for="feedbackType">Feedback Type</label>
+            <select id="feedbackType" class="select-input" style="width: 100%;">
+              <option value="feature">💡 Feature Request</option>
+              <option value="theme">🎨 New Theme Idea</option>
+              <option value="bug">🐛 Bug Report</option>
+              <option value="general">✨ General Thought / Love</option>
+            </select>
+          </div>
+
+          <div class="input-field" style="margin-bottom: 1.25rem;">
+            <label for="feedbackMessage">Message</label>
+            <textarea id="feedbackMessage" rows="4" class="input-field"
+              style="width: 100%; resize: vertical; border-radius: var(--radius-sm); padding: 0.6rem;"
+              placeholder="What would make PomoClock even better for your study sessions?" required></textarea>
+          </div>
+
+          <div class="modal-footer" style="margin-top: 0; padding-top: 0;">
+            <button type="submit" class="modal-btn primary">Submit Feedback</button>
+            <a href="https://github.com/blubumayo-82" target="_blank" rel="noopener noreferrer"
+              class="modal-btn secondary" style="text-align: center; text-decoration: none; line-height: 2.2;">GitHub
+              Issues</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: Timer Settings                                    -->
+  <!-- ======================================================== -->
+  <div id="settingsModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-labelledby="settingsModalTitle">
+      <div class="modal-header">
+        <h2 id="settingsModalTitle" class="modal-title">Timer & Audio Settings</h2>
+        <button class="close-modal-btn" id="closeSettingsModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="setting-group">
+          <h3 class="setting-group-title">Durations (minutes)</h3>
+
+          <div class="duration-inputs-grid">
+            <div class="input-field">
+              <label for="settingPomodoro">Pomodoro</label>
+              <input type="number" id="settingPomodoro" min="1" max="120" value="25">
+            </div>
+            <div class="input-field">
+              <label for="settingShortBreak">Short Break</label>
+              <input type="number" id="settingShortBreak" min="1" max="60" value="5">
+            </div>
+            <div class="input-field">
+              <label for="settingLongBreak">Long Break</label>
+              <input type="number" id="settingLongBreak" min="1" max="90" value="15">
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3 class="setting-group-title">Cycle Sequence</h3>
+          <div class="setting-row">
+            <div>
+              <label for="settingLongBreakInterval" class="setting-label">Long Break Interval</label>
+              <span class="setting-desc">Number of Pomodoro sessions before a long break</span>
+            </div>
+            <input type="number" id="settingLongBreakInterval" min="2" max="10" value="4" class="inline-input">
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <label for="settingAutoStartBreaks" class="setting-label">Auto-start Breaks</label>
+              <span class="setting-desc">Automatically start timer when a break begins</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingAutoStartBreaks">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <label for="settingAutoStartPomodoro" class="setting-label">Auto-start Pomodoros</label>
+              <span class="setting-desc">Automatically start next study session when break ends</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="settingAutoStartPomodoro">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h3 class="setting-group-title">Sound & Notifications</h3>
+
+          <div class="setting-row">
+            <div>
+              <label for="settingSoundType" class="setting-label">Chime Style</label>
+              <span class="setting-desc">Synthesized harmonic sound played on completion</span>
+            </div>
+            <select id="settingSoundType" class="select-input">
+              <option value="zen">Zen Singing Bowl</option>
+              <option value="bell">Gentle Bell</option>
+              <option value="digital">Digital Melody</option>
+              <option value="marimba">Marimba Glow</option>
+              <option value="beep">Classic Beep</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <label for="settingVolume" class="setting-label">Chime Volume</label>
+              <span class="setting-desc" id="volumePercentLabel">80%</span>
+            </div>
+            <div class="volume-slider-wrap">
+              <input type="range" id="settingVolume" min="0" max="100" value="80" class="slider-input">
+              <button id="testSoundBtn" class="test-sound-btn" title="Test Chime Sound">🔔 Test</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <label for="settingNotifications" class="setting-label">Desktop Notifications</label>
+              <span class="setting-desc">Show notification when timer finishes</span>
+            </div>
+            <button id="requestNotificationBtn" class="mini-btn">Enable Alerts</button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="saveSettingsBtn" class="modal-btn primary">Save Changes</button>
+          <button id="cancelSettingsBtn" class="modal-btn secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Canvas for celebration confetti -->
+  <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
+
+  <!-- Main JavaScript File -->
+  <script src="/static/js/script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,1221 @@
+/**
+ * PomoClock - Pomodoro Study Timer
+ * Core JavaScript Engine: Timer Mechanics, Web Audio Chime,
+ * Theme Management, Confetti Celebration, REST API & Analytics Dashboard
+ */
+
+// ==========================================================================
+// 1. Application State & Constants
+// ==========================================================================
+
+const CIRCLE_RADIUS = 140;
+const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS; // ~879.6459
+
+const state = {
+  // Mode durations in seconds
+  durations: {
+    pomodoro: 25 * 60,
+    short_break: 5 * 60,
+    long_break: 15 * 60
+  },
+  currentMode: 'pomodoro', // 'pomodoro' | 'short_break' | 'long_break'
+  timeLeft: 25 * 60,
+  totalDuration: 25 * 60,
+  isRunning: false,
+  timerInterval: null,
+  sessionStartTime: null,
+
+  // Cycle tracking
+  cycleCount: 1,
+  longBreakInterval: 4,
+  autoStartBreaks: false,
+  autoStartPomodoro: false,
+
+  // Audio settings
+  soundEnabled: true,
+  soundVolume: 0.8,
+  soundType: 'zen', // 'zen' | 'bell' | 'digital' | 'marimba' | 'beep'
+  audioContext: null,
+
+  // Theme settings (Default: Matcha Dark)
+  theme: 'matcha',
+  customColors: {
+    bg: '#18221b',
+    card: '#223027',
+    accent: '#4ade80',
+    text: '#f0fdf4'
+  },
+
+  // Task goal
+  currentTask: ''
+};
+
+// Mode metadata configuration
+const MODE_CONFIG = {
+  pomodoro: {
+    title: 'Focus',
+    statusText: 'Focusing...',
+    readyText: 'Ready to Focus',
+    icon: '🎯'
+  },
+  short_break: {
+    title: 'Short Break',
+    statusText: 'Relax & Recharge',
+    readyText: 'Take a Short Break',
+    icon: '☕'
+  },
+  long_break: {
+    title: 'Long Break',
+    statusText: 'Rest & Recover',
+    readyText: 'Enjoy a Long Break',
+    icon: '🌴'
+  }
+};
+
+
+// ==========================================================================
+// 2. DOM Element Selectors
+// ==========================================================================
+
+const DOM = {
+  // Timer elements
+  timeDisplay: document.getElementById('timeDisplay'),
+  statusBadge: document.getElementById('statusBadge'),
+  progressCircle: document.getElementById('progressCircle'),
+  playIcon: document.getElementById('playIcon'),
+  pauseIcon: document.getElementById('pauseIcon'),
+  startPauseText: document.getElementById('startPauseText'),
+  startPauseBtn: document.getElementById('startPauseBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  skipBtn: document.getElementById('skipBtn'),
+  cycleIndicator: document.getElementById('cycleIndicator'),
+  cycleLabel: document.getElementById('cycleLabel'),
+  
+  // Tabs & Badges
+  tabPomodoro: document.getElementById('tabPomodoro'),
+  tabShortBreak: document.getElementById('tabShortBreak'),
+  tabLongBreak: document.getElementById('tabLongBreak'),
+  badgePomodoro: document.getElementById('badgePomodoro'),
+  badgeShortBreak: document.getElementById('badgeShortBreak'),
+  badgeLongBreak: document.getElementById('badgeLongBreak'),
+  
+  // Task input
+  currentTaskInput: document.getElementById('currentTaskInput'),
+  clearTaskBtn: document.getElementById('clearTaskBtn'),
+
+  // Header controls
+  soundToggleBtn: document.getElementById('soundToggleBtn'),
+  soundWave: document.getElementById('soundWave'),
+  openThemeModalBtn: document.getElementById('openThemeModalBtn'),
+  openSettingsModalBtn: document.getElementById('openSettingsModalBtn'),
+
+  // Stats elements
+  statTotalHours: document.getElementById('statTotalHours'),
+  statTotalMinutes: document.getElementById('statTotalMinutes'),
+  statCompletedCount: document.getElementById('statCompletedCount'),
+  statTotalSessions: document.getElementById('statTotalSessions'),
+  statTodayMinutes: document.getElementById('statTodayMinutes'),
+  statTodaySessions: document.getElementById('statTodaySessions'),
+  statStreakDays: document.getElementById('statStreakDays'),
+  chartWeekTotal: document.getElementById('chartWeekTotal'),
+  activityChart: document.getElementById('activityChart'),
+  historyTableBody: document.getElementById('historyTableBody'),
+  clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+
+  // Theme modal elements
+  themeModal: document.getElementById('themeModal'),
+  closeThemeModalBtn: document.getElementById('closeThemeModalBtn'),
+  themePresetsGrid: document.getElementById('themePresetsGrid'),
+  customBgColor: document.getElementById('customBgColor'),
+  customCardColor: document.getElementById('customCardColor'),
+  customAccentColor: document.getElementById('customAccentColor'),
+  customTextColor: document.getElementById('customTextColor'),
+  customBgHex: document.getElementById('customBgHex'),
+  customCardHex: document.getElementById('customCardHex'),
+  customAccentHex: document.getElementById('customAccentHex'),
+  customTextHex: document.getElementById('customTextHex'),
+  applyCustomThemeBtn: document.getElementById('applyCustomThemeBtn'),
+  resetDefaultThemeBtn: document.getElementById('resetDefaultThemeBtn'),
+
+  // Settings modal elements
+  settingsModal: document.getElementById('settingsModal'),
+  closeSettingsModalBtn: document.getElementById('closeSettingsModalBtn'),
+  settingPomodoro: document.getElementById('settingPomodoro'),
+  settingShortBreak: document.getElementById('settingShortBreak'),
+  settingLongBreak: document.getElementById('settingLongBreak'),
+  settingLongBreakInterval: document.getElementById('settingLongBreakInterval'),
+  settingAutoStartBreaks: document.getElementById('settingAutoStartBreaks'),
+  settingAutoStartPomodoro: document.getElementById('settingAutoStartPomodoro'),
+  settingSoundType: document.getElementById('settingSoundType'),
+  settingVolume: document.getElementById('settingVolume'),
+  volumePercentLabel: document.getElementById('volumePercentLabel'),
+  testSoundBtn: document.getElementById('testSoundBtn'),
+  requestNotificationBtn: document.getElementById('requestNotificationBtn'),
+  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+  cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
+
+  // Science & Guide modal elements
+  scienceModal: document.getElementById('scienceModal'),
+  openScienceModalHeaderBtn: document.getElementById('openScienceModalHeaderBtn'),
+  openScienceModalFooterBtn: document.getElementById('openScienceModalFooterBtn'),
+  closeScienceModalBtn: document.getElementById('closeScienceModalBtn'),
+  closeScienceModalBtnBottom: document.getElementById('closeScienceModalBtnBottom'),
+
+  // Feedback modal elements
+  feedbackModal: document.getElementById('feedbackModal'),
+  openFeedbackModalBtn: document.getElementById('openFeedbackModalBtn'),
+  closeFeedbackModalBtn: document.getElementById('closeFeedbackModalBtn'),
+  feedbackForm: document.getElementById('feedbackForm'),
+
+  // Feedback & Canvas
+  confettiCanvas: document.getElementById('confettiCanvas'),
+  toastContainer: document.getElementById('toastContainer')
+};
+
+
+// ==========================================================================
+// 3. Audio Chime Synthesizer (Web Audio API)
+// ==========================================================================
+
+function getAudioContext() {
+  if (!state.audioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    state.audioContext = new AudioCtx();
+  }
+  if (state.audioContext.state === 'suspended') {
+    state.audioContext.resume();
+  }
+  return state.audioContext;
+}
+
+/**
+ * Plays synthesized harmonic chime sounds with zero external audio assets.
+ */
+function playChimeSound(type = state.soundType) {
+  if (!state.soundEnabled || state.soundVolume <= 0) return;
+
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(state.soundVolume, now);
+    masterGain.connect(ctx.destination);
+
+    if (type === 'zen') {
+      // Tibetan Singing Bowl Simulation (rich low fundamental + soft shimmer harmonics)
+      const freqs = [216, 432, 648, 864];
+      const gains = [0.6, 0.3, 0.15, 0.08];
+      
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(gains[idx], now + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
+
+        osc.connect(gainNode);
+        gainNode.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + 4.0);
+      });
+
+    } else if (type === 'bell') {
+      // High Crystal Bell Chord (A5, C#6, E6, A6)
+      const chord = [880, 1108.73, 1318.51, 1760];
+      chord.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + (i * 0.04));
+
+        gain.gain.setValueAtTime(0.35 / (i + 1), now + (i * 0.04));
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5 + (i * 0.1));
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + (i * 0.04));
+        osc.stop(now + 2.8);
+      });
+
+    } else if (type === 'digital') {
+      // Upbeat Digital Arpeggio (C5 -> E5 -> G5 -> C6)
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + (i * 0.12));
+
+        gain.gain.setValueAtTime(0.4, now + (i * 0.12));
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.12) + 0.4);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + (i * 0.12));
+        osc.stop(now + (i * 0.12) + 0.45);
+      });
+
+    } else if (type === 'marimba') {
+      // Warm Marimba Pluck Chord
+      const notes = [440, 554.37, 659.25];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + (i * 0.08));
+
+        gain.gain.setValueAtTime(0.5, now + (i * 0.08));
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + (i * 0.08) + 1.2);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + (i * 0.08));
+        osc.stop(now + (i * 0.08) + 1.3);
+      });
+
+    } else {
+      // Classic Double Beep
+      [0, 0.2].forEach(delay => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now + delay);
+
+        gain.gain.setValueAtTime(0.3, now + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.12);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.15);
+      });
+    }
+  } catch (err) {
+    console.warn('Web Audio synthesis not allowed before user interaction:', err);
+  }
+}
+
+
+// ==========================================================================
+// 4. Confetti Celebration Particle System
+// ==========================================================================
+
+let confettiAnimationId = null;
+
+function triggerConfettiBurst() {
+  const canvas = DOM.confettiCanvas;
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  const colors = ['#4ade80', '#22c55e', '#00f0ff', '#f59e0b', '#f472b6', '#a855f7', '#fbbf24'];
+
+  for (let i = 0; i < 90; i++) {
+    particles.push({
+      x: canvas.width / 2 + (Math.random() * 100 - 50),
+      y: canvas.height * 0.45,
+      vx: (Math.random() - 0.5) * 14,
+      vy: (Math.random() - 0.8) * 16,
+      size: Math.random() * 8 + 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 10,
+      opacity: 1,
+      decay: Math.random() * 0.015 + 0.01
+    });
+  }
+
+  if (confettiAnimationId) {
+    cancelAnimationFrame(confettiAnimationId);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let aliveCount = 0;
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.35; // gravity
+      p.rotation += p.rotationSpeed;
+      p.opacity -= p.decay;
+
+      if (p.opacity > 0) {
+        aliveCount++;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.opacity);
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+      }
+    });
+
+    if (aliveCount > 0) {
+      confettiAnimationId = requestAnimationFrame(render);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      confettiAnimationId = null;
+    }
+  }
+
+  render();
+}
+
+
+// ==========================================================================
+// 5. Timer Engine & UI Updates
+// ==========================================================================
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+  const formatted = formatTime(state.timeLeft);
+  DOM.timeDisplay.textContent = formatted;
+
+  // Update browser document title dynamically as "(MM:SS) PomoClock"
+  document.title = `(${formatted}) PomoClock`;
+
+  // Update circular SVG progress stroke
+  if (DOM.progressCircle) {
+    const fraction = state.totalDuration > 0 ? state.timeLeft / state.totalDuration : 0;
+    const strokeOffset = CIRCUMFERENCE - (fraction * CIRCUMFERENCE);
+    DOM.progressCircle.style.strokeDashoffset = strokeOffset;
+  }
+}
+
+function updateStatusBadge() {
+  const modeInfo = MODE_CONFIG[state.currentMode];
+  if (state.isRunning) {
+    DOM.statusBadge.textContent = modeInfo.statusText;
+    DOM.statusBadge.classList.add('running');
+  } else if (state.timeLeft === state.totalDuration) {
+    DOM.statusBadge.textContent = modeInfo.readyText;
+    DOM.statusBadge.classList.remove('running');
+  } else {
+    DOM.statusBadge.textContent = 'Paused';
+    DOM.statusBadge.classList.remove('running');
+  }
+}
+
+function updateCycleIndicators() {
+  DOM.cycleLabel.textContent = `Session ${state.cycleCount} of ${state.longBreakInterval}`;
+  
+  if (DOM.cycleIndicator) {
+    DOM.cycleIndicator.innerHTML = '';
+    for (let i = 1; i <= state.longBreakInterval; i++) {
+      const dot = document.createElement('span');
+      dot.className = `cycle-dot ${i <= state.cycleCount ? 'active' : ''}`;
+      DOM.cycleIndicator.appendChild(dot);
+    }
+  }
+}
+
+function updateModeTabs() {
+  [DOM.tabPomodoro, DOM.tabShortBreak, DOM.tabLongBreak].forEach(tab => {
+    if (tab) {
+      const mode = tab.getAttribute('data-mode');
+      tab.classList.toggle('active', mode === state.currentMode);
+    }
+  });
+
+  // Update badges
+  if (DOM.badgePomodoro) DOM.badgePomodoro.textContent = `${Math.round(state.durations.pomodoro / 60)}m`;
+  if (DOM.badgeShortBreak) DOM.badgeShortBreak.textContent = `${Math.round(state.durations.short_break / 60)}m`;
+  if (DOM.badgeLongBreak) DOM.badgeLongBreak.textContent = `${Math.round(state.durations.long_break / 60)}m`;
+}
+
+function switchMode(newMode, autoStart = false) {
+  if (state.isRunning) {
+    pauseTimer();
+  }
+
+  state.currentMode = newMode;
+  state.totalDuration = state.durations[newMode];
+  state.timeLeft = state.totalDuration;
+  state.sessionStartTime = null;
+
+  updateModeTabs();
+  updateTimerDisplay();
+  updateStatusBadge();
+
+  if (autoStart) {
+    startTimer();
+  }
+}
+
+function startTimer() {
+  if (state.isRunning) return;
+
+  // Web Audio Context wake-up
+  getAudioContext();
+
+  state.isRunning = true;
+  if (!state.sessionStartTime) {
+    state.sessionStartTime = new Date().toISOString();
+  }
+
+  // Toggle button icons & text
+  DOM.playIcon.classList.add('hidden');
+  DOM.pauseIcon.classList.remove('hidden');
+  DOM.startPauseText.textContent = 'Pause';
+  DOM.startPauseBtn.classList.add('active');
+
+  updateStatusBadge();
+
+  state.timerInterval = setInterval(() => {
+    if (state.timeLeft > 0) {
+      state.timeLeft--;
+      updateTimerDisplay();
+    } else {
+      handleTimerComplete();
+    }
+  }, 1000);
+}
+
+function pauseTimer() {
+  if (!state.isRunning) return;
+
+  state.isRunning = false;
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+
+  DOM.playIcon.classList.remove('hidden');
+  DOM.pauseIcon.classList.add('hidden');
+  DOM.startPauseText.textContent = 'Start';
+  DOM.startPauseBtn.classList.remove('active');
+
+  updateStatusBadge();
+  const formatted = formatTime(state.timeLeft);
+  document.title = `(${formatted}) PomoClock`;
+}
+
+function toggleStartPause() {
+  if (state.isRunning) {
+    pauseTimer();
+  } else {
+    startTimer();
+  }
+}
+
+function resetTimer() {
+  const wasRunning = state.isRunning;
+  pauseTimer();
+  state.timeLeft = state.totalDuration;
+  state.sessionStartTime = null;
+  updateTimerDisplay();
+  updateStatusBadge();
+  showToast('Timer reset', 'info');
+}
+
+function skipSession() {
+  const previousMode = state.currentMode;
+  pauseTimer();
+
+  // Record as skipped session if partially ran
+  const durationCompleted = (state.totalDuration - state.timeLeft) / 60.0;
+  if (durationCompleted >= 0.5) {
+    recordSession({
+      mode: previousMode,
+      duration_minutes: Math.round(durationCompleted * 10) / 10,
+      start_time: state.sessionStartTime || new Date().toISOString(),
+      end_time: new Date().toISOString(),
+      status: 'skipped',
+      task_name: state.currentTask || 'Skipped Session'
+    });
+  }
+
+  transitionToNextMode(false);
+  showToast(`Skipped ${MODE_CONFIG[previousMode].title}`, 'info');
+}
+
+/**
+ * Executes when timer countdown reaches 00:00.
+ */
+async function handleTimerComplete() {
+  pauseTimer();
+  const completedMode = state.currentMode;
+  const durationMins = Math.round((state.totalDuration / 60) * 10) / 10;
+  const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
+  const endTime = new Date().toISOString();
+
+  // 1. Play audio chime
+  playChimeSound();
+
+  // 2. Desktop notification
+  showDesktopNotification(completedMode);
+
+  // 3. Record session in SQLite database via Flask API
+  await recordSession({
+    mode: completedMode,
+    duration_minutes: durationMins,
+    start_time: startTime,
+    end_time: endTime,
+    status: 'completed',
+    task_name: state.currentTask || (completedMode === 'pomodoro' ? 'Focus Session' : 'Break Time')
+  });
+
+  // 4. Confetti & Celebration for completed pomodoro
+  if (completedMode === 'pomodoro') {
+    triggerConfettiBurst();
+    showToast(`🎉 Great job! Completed ${durationMins}m focus session.`, 'success');
+  } else {
+    showToast(`⚡ Break finished! Ready for another round?`, 'info');
+  }
+
+  // 5. Refresh analytics
+  await fetchStatistics();
+
+  // 6. Transition to the next cycle mode
+  transitionToNextMode(true);
+}
+
+function transitionToNextMode(isNaturalCompletion = true) {
+  if (state.currentMode === 'pomodoro') {
+    if (state.cycleCount >= state.longBreakInterval) {
+      // Time for a long break!
+      state.cycleCount = 1;
+      updateCycleIndicators();
+      switchMode('long_break', isNaturalCompletion && state.autoStartBreaks);
+    } else {
+      // Short break
+      state.cycleCount++;
+      updateCycleIndicators();
+      switchMode('short_break', isNaturalCompletion && state.autoStartBreaks);
+    }
+  } else {
+    // Break finished -> back to Pomodoro
+    switchMode('pomodoro', isNaturalCompletion && state.autoStartPomodoro);
+  }
+}
+
+
+// ==========================================================================
+// 6. REST API Client & Statistics Rendering
+// ==========================================================================
+
+async function recordSession(payload) {
+  try {
+    const response = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      console.error('Session recording error:', data.error);
+    }
+    return data;
+  } catch (err) {
+    console.error('Failed to post session to backend:', err);
+  }
+}
+
+async function fetchStatistics() {
+  try {
+    const response = await fetch('/api/stats');
+    const result = await response.json();
+
+    if (result.success && result.stats) {
+      renderStatistics(result.stats);
+    }
+  } catch (err) {
+    console.error('Failed to fetch statistics:', err);
+    if (DOM.activityChart) {
+      DOM.activityChart.innerHTML = `<div class="chart-loading">Could not load stats</div>`;
+    }
+  }
+}
+
+function renderStatistics(stats) {
+  // KPI Cards
+  DOM.statTotalHours.innerHTML = `${stats.total_focus_hours} <small>hrs</small>`;
+  DOM.statTotalMinutes.textContent = `${stats.total_focus_minutes} mins recorded`;
+  DOM.statCompletedCount.textContent = stats.completed_pomodoros;
+  DOM.statTotalSessions.textContent = `${stats.total_sessions} total sessions`;
+  DOM.statTodayMinutes.innerHTML = `${stats.today_focus_minutes} <small>min</small>`;
+  DOM.statTodaySessions.textContent = `${stats.today_pomodoros} sessions today`;
+  DOM.statStreakDays.innerHTML = `${stats.current_streak_days} <small>days</small>`;
+
+  // Weekly Total Badge
+  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + d.focus_minutes, 0);
+  DOM.chartWeekTotal.textContent = `${(weekTotalMins / 60).toFixed(1)}h this week`;
+
+  // Weekly Activity Bar Chart
+  renderWeeklyChart(stats.weekly_activity || []);
+
+  // Recent Sessions Table
+  renderRecentSessions(stats.recent_sessions || []);
+}
+
+function renderWeeklyChart(activity) {
+  if (!DOM.activityChart) return;
+
+  if (!activity.length) {
+    DOM.activityChart.innerHTML = `<div class="chart-loading">No activity recorded this week</div>`;
+    return;
+  }
+
+  const maxMinutes = Math.max(...activity.map(a => a.focus_minutes), 30); // minimum scale 30m
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  let html = '';
+  activity.forEach(item => {
+    const heightPercent = Math.min(100, Math.round((item.focus_minutes / maxMinutes) * 100));
+    const isToday = item.date === todayStr;
+
+    html += `
+      <div class="chart-col ${isToday ? 'today' : ''}">
+        <div class="chart-tooltip">${item.focus_minutes} mins (${item.completed_count} 🍅)</div>
+        <div class="chart-bar-wrap">
+          <div class="chart-bar" style="height: ${Math.max(6, heightPercent)}%;"></div>
+        </div>
+        <span class="chart-day-label">${item.day_name}</span>
+      </div>
+    `;
+  });
+
+  DOM.activityChart.innerHTML = html;
+}
+
+function renderRecentSessions(sessions) {
+  if (!DOM.historyTableBody) return;
+
+  if (!sessions || sessions.length === 0) {
+    DOM.historyTableBody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-state">No sessions recorded yet. Complete a timer to view logs!</td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  sessions.forEach(s => {
+    let modeLabel = 'Focus';
+    if (s.mode === 'short_break') modeLabel = 'Short Break';
+    if (s.mode === 'long_break') modeLabel = 'Long Break';
+
+    // Format start time
+    let formattedTime = 'Just now';
+    try {
+      const d = new Date(s.start_time);
+      formattedTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
+                      ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')';
+    } catch (e) {
+      formattedTime = s.start_time;
+    }
+
+    html += `
+      <tr>
+        <td><strong>${modeLabel}</strong></td>
+        <td>${escapeHtml(s.task_name || 'Study Session')}</td>
+        <td>${s.duration_minutes}m</td>
+        <td><span class="status-badge ${s.status}">${s.status}</span></td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">${formattedTime}</td>
+      </tr>
+    `;
+  });
+
+  DOM.historyTableBody.innerHTML = html;
+}
+
+async function handleClearHistory() {
+  if (!confirm('Are you sure you want to clear all study logs and reset stats?')) return;
+
+  try {
+    const res = await fetch('/api/sessions', { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('All session logs cleared', 'success');
+      await fetchStatistics();
+    }
+  } catch (err) {
+    showToast('Failed to clear history', 'error');
+  }
+}
+
+
+// ==========================================================================
+// 7. Theme Engine & Custom Color System
+// ==========================================================================
+
+const THEME_PRESETS = {
+  matcha: { bg: '#18221b', card: '#223027', accent: '#4ade80', text: '#f0fdf4' },
+  coffee: { bg: '#1e1713', card: '#2d221c', accent: '#f59e0b', text: '#fef3c7' },
+  cyberpunk: { bg: '#090a10', card: '#141724', accent: '#00f0ff', text: '#f8fafc' },
+  midnight: { bg: '#000000', card: '#14141c', accent: '#6366f1', text: '#ffffff' },
+  sakura: { bg: '#23161c', card: '#34202a', accent: '#f472b6', text: '#fff1f2' },
+  sage: { bg: '#F4F7F4', card: '#FFFFFF', accent: '#608066', text: '#2D3748' },
+  blush: { bg: '#FAF5F5', card: '#FFFFFF', accent: '#C07D88', text: '#3B2E31' },
+  cerulean: { bg: '#F0F4F8', card: '#FFFFFF', accent: '#5B82A6', text: '#253342' }
+};
+
+function applyTheme(themeName, customColors = null, save = true) {
+  state.theme = themeName;
+  document.body.setAttribute('data-theme', themeName);
+
+  // Update preset buttons active state
+  document.querySelectorAll('.theme-card-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-preset') === themeName);
+  });
+
+  if (themeName === 'custom' && customColors) {
+    state.customColors = { ...customColors };
+    document.documentElement.style.setProperty('--bg-primary', customColors.bg);
+    document.documentElement.style.setProperty('--bg-secondary', adjustColorBrightness(customColors.bg, 10));
+    document.documentElement.style.setProperty('--bg-card', hexToRgba(customColors.card, 0.9));
+    document.documentElement.style.setProperty('--bg-card-hover', customColors.card);
+    document.documentElement.style.setProperty('--accent-color', customColors.accent);
+    document.documentElement.style.setProperty('--accent-secondary', adjustColorBrightness(customColors.accent, -15));
+    document.documentElement.style.setProperty('--accent-glow', hexToRgba(customColors.accent, 0.35));
+    document.documentElement.style.setProperty('--border-color', hexToRgba(customColors.accent, 0.22));
+    document.documentElement.style.setProperty('--text-primary', customColors.text);
+    document.documentElement.style.setProperty('--text-secondary', hexToRgba(customColors.text, 0.85));
+    document.documentElement.style.setProperty('--text-muted', hexToRgba(customColors.text, 0.6));
+
+    // Update color picker values
+    DOM.customBgColor.value = customColors.bg;
+    DOM.customCardColor.value = customColors.card;
+    DOM.customAccentColor.value = customColors.accent;
+    DOM.customTextColor.value = customColors.text;
+    updateHexLabels();
+  } else {
+    // Clear inline custom overrides so CSS stylesheet theme variables take effect
+    [
+      '--bg-primary', '--bg-secondary', '--bg-card', '--bg-card-hover',
+      '--accent-color', '--accent-secondary', '--accent-glow', '--border-color',
+      '--text-primary', '--text-secondary', '--text-muted'
+    ].forEach(prop => document.documentElement.style.removeProperty(prop));
+
+    // Populate pickers with preset values for quick tweaking
+    const preset = THEME_PRESETS[themeName] || THEME_PRESETS.matcha;
+    DOM.customBgColor.value = preset.bg;
+    DOM.customCardColor.value = preset.card;
+    DOM.customAccentColor.value = preset.accent;
+    DOM.customTextColor.value = preset.text;
+    updateHexLabels();
+  }
+
+  if (save) {
+    localStorage.setItem('pomoclock_theme', themeName);
+    if (customColors) {
+      localStorage.setItem('pomoclock_custom_colors', JSON.stringify(customColors));
+    }
+    // Sync to backend preferences asynchronously
+    syncPreferences({ theme: themeName });
+  }
+}
+
+function updateHexLabels() {
+  DOM.customBgHex.textContent = DOM.customBgColor.value;
+  DOM.customCardHex.textContent = DOM.customCardColor.value;
+  DOM.customAccentHex.textContent = DOM.customAccentColor.value;
+  DOM.customTextHex.textContent = DOM.customTextColor.value;
+}
+
+function hexToRgba(hex, alpha) {
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  const num = parseInt(c, 16);
+  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+}
+
+function adjustColorBrightness(hex, percent) {
+  let num = parseInt(hex.replace('#', ''), 16);
+  let amt = Math.round(2.55 * percent);
+  let R = (num >> 16) + amt;
+  let G = (num >> 8 & 0x00FF) + amt;
+  let B = (num & 0x0000FF) + amt;
+  return '#' + (
+    0x1000000 +
+    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+    (B < 255 ? (B < 1 ? 0 : B) : 255)
+  ).toString(16).slice(1);
+}
+
+
+// ==========================================================================
+// 8. Desktop Notifications & Toast Alerts
+// ==========================================================================
+
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+
+  DOM.toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+function showDesktopNotification(mode) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const modeInfo = MODE_CONFIG[mode];
+  const title = mode === 'pomodoro' ? '🍅 Focus Session Completed!' : '⚡ Break Time Over!';
+  const body = mode === 'pomodoro' 
+    ? `Awesome work! Take a well-deserved ${state.cycleCount >= state.longBreakInterval ? 'long' : 'short'} break.`
+    : `Time to jump back into your study zone!`;
+
+  try {
+    new Notification(title, {
+      body: body,
+      icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>'
+    });
+  } catch (err) {
+    console.warn('Desktop notification dispatch failed:', err);
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showToast('Browser notifications not supported in this environment', 'error');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    showToast('Notifications enabled!', 'success');
+    DOM.requestNotificationBtn.textContent = 'Alerts Enabled ✓';
+    DOM.requestNotificationBtn.disabled = true;
+  } else {
+    showToast('Notification permission denied', 'error');
+  }
+}
+
+
+// ==========================================================================
+// 9. Settings & Preferences Management
+// ==========================================================================
+
+function loadStoredSettings() {
+  // Load Theme (Default: Matcha Dark)
+  const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'matcha';
+  const savedCustom = localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
+  if (savedTheme === 'custom' && savedCustom) {
+    applyTheme('custom', JSON.parse(savedCustom), false);
+  } else {
+    applyTheme(savedTheme, null, false);
+  }
+
+  // Load Custom Durations
+  const savedPomo = parseInt(localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
+  const savedShort = parseInt(localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
+  const savedLong = parseInt(localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
+  const savedInterval = parseInt(localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
+  const savedAutoBreaks = (localStorage.getItem('pomoclock_auto_breaks') || localStorage.getItem('focusflow_auto_breaks')) === 'true';
+  const savedAutoPomo = (localStorage.getItem('pomoclock_auto_pomo') || localStorage.getItem('focusflow_auto_pomo')) === 'true';
+  const savedSound = localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
+  const savedVolume = parseFloat(localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
+
+  if (!isNaN(savedPomo) && savedPomo > 0) state.durations.pomodoro = savedPomo * 60;
+  if (!isNaN(savedShort) && savedShort > 0) state.durations.short_break = savedShort * 60;
+  if (!isNaN(savedLong) && savedLong > 0) state.durations.long_break = savedLong * 60;
+  if (!isNaN(savedInterval) && savedInterval >= 2) state.longBreakInterval = savedInterval;
+  state.autoStartBreaks = savedAutoBreaks;
+  state.autoStartPomodoro = savedAutoPomo;
+  state.soundType = savedSound;
+  if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
+
+  // Initialize current timer values
+  state.totalDuration = state.durations[state.currentMode];
+  state.timeLeft = state.totalDuration;
+
+  // Populate settings modal inputs
+  DOM.settingPomodoro.value = Math.round(state.durations.pomodoro / 60);
+  DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
+  DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
+  DOM.settingLongBreakInterval.value = state.longBreakInterval;
+  DOM.settingAutoStartBreaks.checked = state.autoStartBreaks;
+  DOM.settingAutoStartPomodoro.checked = state.autoStartPomodoro;
+  DOM.settingSoundType.value = state.soundType;
+  DOM.settingVolume.value = Math.round(state.soundVolume * 100);
+  DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
+
+  // Notification button state
+  if ('Notification' in window && Notification.permission === 'granted') {
+    DOM.requestNotificationBtn.textContent = 'Alerts Enabled ✓';
+    DOM.requestNotificationBtn.disabled = true;
+  }
+}
+
+function saveSettingsFromModal() {
+  const pomoMins = parseInt(DOM.settingPomodoro.value, 10);
+  const shortMins = parseInt(DOM.settingShortBreak.value, 10);
+  const longMins = parseInt(DOM.settingLongBreak.value, 10);
+  const interval = parseInt(DOM.settingLongBreakInterval.value, 10);
+
+  if (pomoMins > 0) state.durations.pomodoro = pomoMins * 60;
+  if (shortMins > 0) state.durations.short_break = shortMins * 60;
+  if (longMins > 0) state.durations.long_break = longMins * 60;
+  if (interval >= 2) state.longBreakInterval = interval;
+
+  state.autoStartBreaks = DOM.settingAutoStartBreaks.checked;
+  state.autoStartPomodoro = DOM.settingAutoStartPomodoro.checked;
+  state.soundType = DOM.settingSoundType.value;
+  state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
+
+  // Save to localStorage
+  localStorage.setItem('pomoclock_dur_pomo', pomoMins);
+  localStorage.setItem('pomoclock_dur_short', shortMins);
+  localStorage.setItem('pomoclock_dur_long', longMins);
+  localStorage.setItem('pomoclock_cycle_interval', interval);
+  localStorage.setItem('pomoclock_auto_breaks', state.autoStartBreaks);
+  localStorage.setItem('pomoclock_auto_pomo', state.autoStartPomodoro);
+  localStorage.setItem('pomoclock_sound_type', state.soundType);
+  localStorage.setItem('pomoclock_sound_volume', state.soundVolume);
+
+  // Sync to backend
+  syncPreferences({
+    pomodoro_duration: pomoMins,
+    short_break_duration: shortMins,
+    long_break_duration: longMins,
+    sound_type: state.soundType
+  });
+
+  // Apply new durations if paused
+  if (!state.isRunning) {
+    state.totalDuration = state.durations[state.currentMode];
+    state.timeLeft = state.totalDuration;
+    updateTimerDisplay();
+  }
+
+  updateModeTabs();
+  updateCycleIndicators();
+  closeModal(DOM.settingsModal);
+  showToast('Settings saved successfully', 'success');
+}
+
+async function syncPreferences(prefs) {
+  try {
+    await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefs)
+    });
+  } catch (e) {
+    // Non-blocking preference sync
+  }
+}
+
+
+// ==========================================================================
+// 10. Modals, Event Listeners & Keyboard Shortcuts
+// ==========================================================================
+
+function openModal(modal) {
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal(modal) {
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
+function setupEventListeners() {
+  // Timer Controls
+  DOM.startPauseBtn.addEventListener('click', toggleStartPause);
+  DOM.resetBtn.addEventListener('click', resetTimer);
+  DOM.skipBtn.addEventListener('click', skipSession);
+
+  // Mode Tabs
+  DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
+  DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
+  DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
+
+  // Task Input
+  DOM.currentTaskInput.addEventListener('input', (e) => {
+    state.currentTask = e.target.value.trim();
+  });
+  DOM.clearTaskBtn.addEventListener('click', () => {
+    DOM.currentTaskInput.value = '';
+    state.currentTask = '';
+    DOM.currentTaskInput.focus();
+  });
+
+  // Sound Toggle (Mute / Unmute)
+  DOM.soundToggleBtn.addEventListener('click', () => {
+    state.soundEnabled = !state.soundEnabled;
+    DOM.soundToggleBtn.style.opacity = state.soundEnabled ? '1' : '0.4';
+    DOM.soundWave.style.display = state.soundEnabled ? 'block' : 'none';
+    showToast(state.soundEnabled ? 'Sound enabled' : 'Sound muted', 'info');
+  });
+
+  // Modals Open / Close (Theme, Settings, Science, Feedback)
+  DOM.openThemeModalBtn.addEventListener('click', () => openModal(DOM.themeModal));
+  DOM.closeThemeModalBtn.addEventListener('click', () => closeModal(DOM.themeModal));
+  
+  DOM.openSettingsModalBtn.addEventListener('click', () => openModal(DOM.settingsModal));
+  DOM.closeSettingsModalBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
+  DOM.cancelSettingsBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
+  DOM.saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
+
+  // Science & Guide Modal Open / Close
+  if (DOM.openScienceModalHeaderBtn) {
+    DOM.openScienceModalHeaderBtn.addEventListener('click', () => openModal(DOM.scienceModal));
+  }
+  if (DOM.openScienceModalFooterBtn) {
+    DOM.openScienceModalFooterBtn.addEventListener('click', () => openModal(DOM.scienceModal));
+  }
+  if (DOM.closeScienceModalBtn) {
+    DOM.closeScienceModalBtn.addEventListener('click', () => closeModal(DOM.scienceModal));
+  }
+  if (DOM.closeScienceModalBtnBottom) {
+    DOM.closeScienceModalBtnBottom.addEventListener('click', () => closeModal(DOM.scienceModal));
+  }
+
+  // Feedback Modal Open / Close
+  if (DOM.openFeedbackModalBtn) {
+    DOM.openFeedbackModalBtn.addEventListener('click', () => openModal(DOM.feedbackModal));
+  }
+  if (DOM.closeFeedbackModalBtn) {
+    DOM.closeFeedbackModalBtn.addEventListener('click', () => closeModal(DOM.feedbackModal));
+  }
+
+  // Backdrop click to close any modal
+  [DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(modal => {
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal(modal);
+      });
+    }
+  });
+
+  // Theme Preset Buttons
+  DOM.themePresetsGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.theme-card-btn');
+    if (btn) {
+      const preset = btn.getAttribute('data-preset');
+      applyTheme(preset, null, true);
+      showToast(`Switched theme to ${preset.charAt(0).toUpperCase() + preset.slice(1)}`, 'success');
+    }
+  });
+
+  // Custom Color Pickers
+  [DOM.customBgColor, DOM.customCardColor, DOM.customAccentColor, DOM.customTextColor].forEach(picker => {
+    picker.addEventListener('input', updateHexLabels);
+  });
+
+  DOM.applyCustomThemeBtn.addEventListener('click', () => {
+    const customColors = {
+      bg: DOM.customBgColor.value,
+      card: DOM.customCardColor.value,
+      accent: DOM.customAccentColor.value,
+      text: DOM.customTextColor.value
+    };
+    applyTheme('custom', customColors, true);
+    showToast('Custom theme applied!', 'success');
+  });
+
+  DOM.resetDefaultThemeBtn.addEventListener('click', () => {
+    applyTheme('matcha', null, true);
+    showToast('Reset to Matcha Dark theme', 'info');
+  });
+
+  // Sound Test & Notifications
+  DOM.settingVolume.addEventListener('input', (e) => {
+    DOM.volumePercentLabel.textContent = `${e.target.value}%`;
+    state.soundVolume = parseInt(e.target.value, 10) / 100;
+  });
+
+  DOM.testSoundBtn.addEventListener('click', () => {
+    playChimeSound(DOM.settingSoundType.value);
+  });
+
+  DOM.requestNotificationBtn.addEventListener('click', requestNotificationPermission);
+
+  // Stats Actions
+  DOM.clearHistoryBtn.addEventListener('click', handleClearHistory);
+
+  // Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    // Ignore keyboard shortcuts when user is typing in text inputs
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      if (e.key === 'Escape') {
+        document.activeElement.blur();
+      }
+      return;
+    }
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      toggleStartPause();
+    } else if (e.code === 'KeyR') {
+      e.preventDefault();
+      resetTimer();
+    } else if (e.code === 'KeyS') {
+      e.preventDefault();
+      skipSession();
+    } else if (e.code === 'KeyT') {
+      e.preventDefault();
+      DOM.themeModal.classList.contains('open') ? closeModal(DOM.themeModal) : openModal(DOM.themeModal);
+    } else if (e.code === 'KeyM') {
+      e.preventDefault();
+      DOM.soundToggleBtn.click();
+    } else if (e.key === 'Escape') {
+      [DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(m => {
+        if (m && m.classList.contains('open')) closeModal(m);
+      });
+    }
+  });
+}
+
+function submitFeedback() {
+  const form = DOM.feedbackForm;
+  if (!form) return;
+
+  const type = document.getElementById('feedbackType').value;
+  const message = document.getElementById('feedbackMessage').value;
+
+  if (!message.trim()) return;
+
+  showToast('Thank you for your feedback! 💚', 'success');
+  form.reset();
+  closeModal(DOM.feedbackModal);
+}
+
+
+// ==========================================================================
+// 11. App Initialization
+// ==========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Set progress ring stroke-dasharray
+  if (DOM.progressCircle) {
+    DOM.progressCircle.style.strokeDasharray = CIRCUMFERENCE;
+  }
+
+  loadStoredSettings();
+  setupEventListeners();
+  updateModeTabs();
+  updateCycleIndicators();
+  updateTimerDisplay();
+  updateStatusBadge();
+
+  // Load initial statistics from backend
+  fetchStatistics();
+});
