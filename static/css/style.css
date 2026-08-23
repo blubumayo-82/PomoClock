@@ -252,7 +252,7 @@ body {
   align-items: center;
   justify-content: flex-start;
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
   max-width: 100%;
   padding: 0;
   margin: 0;
@@ -310,10 +310,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   width: 100%;
-  max-width: 440px; /* limits width cleanly on mobile */
+  max-width: min(92vw, 440px);
   margin: 0 auto !important;
-  padding: 1rem 1rem 3rem 1rem;
+  padding: 1rem 0 3rem 0;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
@@ -327,12 +328,20 @@ body {
   }
 }
 
-.card, .timer-section, .timer-card, .main-timer-section, .stats-grid, .activity-card, .weekly-activity-card, .history-card, .recent-sessions-card, .dashboard-section {
-  width: 100%;
-  max-width: 100%;
+.card, .timer-section, .timer-card, .main-timer-section, .dashboard-section, .stats-grid, .stats-card-grid, .activity-card, .weekly-activity-card, .history-card, .recent-sessions-card, .dashboard-grid {
+  width: 100% !important;
+  max-width: min(92vw, 440px) !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  box-sizing: border-box;
+  left: 0 !important;
+  right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 768px) {
+  .card, .timer-section, .timer-card, .main-timer-section, .dashboard-section, .stats-grid, .stats-card-grid, .activity-card, .weekly-activity-card, .history-card, .recent-sessions-card, .dashboard-grid {
+    max-width: 100% !important;
+  }
 }
 
 .card {
@@ -354,37 +363,41 @@ body {
    4. Header & Navigation
    -------------------------------------------------------------------------- */
 
-header, .app-header, .header-nav, .top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 100%;
-  margin: 0 auto 1.25rem auto;
-  padding: 0 0 1rem 0;
+header, .app-header, .header, .top-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: min(92vw, 440px) !important;
+  margin: 0 auto 1.5rem auto !important;
+  padding: 0 0 1rem 0 !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  box-sizing: border-box;
+  box-sizing: border-box !important;
 }
 
 @media (min-width: 768px) {
-  .app-header {
-    max-width: 1200px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.75rem;
+  header, .app-header, .header, .top-bar {
+    max-width: 1200px !important;
+    padding: 0.75rem 0 !important;
+    margin-bottom: 1.75rem !important;
   }
 }
 
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.45rem !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
 }
 
 .brand-icon {
-  font-size: 2rem;
+  font-size: 1.6rem;
   line-height: 1;
   filter: drop-shadow(0 4px 10px var(--accent-glow));
   animation: floatIcon 4s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
 @keyframes floatIcon {
@@ -392,46 +405,89 @@ header, .app-header, .header-nav, .top-bar {
   50% { transform: translateY(-4px); }
 }
 
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .brand-text h1 {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1.1;
   background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  white-space: nowrap;
 }
 
 .brand-tagline {
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-left: auto;
-  flex-wrap: wrap;
+@media (min-width: 768px) {
+  .brand-icon {
+    font-size: 2rem;
+  }
+  .brand-text h1 {
+    font-size: 1.4rem;
+  }
+  .brand-tagline {
+    font-size: 0.72rem;
+  }
 }
 
-.icon-btn {
+.header-actions, .nav-icons {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  flex-wrap: nowrap !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.icon-btn, .header-text-btn, .auth-btn {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-md);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-md) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   cursor: pointer;
   transition: all var(--transition-fast);
+  flex-shrink: 0 !important;
+  box-sizing: border-box;
 }
 
-.icon-btn:hover {
+.header-btn-text {
+  display: none !important;
+}
+
+@media (min-width: 900px) {
+  .header-text-btn {
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 0.8rem !important;
+  }
+  .header-btn-text {
+    display: inline-block !important;
+  }
+}
+
+.icon-btn:hover, .header-text-btn:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent-color);
   color: var(--accent-color);
@@ -439,9 +495,9 @@ header, .app-header, .header-nav, .top-bar {
   box-shadow: 0 4px 12px var(--accent-glow);
 }
 
-.icon-btn .icon {
-  width: 20px;
-  height: 20px;
+.icon-btn .icon, .header-text-btn .icon {
+  width: 18px !important;
+  height: 18px !important;
 }
 
 
@@ -449,42 +505,38 @@ header, .app-header, .header-nav, .top-bar {
    5. Main Responsive Grid Layout
    -------------------------------------------------------------------------- */
 
-.main-layout, .app-container, .main-content, .dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr;
+.main-layout, .app-layout, .dashboard-container, .main-content {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: min(92vw, 440px) !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
   gap: 1.5rem;
-  width: 100%;
-  max-width: 100%;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  box-sizing: border-box;
-  flex: 1;
+  box-sizing: border-box !important;
 }
 
 /* Tablet / iPad (768px - 1024px) */
 @media (min-width: 768px) and (max-width: 1024px) {
   .main-layout {
-    grid-template-columns: 360px 1fr;
-    gap: 1.5rem;
-    align-items: start;
+    display: grid !important;
+    grid-template-columns: 360px 1fr !important;
+    gap: 1.5rem !important;
+    align-items: start !important;
+    max-width: 1200px !important;
   }
 }
 
 /* Desktop (> 1024px) */
 @media (min-width: 1025px) {
   .main-layout {
-    grid-template-columns: 460px 1fr;
-    gap: 2rem;
-    align-items: start;
-  }
-}
-
-@media (max-width: 767px) {
-  .app-container, .main-content, .dashboard-grid, .main-layout, .timer-section, .dashboard-section {
-    width: 100%;
-    max-width: 460px;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    display: grid !important;
+    grid-template-columns: 460px 1fr !important;
+    gap: 2rem !important;
+    align-items: start !important;
+    max-width: 1200px !important;
   }
 }
 
@@ -1976,9 +2028,11 @@ input:checked + .slider:before {
 .user-badge-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  height: 42px;
-  padding: 0 0.85rem;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 36px;
+  min-width: 36px;
+  padding: 0 0.6rem;
   background: var(--bg-card);
   border: 1.5px solid var(--accent-color);
   border-radius: var(--radius-md);
@@ -1988,6 +2042,18 @@ input:checked + .slider:before {
   font-size: 0.85rem;
   font-weight: 600;
   transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .user-badge-btn .user-badge-name {
+    display: none;
+  }
+  .user-badge-btn {
+    padding: 0;
+    width: 36px;
+    height: 36px;
+  }
 }
 
 .user-avatar-circle {
