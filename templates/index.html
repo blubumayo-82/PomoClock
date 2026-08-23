@@ -37,8 +37,7 @@
 
   <!-- Main Stylesheet -->
   <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='pomoGrad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234ade80'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='52' r='42' fill='url(%23pomoGrad)'/%3E%3Cpath d='M50 10 C48 18 42 22 36 24 C45 27 50 30 50 30 C50 30 55 27 64 24 C58 22 52 18 50 10 Z' fill='%2314532d'/%3E%3Ccircle cx='50' cy='52' r='32' fill='%23121a15'/%3E%3Ccircle cx='50' cy='52' r='3' fill='%234ade80'/%3E%3Cline x1='50' y1='52' x2='50' y2='32' stroke='%234ade80' stroke-width='3.5' stroke-linecap='round'/%3E%3Cline x1='50' y1='52' x2='64' y2='52' stroke='%234ade80' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 
 <body data-theme="matcha">
@@ -60,6 +59,31 @@
       </div>
 
       <div class="header-actions">
+        <!-- Optional User Auth & Sync Button / Menu -->
+        <div id="authContainer" class="auth-container">
+          <button id="openAuthModalBtn" class="header-text-btn auth-btn" title="Sign in to sync across devices" aria-label="Sign In or Sync">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span id="authBtnText" class="header-btn-text">Sign In / Sync</span>
+          </button>
+          <div id="userMenuDropdown" class="user-dropdown-menu" style="display: none;">
+            <div class="user-dropdown-header">
+              <span id="userMenuName" class="user-dropdown-username">User</span>
+              <span id="userMenuEmail" class="user-dropdown-email">user@example.com</span>
+            </div>
+            <button id="userLogoutBtn" class="dropdown-item-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Science & How to Use Trigger -->
         <button id="openScienceModalHeaderBtn" class="header-text-btn" title="How it Works & Science"
           aria-label="How it Works & Science">
@@ -353,6 +377,56 @@
       </div>
     </footer>
 
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: User Authentication & Cloud Sync                  -->
+  <!-- ======================================================== -->
+  <div id="authModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card modal-compact" role="dialog" aria-labelledby="authModalTitle">
+      <div class="modal-header">
+        <h2 id="authModalTitle" class="modal-title">Sync Study Progress</h2>
+        <button class="close-modal-btn" id="closeAuthModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="auth-tabs">
+          <button type="button" id="tabLoginBtn" class="auth-tab-btn active">Sign In</button>
+          <button type="button" id="tabRegisterBtn" class="auth-tab-btn">Create Account</button>
+        </div>
+
+        <p class="auth-subtext" id="authSubtext">
+          Sign in to sync your study streaks and stats across multiple devices. (Optional — Guest data stays saved locally).
+        </p>
+
+        <div id="authErrorAlert" class="auth-error-alert" style="display: none;"></div>
+
+        <form id="authForm" onsubmit="event.preventDefault(); handleAuthFormSubmit();">
+          <div class="input-field" id="usernameFieldGroup" style="display: none; margin-bottom: 0.85rem;">
+            <label for="authUsername">Username</label>
+            <input type="text" id="authUsername" placeholder="e.g. StudyScholar" autocomplete="username" minlength="3" maxlength="30">
+          </div>
+
+          <div class="input-field" style="margin-bottom: 0.85rem;">
+            <label for="authEmailOrLogin" id="authEmailLabel">Email or Username</label>
+            <input type="text" id="authEmailOrLogin" placeholder="Enter your email or username" autocomplete="username" required>
+          </div>
+
+          <div class="input-field" style="margin-bottom: 1.25rem;">
+            <label for="authPassword">Password</label>
+            <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" minlength="6" required>
+          </div>
+
+          <div class="modal-footer" style="margin-top: 0; padding-top: 0;">
+            <button type="submit" id="authSubmitBtn" class="modal-btn primary" style="width: 100%;">Sign In</button>
+          </div>
+        </form>
+
+        <div class="guest-mode-banner">
+          <span>🔒 Guest Mode Active: All study records remain safely preserved on this device.</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ======================================================== -->

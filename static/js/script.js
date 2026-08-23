@@ -1,7 +1,8 @@
 /**
  * PomoClock - Pomodoro Study Timer
  * Core JavaScript Engine: Timer Mechanics, Web Audio Chime,
- * Theme Management, Confetti Celebration, REST API & Analytics Dashboard
+ * Theme Management, Confetti Celebration, Hybrid Local Storage Persistence,
+ * Optional User Authentication & Analytics Dashboard
  */
 
 // ==========================================================================
@@ -10,6 +11,7 @@
 
 const CIRCLE_RADIUS = 140;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS; // ~879.6459
+const LOCAL_STORAGE_KEY_SESSIONS = 'pomoclock_local_sessions';
 
 const state = {
   // Mode durations in seconds
@@ -47,7 +49,11 @@ const state = {
   },
 
   // Task goal
-  currentTask: ''
+  currentTask: '',
+
+  // Authentication State (Guest Mode by default)
+  currentUser: null,
+  authMode: 'login' // 'login' | 'register'
 };
 
 // Mode metadata configuration
@@ -103,9 +109,18 @@ const DOM = {
   currentTaskInput: document.getElementById('currentTaskInput'),
   clearTaskBtn: document.getElementById('clearTaskBtn'),
 
-  // Header controls
+  // Header controls & Auth
+  authContainer: document.getElementById('authContainer'),
+  openAuthModalBtn: document.getElementById('openAuthModalBtn'),
+  authBtnText: document.getElementById('authBtnText'),
+  userMenuDropdown: document.getElementById('userMenuDropdown'),
+  userMenuName: document.getElementById('userMenuName'),
+  userMenuEmail: document.getElementById('userMenuEmail'),
+  userLogoutBtn: document.getElementById('userLogoutBtn'),
+
   soundToggleBtn: document.getElementById('soundToggleBtn'),
   soundWave: document.getElementById('soundWave'),
+  openScienceModalHeaderBtn: document.getElementById('openScienceModalHeaderBtn'),
   openThemeModalBtn: document.getElementById('openThemeModalBtn'),
   openSettingsModalBtn: document.getElementById('openSettingsModalBtn'),
 
@@ -121,6 +136,21 @@ const DOM = {
   activityChart: document.getElementById('activityChart'),
   historyTableBody: document.getElementById('historyTableBody'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+
+  // Auth modal elements
+  authModal: document.getElementById('authModal'),
+  closeAuthModalBtn: document.getElementById('closeAuthModalBtn'),
+  tabLoginBtn: document.getElementById('tabLoginBtn'),
+  tabRegisterBtn: document.getElementById('tabRegisterBtn'),
+  authSubtext: document.getElementById('authSubtext'),
+  authErrorAlert: document.getElementById('authErrorAlert'),
+  authForm: document.getElementById('authForm'),
+  usernameFieldGroup: document.getElementById('usernameFieldGroup'),
+  authUsername: document.getElementById('authUsername'),
+  authEmailOrLogin: document.getElementById('authEmailOrLogin'),
+  authEmailLabel: document.getElementById('authEmailLabel'),
+  authPassword: document.getElementById('authPassword'),
+  authSubmitBtn: document.getElementById('authSubmitBtn'),
 
   // Theme modal elements
   themeModal: document.getElementById('themeModal'),
@@ -156,7 +186,6 @@ const DOM = {
 
   // Science & Guide modal elements
   scienceModal: document.getElementById('scienceModal'),
-  openScienceModalHeaderBtn: document.getElementById('openScienceModalHeaderBtn'),
   openScienceModalFooterBtn: document.getElementById('openScienceModalFooterBtn'),
   closeScienceModalBtn: document.getElementById('closeScienceModalBtn'),
   closeScienceModalBtnBottom: document.getElementById('closeScienceModalBtnBottom'),
@@ -188,9 +217,6 @@ function getAudioContext() {
   return state.audioContext;
 }
 
-/**
- * Plays synthesized harmonic chime sounds with zero external audio assets.
- */
 function playChimeSound(type = state.soundType) {
   if (!state.soundEnabled || state.soundVolume <= 0) return;
 
@@ -202,7 +228,6 @@ function playChimeSound(type = state.soundType) {
     masterGain.connect(ctx.destination);
 
     if (type === 'zen') {
-      // Tibetan Singing Bowl Simulation (rich low fundamental + soft shimmer harmonics)
       const freqs = [216, 432, 648, 864];
       const gains = [0.6, 0.3, 0.15, 0.08];
       
@@ -218,92 +243,86 @@ function playChimeSound(type = state.soundType) {
 
         osc.connect(gainNode);
         gainNode.connect(masterGain);
+
         osc.start(now);
         osc.stop(now + 4.0);
       });
-
     } else if (type === 'bell') {
-      // High Crystal Bell Chord (A5, C#6, E6, A6)
-      const chord = [880, 1108.73, 1318.51, 1760];
-      chord.forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + (i * 0.04));
-
-        gain.gain.setValueAtTime(0.35 / (i + 1), now + (i * 0.04));
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5 + (i * 0.1));
-
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start(now + (i * 0.04));
-        osc.stop(now + 2.8);
-      });
-
-    } else if (type === 'digital') {
-      // Upbeat Digital Arpeggio (C5 -> E5 -> G5 -> C6)
-      const notes = [523.25, 659.25, 783.99, 1046.50];
-      notes.forEach((freq, i) => {
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((f, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + (i * 0.12));
+        osc.frequency.setValueAtTime(f, now + i * 0.08);
 
-        gain.gain.setValueAtTime(0.4, now + (i * 0.12));
-        gain.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.12) + 0.4);
+        gain.gain.setValueAtTime(0, now + i * 0.08);
+        gain.gain.linearRampToValueAtTime(0.4, now + i * 0.08 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 2.5);
 
         osc.connect(gain);
         gain.connect(masterGain);
-        osc.start(now + (i * 0.12));
-        osc.stop(now + (i * 0.12) + 0.45);
-      });
 
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 2.6);
+      });
+    } else if (type === 'digital') {
+      const notes = [587.33, 739.99, 880.00, 1174.66];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+
+        gain.gain.setValueAtTime(0.3, now + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.35);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.4);
+      });
     } else if (type === 'marimba') {
-      // Warm Marimba Pluck Chord
-      const notes = [440, 554.37, 659.25];
-      notes.forEach((freq, i) => {
+      const freqs = [440, 554.37, 659.25];
+      freqs.forEach((freq, idx) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + (i * 0.08));
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
 
-        gain.gain.setValueAtTime(0.5, now + (i * 0.08));
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + (i * 0.08) + 1.2);
+        gain.gain.setValueAtTime(0.5, now + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
 
         osc.connect(gain);
         gain.connect(masterGain);
-        osc.start(now + (i * 0.08));
-        osc.stop(now + (i * 0.08) + 1.3);
-      });
 
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.85);
+      });
     } else {
-      // Classic Double Beep
-      [0, 0.2].forEach(delay => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now + delay);
+      // Classic Beep
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, now);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
 
-        gain.gain.setValueAtTime(0.3, now + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.12);
+      osc.connect(gain);
+      gain.connect(masterGain);
 
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start(now + delay);
-        osc.stop(now + delay + 0.15);
-      });
+      osc.start(now);
+      osc.stop(now + 0.45);
     }
   } catch (err) {
-    console.warn('Web Audio synthesis not allowed before user interaction:', err);
+    console.warn('Audio synthesis note:', err);
   }
 }
 
 
 // ==========================================================================
-// 4. Confetti Celebration Particle System
+// 4. Confetti Celebration Effect
 // ==========================================================================
-
-let confettiAnimationId = null;
 
 function triggerConfettiBurst() {
   const canvas = DOM.confettiCanvas;
@@ -314,64 +333,62 @@ function triggerConfettiBurst() {
   canvas.height = window.innerHeight;
 
   const particles = [];
-  const colors = ['#4ade80', '#22c55e', '#00f0ff', '#f59e0b', '#f472b6', '#a855f7', '#fbbf24'];
+  const colors = ['#4ade80', '#22c55e', '#608066', '#f59e0b', '#00f0ff', '#f472b6', '#a855f7'];
 
   for (let i = 0; i < 90; i++) {
     particles.push({
-      x: canvas.width / 2 + (Math.random() * 100 - 50),
+      x: canvas.width / 2,
       y: canvas.height * 0.45,
       vx: (Math.random() - 0.5) * 14,
-      vy: (Math.random() - 0.8) * 16,
+      vy: (Math.random() - 0.8) * 16 - 2,
       size: Math.random() * 8 + 4,
       color: colors[Math.floor(Math.random() * colors.length)],
+      alpha: 1,
       rotation: Math.random() * 360,
-      rotationSpeed: (Math.random() - 0.5) * 10,
-      opacity: 1,
-      decay: Math.random() * 0.015 + 0.01
+      vRotation: (Math.random() - 0.5) * 10
     });
   }
 
-  if (confettiAnimationId) {
-    cancelAnimationFrame(confettiAnimationId);
-  }
+  let animationFrameId;
 
-  function render() {
+  function renderConfetti() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    let aliveCount = 0;
+    let alive = false;
 
     particles.forEach(p => {
       p.x += p.vx;
       p.y += p.vy;
-      p.vy += 0.35; // gravity
-      p.rotation += p.rotationSpeed;
-      p.opacity -= p.decay;
+      p.vy += 0.35; // Gravity
+      p.vx *= 0.98; // Air resistance
+      p.rotation += p.vRotation;
+      p.alpha -= 0.009;
 
-      if (p.opacity > 0) {
-        aliveCount++;
+      if (p.alpha > 0) {
+        alive = true;
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.globalAlpha = Math.max(0, p.alpha);
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, p.opacity);
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
         ctx.restore();
       }
     });
 
-    if (aliveCount > 0) {
-      confettiAnimationId = requestAnimationFrame(render);
+    if (alive) {
+      animationFrameId = requestAnimationFrame(renderConfetti);
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      confettiAnimationId = null;
+      cancelAnimationFrame(animationFrameId);
     }
   }
 
-  render();
+  renderConfetti();
 }
 
 
 // ==========================================================================
-// 5. Timer Engine & UI Updates
+// 5. Timer Mechanics & Display Updates
 // ==========================================================================
 
 function formatTime(seconds) {
@@ -384,56 +401,51 @@ function updateTimerDisplay() {
   const formatted = formatTime(state.timeLeft);
   DOM.timeDisplay.textContent = formatted;
 
-  // Update browser document title dynamically as "(MM:SS) PomoClock"
+  // Dynamic Browser Tab Title: (MM:SS) PomoClock
+  const modeName = MODE_CONFIG[state.currentMode].title;
   document.title = `(${formatted}) PomoClock`;
 
-  // Update circular SVG progress stroke
+  // Update circular SVG progress ring
   if (DOM.progressCircle) {
-    const fraction = state.totalDuration > 0 ? state.timeLeft / state.totalDuration : 0;
-    const strokeOffset = CIRCUMFERENCE - (fraction * CIRCUMFERENCE);
-    DOM.progressCircle.style.strokeDashoffset = strokeOffset;
+    const fraction = state.totalDuration > 0 ? (state.timeLeft / state.totalDuration) : 0;
+    const offset = CIRCUMFERENCE * (1 - fraction);
+    DOM.progressCircle.style.strokeDashoffset = offset;
   }
 }
 
 function updateStatusBadge() {
-  const modeInfo = MODE_CONFIG[state.currentMode];
+  const config = MODE_CONFIG[state.currentMode];
+  DOM.statusBadge.textContent = state.isRunning ? config.statusText : config.readyText;
+  
   if (state.isRunning) {
-    DOM.statusBadge.textContent = modeInfo.statusText;
     DOM.statusBadge.classList.add('running');
-  } else if (state.timeLeft === state.totalDuration) {
-    DOM.statusBadge.textContent = modeInfo.readyText;
-    DOM.statusBadge.classList.remove('running');
   } else {
-    DOM.statusBadge.textContent = 'Paused';
     DOM.statusBadge.classList.remove('running');
   }
 }
 
 function updateCycleIndicators() {
-  DOM.cycleLabel.textContent = `Session ${state.cycleCount} of ${state.longBreakInterval}`;
+  DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${state.longBreakInterval}`;
   
-  if (DOM.cycleIndicator) {
-    DOM.cycleIndicator.innerHTML = '';
-    for (let i = 1; i <= state.longBreakInterval; i++) {
-      const dot = document.createElement('span');
-      dot.className = `cycle-dot ${i <= state.cycleCount ? 'active' : ''}`;
-      DOM.cycleIndicator.appendChild(dot);
+  const dots = DOM.cycleIndicator.querySelectorAll('.cycle-dot');
+  dots.forEach((dot, idx) => {
+    dot.classList.remove('active', 'completed');
+    if (idx + 1 < state.cycleCount) {
+      dot.classList.add('completed');
+    } else if (idx + 1 === state.cycleCount) {
+      dot.classList.add('active');
     }
-  }
+  });
 }
 
 function updateModeTabs() {
-  [DOM.tabPomodoro, DOM.tabShortBreak, DOM.tabLongBreak].forEach(tab => {
+  const modes = ['pomodoro', 'short_break', 'long_break'];
+  modes.forEach(mode => {
+    const tab = DOM['tab' + mode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')];
     if (tab) {
-      const mode = tab.getAttribute('data-mode');
-      tab.classList.toggle('active', mode === state.currentMode);
+      tab.classList.toggle('active', state.currentMode === mode);
     }
   });
-
-  // Update badges
-  if (DOM.badgePomodoro) DOM.badgePomodoro.textContent = `${Math.round(state.durations.pomodoro / 60)}m`;
-  if (DOM.badgeShortBreak) DOM.badgeShortBreak.textContent = `${Math.round(state.durations.short_break / 60)}m`;
-  if (DOM.badgeLongBreak) DOM.badgeLongBreak.textContent = `${Math.round(state.durations.long_break / 60)}m`;
 }
 
 function switchMode(newMode, autoStart = false) {
@@ -458,47 +470,50 @@ function switchMode(newMode, autoStart = false) {
 function startTimer() {
   if (state.isRunning) return;
 
-  // Web Audio Context wake-up
-  getAudioContext();
-
   state.isRunning = true;
-  if (!state.sessionStartTime) {
-    state.sessionStartTime = new Date().toISOString();
-  }
+  state.sessionStartTime = new Date().toISOString();
 
-  // Toggle button icons & text
-  DOM.playIcon.classList.add('hidden');
-  DOM.pauseIcon.classList.remove('hidden');
+  // Switch play/pause icon & text
+  DOM.playIcon.style.display = 'none';
+  DOM.pauseIcon.style.display = 'inline-block';
   DOM.startPauseText.textContent = 'Pause';
-  DOM.startPauseBtn.classList.add('active');
+  DOM.startPauseBtn.classList.add('running');
 
   updateStatusBadge();
 
+  // Drift-free interval timer based on real timestamps
+  const expectedEnd = Date.now() + state.timeLeft * 1000;
+
   state.timerInterval = setInterval(() => {
-    if (state.timeLeft > 0) {
-      state.timeLeft--;
-      updateTimerDisplay();
-    } else {
+    const remainingMs = expectedEnd - Date.now();
+    const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+
+    state.timeLeft = remainingSecs;
+    updateTimerDisplay();
+
+    if (state.timeLeft <= 0) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
       handleTimerComplete();
     }
-  }, 1000);
+  }, 250);
 }
 
 function pauseTimer() {
   if (!state.isRunning) return;
 
   state.isRunning = false;
-  clearInterval(state.timerInterval);
-  state.timerInterval = null;
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
 
-  DOM.playIcon.classList.remove('hidden');
-  DOM.pauseIcon.classList.add('hidden');
+  DOM.playIcon.style.display = 'inline-block';
+  DOM.pauseIcon.style.display = 'none';
   DOM.startPauseText.textContent = 'Start';
-  DOM.startPauseBtn.classList.remove('active');
+  DOM.startPauseBtn.classList.remove('running');
 
   updateStatusBadge();
-  const formatted = formatTime(state.timeLeft);
-  document.title = `(${formatted}) PomoClock`;
 }
 
 function toggleStartPause() {
@@ -512,27 +527,31 @@ function toggleStartPause() {
 function resetTimer() {
   const wasRunning = state.isRunning;
   pauseTimer();
+
   state.timeLeft = state.totalDuration;
   state.sessionStartTime = null;
   updateTimerDisplay();
   updateStatusBadge();
-  showToast('Timer reset', 'info');
+
+  if (wasRunning) {
+    showToast('Timer reset', 'info');
+  }
 }
 
 function skipSession() {
   const previousMode = state.currentMode;
   pauseTimer();
 
-  // Record as skipped session if partially ran
-  const durationCompleted = (state.totalDuration - state.timeLeft) / 60.0;
-  if (durationCompleted >= 0.5) {
+  // Log skipped session if had ran partially
+  if (state.sessionStartTime && (state.totalDuration - state.timeLeft) > 10) {
+    const durationMins = Math.round(((state.totalDuration - state.timeLeft) / 60) * 10) / 10;
     recordSession({
       mode: previousMode,
-      duration_minutes: Math.round(durationCompleted * 10) / 10,
-      start_time: state.sessionStartTime || new Date().toISOString(),
+      duration_minutes: durationMins,
+      start_time: state.sessionStartTime,
       end_time: new Date().toISOString(),
       status: 'skipped',
-      task_name: state.currentTask || 'Skipped Session'
+      task_name: state.currentTask || 'Study Session'
     });
   }
 
@@ -540,9 +559,6 @@ function skipSession() {
   showToast(`Skipped ${MODE_CONFIG[previousMode].title}`, 'info');
 }
 
-/**
- * Executes when timer countdown reaches 00:00.
- */
 async function handleTimerComplete() {
   pauseTimer();
   const completedMode = state.currentMode;
@@ -556,7 +572,7 @@ async function handleTimerComplete() {
   // 2. Desktop notification
   showDesktopNotification(completedMode);
 
-  // 3. Record session in SQLite database via Flask API
+  // 3. Record session in SQLite database & localStorage
   await recordSession({
     mode: completedMode,
     duration_minutes: durationMins,
@@ -584,63 +600,173 @@ async function handleTimerComplete() {
 function transitionToNextMode(isNaturalCompletion = true) {
   if (state.currentMode === 'pomodoro') {
     if (state.cycleCount >= state.longBreakInterval) {
-      // Time for a long break!
       state.cycleCount = 1;
       updateCycleIndicators();
       switchMode('long_break', isNaturalCompletion && state.autoStartBreaks);
     } else {
-      // Short break
       state.cycleCount++;
       updateCycleIndicators();
       switchMode('short_break', isNaturalCompletion && state.autoStartBreaks);
     }
   } else {
-    // Break finished -> back to Pomodoro
     switchMode('pomodoro', isNaturalCompletion && state.autoStartPomodoro);
   }
 }
 
 
 // ==========================================================================
-// 6. REST API Client & Statistics Rendering
+// 6. Hybrid Persistence & Local Storage Engine
+// ==========================================================================
+
+function getLocalSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalSession(sessionItem) {
+  try {
+    const sessions = getLocalSessions();
+    sessions.unshift(sessionItem);
+    if (sessions.length > 300) sessions.length = 300;
+    localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
+  } catch (e) {
+    console.error('Failed to save session locally:', e);
+  }
+}
+
+function clearLocalSessions() {
+  localStorage.removeItem(LOCAL_STORAGE_KEY_SESSIONS);
+}
+
+function computeLocalStats() {
+  const sessions = getLocalSessions();
+  const completedPomodoros = sessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed');
+  const totalFocusMinutes = completedPomodoros.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
+  const totalFocusHours = Math.round((totalFocusMinutes / 60) * 100) / 100;
+  const totalSessions = sessions.length;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayPomodoros = completedPomodoros.filter(s => s.start_time && s.start_time.startsWith(todayStr));
+  const todayFocusMinutes = todayPomodoros.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
+
+  // 7-day activity
+  const weeklyActivity = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toISOString().split('T')[0];
+    const dayName = d.toLocaleDateString([], { weekday: 'short' });
+
+    const daySessions = completedPomodoros.filter(s => s.start_time && s.start_time.startsWith(dayStr));
+    const dayMinutes = daySessions.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
+
+    weeklyActivity.push({
+      date: dayStr,
+      day_name: dayName,
+      focus_minutes: Math.round(dayMinutes * 10) / 10,
+      completed_count: daySessions.length
+    });
+  }
+
+  // Streak calculation
+  let streakDays = 0;
+  const todayActive = todayPomodoros.length > 0;
+  if (todayActive) streakDays = 1;
+  let offset = 1;
+  while (true) {
+    const pd = new Date(now);
+    pd.setDate(pd.getDate() - offset);
+    const pdStr = pd.toISOString().split('T')[0];
+    const hasDay = completedPomodoros.some(s => s.start_time && s.start_time.startsWith(pdStr));
+    if (hasDay) {
+      streakDays++;
+      offset++;
+    } else {
+      break;
+    }
+    if (offset > 365) break;
+  }
+
+  return {
+    total_focus_minutes: Math.round(totalFocusMinutes * 10) / 10,
+    total_focus_hours: totalFocusHours,
+    completed_pomodoros: completedPomodoros.length,
+    total_sessions: totalSessions,
+    today_focus_minutes: Math.round(todayFocusMinutes * 10) / 10,
+    today_pomodoros: todayPomodoros.length,
+    current_streak_days: streakDays,
+    weekly_activity: weeklyActivity,
+    recent_sessions: sessions.slice(0, 10)
+  };
+}
+
+async function syncLocalSessionsWithServer() {
+  const localSessions = getLocalSessions();
+  if (!localSessions.length) return;
+
+  try {
+    const res = await fetch('/api/sessions/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessions: localSessions })
+    });
+    const data = await res.json();
+    if (data.success && data.synced_count > 0) {
+      console.log(`Synced ${data.synced_count} local sessions to server.`);
+    }
+  } catch (e) {
+    console.warn('Could not sync local sessions to server:', e);
+  }
+}
+
+
+// ==========================================================================
+// 7. REST API Client & Statistics Rendering
 // ==========================================================================
 
 async function recordSession(payload) {
+  // 1. Store in localStorage first for 100% hybrid persistence
+  saveLocalSession(payload);
+
+  // 2. Attempt server sync
   try {
     const response = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
     const data = await response.json();
-    if (!data.success) {
-      console.error('Session recording error:', data.error);
-    }
     return data;
   } catch (err) {
-    console.error('Failed to post session to backend:', err);
+    console.warn('Backend unavailable; session preserved safely in local storage.');
+    return { success: true, local_only: true };
   }
 }
 
 async function fetchStatistics() {
   try {
     const response = await fetch('/api/stats');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
 
     if (result.success && result.stats) {
       renderStatistics(result.stats);
+      return;
     }
   } catch (err) {
-    console.error('Failed to fetch statistics:', err);
-    if (DOM.activityChart) {
-      DOM.activityChart.innerHTML = `<div class="chart-loading">Could not load stats</div>`;
-    }
+    console.warn('Backend stats unavailable, using local calculation fallback:', err);
   }
+
+  // Fallback to local statistics calculation
+  const localStats = computeLocalStats();
+  renderStatistics(localStats);
 }
 
 function renderStatistics(stats) {
-  // KPI Cards
   DOM.statTotalHours.innerHTML = `${stats.total_focus_hours} <small>hrs</small>`;
   DOM.statTotalMinutes.textContent = `${stats.total_focus_minutes} mins recorded`;
   DOM.statCompletedCount.textContent = stats.completed_pomodoros;
@@ -649,14 +775,10 @@ function renderStatistics(stats) {
   DOM.statTodaySessions.textContent = `${stats.today_pomodoros} sessions today`;
   DOM.statStreakDays.innerHTML = `${stats.current_streak_days} <small>days</small>`;
 
-  // Weekly Total Badge
   const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + d.focus_minutes, 0);
   DOM.chartWeekTotal.textContent = `${(weekTotalMins / 60).toFixed(1)}h this week`;
 
-  // Weekly Activity Bar Chart
   renderWeeklyChart(stats.weekly_activity || []);
-
-  // Recent Sessions Table
   renderRecentSessions(stats.recent_sessions || []);
 }
 
@@ -668,7 +790,7 @@ function renderWeeklyChart(activity) {
     return;
   }
 
-  const maxMinutes = Math.max(...activity.map(a => a.focus_minutes), 30); // minimum scale 30m
+  const maxMinutes = Math.max(...activity.map(a => a.focus_minutes), 30);
   const todayStr = new Date().toISOString().split('T')[0];
 
   let html = '';
@@ -708,7 +830,6 @@ function renderRecentSessions(sessions) {
     if (s.mode === 'short_break') modeLabel = 'Short Break';
     if (s.mode === 'long_break') modeLabel = 'Long Break';
 
-    // Format start time
     let formattedTime = 'Just now';
     try {
       const d = new Date(s.start_time);
@@ -735,21 +856,172 @@ function renderRecentSessions(sessions) {
 async function handleClearHistory() {
   if (!confirm('Are you sure you want to clear all study logs and reset stats?')) return;
 
+  clearLocalSessions();
+
   try {
-    const res = await fetch('/api/sessions', { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      showToast('All session logs cleared', 'success');
-      await fetchStatistics();
-    }
+    await fetch('/api/sessions', { method: 'DELETE' });
   } catch (err) {
-    showToast('Failed to clear history', 'error');
+    console.warn('Backend clear failed, local history already cleared:', err);
+  }
+
+  await fetchStatistics();
+  showToast('Study history cleared', 'info');
+}
+
+async function syncPreferences(prefsObj) {
+  try {
+    await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prefsObj)
+    });
+  } catch (err) {
+    console.warn('Could not sync preferences to backend:', err);
   }
 }
 
 
 // ==========================================================================
-// 7. Theme Engine & Custom Color System
+// 8. User Authentication Module
+// ==========================================================================
+
+async function checkAuthStatus() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.authenticated && data.user) {
+      state.currentUser = data.user;
+    } else {
+      state.currentUser = null;
+    }
+  } catch (e) {
+    state.currentUser = null;
+  }
+  updateAuthUI();
+}
+
+function updateAuthUI() {
+  if (!DOM.openAuthModalBtn) return;
+
+  if (state.currentUser) {
+    const initial = state.currentUser.username ? state.currentUser.username.charAt(0).toUpperCase() : 'U';
+    DOM.openAuthModalBtn.innerHTML = `
+      <div class="user-avatar-circle">${initial}</div>
+      <span class="header-btn-text">${escapeHtml(state.currentUser.username)}</span>
+    `;
+    DOM.openAuthModalBtn.title = `Logged in as ${state.currentUser.username}`;
+    DOM.userMenuName.textContent = state.currentUser.username;
+    DOM.userMenuEmail.textContent = state.currentUser.email;
+  } else {
+    DOM.openAuthModalBtn.innerHTML = `
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span class="header-btn-text">Sign In / Sync</span>
+    `;
+    DOM.openAuthModalBtn.title = "Sign in to sync across devices (Optional)";
+    if (DOM.userMenuDropdown) DOM.userMenuDropdown.style.display = 'none';
+  }
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  DOM.authErrorAlert.style.display = 'none';
+
+  if (mode === 'register') {
+    DOM.tabRegisterBtn.classList.add('active');
+    DOM.tabLoginBtn.classList.remove('active');
+    DOM.usernameFieldGroup.style.display = 'block';
+    DOM.authUsername.required = true;
+    DOM.authEmailLabel.textContent = 'Email Address';
+    DOM.authEmailOrLogin.type = 'email';
+    DOM.authEmailOrLogin.placeholder = 'you@example.com';
+    DOM.authSubmitBtn.textContent = 'Create Account & Sync';
+    DOM.authSubtext.textContent = 'Create a free account to sync your study streaks and stats seamlessly across multiple devices.';
+  } else {
+    DOM.tabLoginBtn.classList.add('active');
+    DOM.tabRegisterBtn.classList.remove('active');
+    DOM.usernameFieldGroup.style.display = 'none';
+    DOM.authUsername.required = false;
+    DOM.authEmailLabel.textContent = 'Email or Username';
+    DOM.authEmailOrLogin.type = 'text';
+    DOM.authEmailOrLogin.placeholder = 'Enter your email or username';
+    DOM.authSubmitBtn.textContent = 'Sign In';
+    DOM.authSubtext.textContent = 'Sign in to sync your study streaks and stats across multiple devices. (Optional — Guest data stays saved locally).';
+  }
+}
+
+async function handleAuthFormSubmit() {
+  DOM.authErrorAlert.style.display = 'none';
+  const emailOrLogin = DOM.authEmailOrLogin.value.trim();
+  const password = DOM.authPassword.value;
+  const username = DOM.authUsername.value.trim();
+
+  DOM.authSubmitBtn.disabled = true;
+  DOM.authSubmitBtn.textContent = 'Please wait...';
+
+  try {
+    let endpoint = '/api/auth/login';
+    let payload = { login: emailOrLogin, password };
+
+    if (state.authMode === 'register') {
+      endpoint = '/api/auth/register';
+      payload = { username, email: emailOrLogin, password };
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      DOM.authErrorAlert.textContent = data.error || 'Authentication failed. Please try again.';
+      DOM.authErrorAlert.style.display = 'block';
+      DOM.authSubmitBtn.disabled = false;
+      DOM.authSubmitBtn.textContent = state.authMode === 'register' ? 'Create Account & Sync' : 'Sign In';
+      return;
+    }
+
+    state.currentUser = data.user;
+    updateAuthUI();
+    closeModal(DOM.authModal);
+    DOM.authForm.reset();
+
+    showToast(`Welcome, ${data.user.username}! Syncing sessions...`, 'success');
+
+    // Auto-sync guest sessions to account
+    await syncLocalSessionsWithServer();
+    await fetchStatistics();
+
+  } catch (err) {
+    DOM.authErrorAlert.textContent = 'Network error. Please check your connection.';
+    DOM.authErrorAlert.style.display = 'block';
+  } finally {
+    DOM.authSubmitBtn.disabled = false;
+    DOM.authSubmitBtn.textContent = state.authMode === 'register' ? 'Create Account & Sync' : 'Sign In';
+  }
+}
+
+async function handleUserLogout() {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    state.currentUser = null;
+    updateAuthUI();
+    if (DOM.userMenuDropdown) DOM.userMenuDropdown.style.display = 'none';
+    showToast('Logged out. Switched to Guest Mode.', 'info');
+    await fetchStatistics();
+  } catch (e) {
+    console.error('Logout error:', e);
+  }
+}
+
+
+// ==========================================================================
+// 9. Theme Engine & Custom Color System
 // ==========================================================================
 
 const THEME_PRESETS = {
@@ -767,7 +1039,6 @@ function applyTheme(themeName, customColors = null, save = true) {
   state.theme = themeName;
   document.body.setAttribute('data-theme', themeName);
 
-  // Update preset buttons active state
   document.querySelectorAll('.theme-card-btn').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-preset') === themeName);
   });
@@ -786,21 +1057,18 @@ function applyTheme(themeName, customColors = null, save = true) {
     document.documentElement.style.setProperty('--text-secondary', hexToRgba(customColors.text, 0.85));
     document.documentElement.style.setProperty('--text-muted', hexToRgba(customColors.text, 0.6));
 
-    // Update color picker values
     DOM.customBgColor.value = customColors.bg;
     DOM.customCardColor.value = customColors.card;
     DOM.customAccentColor.value = customColors.accent;
     DOM.customTextColor.value = customColors.text;
     updateHexLabels();
   } else {
-    // Clear inline custom overrides so CSS stylesheet theme variables take effect
     [
       '--bg-primary', '--bg-secondary', '--bg-card', '--bg-card-hover',
       '--accent-color', '--accent-secondary', '--accent-glow', '--border-color',
       '--text-primary', '--text-secondary', '--text-muted'
     ].forEach(prop => document.documentElement.style.removeProperty(prop));
 
-    // Populate pickers with preset values for quick tweaking
     const preset = THEME_PRESETS[themeName] || THEME_PRESETS.matcha;
     DOM.customBgColor.value = preset.bg;
     DOM.customCardColor.value = preset.card;
@@ -814,100 +1082,82 @@ function applyTheme(themeName, customColors = null, save = true) {
     if (customColors) {
       localStorage.setItem('pomoclock_custom_colors', JSON.stringify(customColors));
     }
-    // Sync to backend preferences asynchronously
     syncPreferences({ theme: themeName });
   }
 }
 
 function updateHexLabels() {
-  DOM.customBgHex.textContent = DOM.customBgColor.value;
-  DOM.customCardHex.textContent = DOM.customCardColor.value;
-  DOM.customAccentHex.textContent = DOM.customAccentColor.value;
-  DOM.customTextHex.textContent = DOM.customTextColor.value;
-}
-
-function hexToRgba(hex, alpha) {
-  let c = hex.replace('#', '');
-  if (c.length === 3) c = c.split('').map(x => x + x).join('');
-  const num = parseInt(c, 16);
-  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
-}
-
-function adjustColorBrightness(hex, percent) {
-  let num = parseInt(hex.replace('#', ''), 16);
-  let amt = Math.round(2.55 * percent);
-  let R = (num >> 16) + amt;
-  let G = (num >> 8 & 0x00FF) + amt;
-  let B = (num & 0x0000FF) + amt;
-  return '#' + (
-    0x1000000 +
-    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
-    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
-    (B < 255 ? (B < 1 ? 0 : B) : 255)
-  ).toString(16).slice(1);
+  DOM.customBgHex.textContent = DOM.customBgColor.value.toUpperCase();
+  DOM.customCardHex.textContent = DOM.customCardColor.value.toUpperCase();
+  DOM.customAccentHex.textContent = DOM.customAccentColor.value.toUpperCase();
+  DOM.customTextHex.textContent = DOM.customTextColor.value.toUpperCase();
 }
 
 
 // ==========================================================================
-// 8. Desktop Notifications & Toast Alerts
+// 10. Notification & Toast Engine
 // ==========================================================================
 
 function showToast(message, type = 'info') {
+  const container = DOM.toastContainer;
+  if (!container) return;
+
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${message}</span>`;
+  toast.textContent = message;
 
-  DOM.toastContainer.appendChild(toast);
+  container.appendChild(toast);
 
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(10px)';
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+    toast.style.animation = 'slideOutRight 0.25s forwards';
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
+}
+
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showToast('Notifications not supported by browser', 'error');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    showToast('Notifications already active!', 'success');
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        showToast('Notifications enabled!', 'success');
+      } else {
+        showToast('Notifications disabled', 'info');
+      }
+    });
+  } else {
+    showToast('Notification permission denied in browser settings', 'error');
+  }
 }
 
 function showDesktopNotification(mode) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-  const modeInfo = MODE_CONFIG[mode];
-  const title = mode === 'pomodoro' ? '🍅 Focus Session Completed!' : '⚡ Break Time Over!';
-  const body = mode === 'pomodoro' 
-    ? `Awesome work! Take a well-deserved ${state.cycleCount >= state.longBreakInterval ? 'long' : 'short'} break.`
-    : `Time to jump back into your study zone!`;
+  const config = MODE_CONFIG[mode];
+  const title = mode === 'pomodoro' ? '🍅 Focus Session Complete!' : '☕ Break Finished!';
+  const body = mode === 'pomodoro' ? 'Great work! Take a well-deserved break.' : 'Time to dive back into deep focus.';
 
   try {
     new Notification(title, {
-      body: body,
+      body,
       icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍅</text></svg>'
     });
   } catch (err) {
-    console.warn('Desktop notification dispatch failed:', err);
-  }
-}
-
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) {
-    showToast('Browser notifications not supported in this environment', 'error');
-    return;
-  }
-
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    showToast('Notifications enabled!', 'success');
-    DOM.requestNotificationBtn.textContent = 'Alerts Enabled ✓';
-    DOM.requestNotificationBtn.disabled = true;
-  } else {
-    showToast('Notification permission denied', 'error');
+    console.warn('Desktop notification error:', err);
   }
 }
 
 
 // ==========================================================================
-// 9. Settings & Preferences Management
+// 11. Settings & Preferences Management
 // ==========================================================================
 
 function loadStoredSettings() {
-  // Load Theme (Default: Matcha Dark)
   const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'matcha';
   const savedCustom = localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
   if (savedTheme === 'custom' && savedCustom) {
@@ -916,7 +1166,6 @@ function loadStoredSettings() {
     applyTheme(savedTheme, null, false);
   }
 
-  // Load Custom Durations
   const savedPomo = parseInt(localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
   const savedShort = parseInt(localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
   const savedLong = parseInt(localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
@@ -935,11 +1184,9 @@ function loadStoredSettings() {
   state.soundType = savedSound;
   if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
 
-  // Initialize current timer values
   state.totalDuration = state.durations[state.currentMode];
   state.timeLeft = state.totalDuration;
 
-  // Populate settings modal inputs
   DOM.settingPomodoro.value = Math.round(state.durations.pomodoro / 60);
   DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
   DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
@@ -949,12 +1196,6 @@ function loadStoredSettings() {
   DOM.settingSoundType.value = state.soundType;
   DOM.settingVolume.value = Math.round(state.soundVolume * 100);
   DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
-
-  // Notification button state
-  if ('Notification' in window && Notification.permission === 'granted') {
-    DOM.requestNotificationBtn.textContent = 'Alerts Enabled ✓';
-    DOM.requestNotificationBtn.disabled = true;
-  }
 }
 
 function saveSettingsFromModal() {
@@ -963,78 +1204,98 @@ function saveSettingsFromModal() {
   const longMins = parseInt(DOM.settingLongBreak.value, 10);
   const interval = parseInt(DOM.settingLongBreakInterval.value, 10);
 
-  if (pomoMins > 0) state.durations.pomodoro = pomoMins * 60;
-  if (shortMins > 0) state.durations.short_break = shortMins * 60;
-  if (longMins > 0) state.durations.long_break = longMins * 60;
-  if (interval >= 2) state.longBreakInterval = interval;
+  if (pomoMins > 0) {
+    state.durations.pomodoro = pomoMins * 60;
+    localStorage.setItem('pomoclock_dur_pomo', pomoMins);
+  }
+  if (shortMins > 0) {
+    state.durations.short_break = shortMins * 60;
+    localStorage.setItem('pomoclock_dur_short', shortMins);
+  }
+  if (longMins > 0) {
+    state.durations.long_break = longMins * 60;
+    localStorage.setItem('pomoclock_dur_long', longMins);
+  }
+  if (interval >= 2) {
+    state.longBreakInterval = interval;
+    localStorage.setItem('pomoclock_cycle_interval', interval);
+  }
 
   state.autoStartBreaks = DOM.settingAutoStartBreaks.checked;
   state.autoStartPomodoro = DOM.settingAutoStartPomodoro.checked;
   state.soundType = DOM.settingSoundType.value;
   state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
 
-  // Save to localStorage
-  localStorage.setItem('pomoclock_dur_pomo', pomoMins);
-  localStorage.setItem('pomoclock_dur_short', shortMins);
-  localStorage.setItem('pomoclock_dur_long', longMins);
-  localStorage.setItem('pomoclock_cycle_interval', interval);
   localStorage.setItem('pomoclock_auto_breaks', state.autoStartBreaks);
   localStorage.setItem('pomoclock_auto_pomo', state.autoStartPomodoro);
   localStorage.setItem('pomoclock_sound_type', state.soundType);
   localStorage.setItem('pomoclock_sound_volume', state.soundVolume);
 
-  // Sync to backend
-  syncPreferences({
-    pomodoro_duration: pomoMins,
-    short_break_duration: shortMins,
-    long_break_duration: longMins,
-    sound_type: state.soundType
-  });
-
-  // Apply new durations if paused
   if (!state.isRunning) {
     state.totalDuration = state.durations[state.currentMode];
     state.timeLeft = state.totalDuration;
     updateTimerDisplay();
   }
 
-  updateModeTabs();
   updateCycleIndicators();
   closeModal(DOM.settingsModal);
   showToast('Settings saved successfully', 'success');
+
+  syncPreferences({
+    pomodoro_duration: pomoMins,
+    short_break_duration: shortMins,
+    long_break_duration: longMins,
+    sound_type: state.soundType
+  });
 }
-
-async function syncPreferences(prefs) {
-  try {
-    await fetch('/api/preferences', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prefs)
-    });
-  } catch (e) {
-    // Non-blocking preference sync
-  }
-}
-
-
-// ==========================================================================
-// 10. Modals, Event Listeners & Keyboard Shortcuts
-// ==========================================================================
 
 function openModal(modal) {
+  if (!modal) return;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal(modal) {
+  if (!modal) return;
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
 }
 
-function escapeHtml(text) {
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-  return String(text).replace(/[&<>"']/g, m => map[m]);
+
+// ==========================================================================
+// 12. Helper Utilities
+// ==========================================================================
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
+
+function hexToRgba(hex, alpha = 1) {
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  const num = parseInt(c, 16);
+  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+}
+
+function adjustColorBrightness(hex, percent) {
+  let num = parseInt(hex.replace('#', ''), 16);
+  let amt = Math.round(2.55 * percent);
+  let R = (num >> 16) + amt;
+  let G = (num >> 8 & 0x00FF) + amt;
+  let B = (num & 0x0000FF) + amt;
+  return '#' + (0x1000000 + (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+    (B < 255 ? (B < 1 ? 0 : B) : 255)).toString(16).slice(1);
+}
+
+
+// ==========================================================================
+// 13. Event Listeners Setup
+// ==========================================================================
 
 function setupEventListeners() {
   // Timer Controls
@@ -1042,7 +1303,7 @@ function setupEventListeners() {
   DOM.resetBtn.addEventListener('click', resetTimer);
   DOM.skipBtn.addEventListener('click', skipSession);
 
-  // Mode Tabs
+  // Mode Selection Tabs
   DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
   DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
   DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
@@ -1065,7 +1326,45 @@ function setupEventListeners() {
     showToast(state.soundEnabled ? 'Sound enabled' : 'Sound muted', 'info');
   });
 
-  // Modals Open / Close (Theme, Settings, Science, Feedback)
+  // Auth Button (Sign In / User Menu Trigger)
+  if (DOM.openAuthModalBtn) {
+    DOM.openAuthModalBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.currentUser) {
+        // Toggle user dropdown menu
+        const isShown = DOM.userMenuDropdown.style.display === 'flex';
+        DOM.userMenuDropdown.style.display = isShown ? 'none' : 'flex';
+      } else {
+        setAuthMode('login');
+        openModal(DOM.authModal);
+      }
+    });
+  }
+
+  // Close dropdown on outside click
+  window.addEventListener('click', (e) => {
+    if (DOM.userMenuDropdown && !DOM.authContainer.contains(e.target)) {
+      DOM.userMenuDropdown.style.display = 'none';
+    }
+  });
+
+  // Auth Tabs (Login vs Register)
+  if (DOM.tabLoginBtn) {
+    DOM.tabLoginBtn.addEventListener('click', () => setAuthMode('login'));
+  }
+  if (DOM.tabRegisterBtn) {
+    DOM.tabRegisterBtn.addEventListener('click', () => setAuthMode('register'));
+  }
+
+  // Logout button
+  if (DOM.userLogoutBtn) {
+    DOM.userLogoutBtn.addEventListener('click', handleUserLogout);
+  }
+
+  // Modals Open / Close
+  if (DOM.closeAuthModalBtn) {
+    DOM.closeAuthModalBtn.addEventListener('click', () => closeModal(DOM.authModal));
+  }
   DOM.openThemeModalBtn.addEventListener('click', () => openModal(DOM.themeModal));
   DOM.closeThemeModalBtn.addEventListener('click', () => closeModal(DOM.themeModal));
   
@@ -1097,7 +1396,7 @@ function setupEventListeners() {
   }
 
   // Backdrop click to close any modal
-  [DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(modal => {
+  [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(modal => {
     if (modal) {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal(modal);
@@ -1153,7 +1452,6 @@ function setupEventListeners() {
 
   // Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
-    // Ignore keyboard shortcuts when user is typing in text inputs
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
       if (e.key === 'Escape') {
         document.activeElement.blur();
@@ -1177,7 +1475,7 @@ function setupEventListeners() {
       e.preventDefault();
       DOM.soundToggleBtn.click();
     } else if (e.key === 'Escape') {
-      [DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(m => {
+      [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(m => {
         if (m && m.classList.contains('open')) closeModal(m);
       });
     }
@@ -1188,9 +1486,7 @@ function submitFeedback() {
   const form = DOM.feedbackForm;
   if (!form) return;
 
-  const type = document.getElementById('feedbackType').value;
   const message = document.getElementById('feedbackMessage').value;
-
   if (!message.trim()) return;
 
   showToast('Thank you for your feedback! 💚', 'success');
@@ -1200,11 +1496,10 @@ function submitFeedback() {
 
 
 // ==========================================================================
-// 11. App Initialization
+// 14. App Initialization
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Set progress ring stroke-dasharray
   if (DOM.progressCircle) {
     DOM.progressCircle.style.strokeDasharray = CIRCUMFERENCE;
   }
@@ -1216,6 +1511,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTimerDisplay();
   updateStatusBadge();
 
-  // Load initial statistics from backend
+  // Check auth session & load statistics
+  checkAuthStatus();
   fetchStatistics();
 });
