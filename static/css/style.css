@@ -298,15 +298,25 @@ body {
    -------------------------------------------------------------------------- */
 
 .app-wrapper {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 1rem 1rem 3rem 1rem;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem 0.75rem;
+  margin: 0 auto;
   min-height: 100vh;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .app-wrapper {
+    max-width: 1200px;
+    padding: 1rem 1.25rem 3rem 1.25rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -337,15 +347,25 @@ body {
    -------------------------------------------------------------------------- */
 
 .app-header {
+  width: 100%;
+  max-width: 440px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  align-items: center;
+  margin: 0 auto 1.5rem auto;
+  padding: 0.75rem 0.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  margin-bottom: 1.75rem;
+  box-sizing: border-box;
   flex-wrap: wrap;
   gap: 0.5rem;
-  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .app-header {
+    max-width: 1200px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.75rem;
+  }
 }
 
 .brand {
@@ -426,6 +446,8 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
   flex: 1;
 }
 
@@ -459,12 +481,16 @@ body {
   align-items: center;
   position: relative;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Task Bar */
 .task-bar {
   width: 100%;
-  margin-bottom: 1.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1.25rem;
 }
 
 .task-input-wrapper {
@@ -473,7 +499,11 @@ body {
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
-  padding: 0.4rem 0.9rem;
+  padding: 0.35rem 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  gap: 0.4rem;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -483,17 +513,20 @@ body {
 }
 
 .task-icon {
-  font-size: 1.1rem;
-  margin-right: 0.5rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .task-input {
+  min-width: 0;
+  width: 100%;
   flex: 1;
   background: transparent;
   border: none;
   color: var(--text-primary);
   font-family: var(--font-main);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   outline: none;
 }
 
@@ -510,6 +543,7 @@ body {
   padding: 0 0.3rem;
   line-height: 1;
   transition: color var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .task-clear-btn:hover {
@@ -519,33 +553,36 @@ body {
 /* Mode Selector Tabs */
 .mode-tabs {
   display: flex;
+  width: 100%;
+  max-width: 100%;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.35);
-  padding: 0.35rem;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-color);
-  gap: 0.35rem;
-  width: 100%;
-  max-width: 380px;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .mode-tab {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: clamp(0.7rem, 2.5vw, 0.82rem);
+  padding: 0.45rem 0.2rem;
+  white-space: nowrap;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-full);
   background: transparent;
   border: none;
   color: var(--text-muted);
   font-family: var(--font-main);
   font-weight: 600;
-  font-size: 0.85rem;
-  padding: 0.6rem 0.4rem;
-  border-radius: var(--radius-full);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
   transition: all var(--transition-fast);
-  white-space: nowrap;
 }
 
 .mode-tab:hover {
@@ -554,17 +591,27 @@ body {
 
 .mode-tab.active {
   background: var(--accent-color);
-  color: var(--bg-primary);
+  color: var(--btn-primary-text, #18221b);
   box-shadow: 0 4px 14px var(--accent-glow);
   font-weight: 700;
 }
 
 .mode-duration-badge {
-  font-size: 0.7rem;
-  padding: 0.15rem 0.4rem;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
   border-radius: var(--radius-full);
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
+}
+
+@media (max-width: 480px) {
+  .mode-duration-badge {
+    display: none;
+  }
+  .mode-tab {
+    padding: 0.4rem 0.15rem;
+    font-size: clamp(0.68rem, 2.8vw, 0.78rem);
+  }
 }
 
 /* Circular SVG Progress Ring */
