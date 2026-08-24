@@ -96,19 +96,21 @@
         <span class="brand-tagline">YOUR COZY FOCUS HAVEN</span>
       </div>
 
-      <div class="header-actions">
+      <div class="header-right header-actions">
         <!-- Optional User Auth & Sync Button / Menu -->
         <div id="authContainer" class="auth-container">
-          <button id="openAuthModalBtn" class="header-text-btn auth-btn" title="Sign In & Cloud Sync" aria-label="Sign In or Account">
-            <span id="authAvatar" class="auth-avatar-pill hidden">
+          <button id="openAuthModalBtn" class="user-pill header-text-btn auth-btn" title="Sign In & Cloud Sync" aria-label="Sign In or Account">
+            <span id="authAvatar" class="user-avatar-circle auth-avatar-pill hidden">
               <img id="userAvatarImg" class="avatar-img-round hidden" src="" alt="Avatar">
               <span id="userAvatarInitials" class="avatar-initials-badge">?</span>
             </span>
-            <svg id="authIcon" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span id="authBtnText" class="header-btn-text">Sign In / Sync</span>
+            <span id="authDefaultAvatar" class="user-avatar-circle">
+              <svg id="authIcon" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <span id="authBtnText" class="header-btn-text">Sign In</span>
           </button>
           <div id="userMenuDropdown" class="user-dropdown-menu" style="display: none;">
             <div class="user-dropdown-header">
@@ -135,10 +137,10 @@
         </div>
 
         <!-- Science & How to Use Trigger -->
-        <button id="openScienceModalHeaderBtn" class="header-text-btn" title="How it Works & Science"
+        <button id="openScienceModalHeaderBtn" class="guide-btn science-btn header-text-btn" title="How it Works & Science"
           aria-label="How it Works & Science">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"
-            height="16">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15"
+            height="15">
             <circle cx="12" cy="12" r="10"></circle>
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
             <line x1="12" y1="17" x2="12.01" y2="17"></line>

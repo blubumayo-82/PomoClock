@@ -1197,17 +1197,17 @@ function updateAuthUI() {
 
     if (avatarUrl) {
       DOM.openAuthModalBtn.innerHTML = `
-        <span class="auth-avatar-pill">
+        <span class="user-avatar-circle auth-avatar-pill">
           <img src="${escapeHtml(avatarUrl)}" class="avatar-img-round" alt="Avatar" referrerpolicy="no-referrer">
         </span>
-        <span class="header-btn-text">${escapeHtml(displayName)}</span>
+        <span class="header-btn-text user-name-text">${escapeHtml(displayName)}</span>
       `;
     } else {
       DOM.openAuthModalBtn.innerHTML = `
-        <span class="auth-avatar-pill">
+        <span class="user-avatar-circle auth-avatar-pill">
           <span class="avatar-initials-badge">${initial}</span>
         </span>
-        <span class="header-btn-text">${escapeHtml(displayName)}</span>
+        <span class="header-btn-text user-name-text">${escapeHtml(displayName)}</span>
       `;
     }
 
@@ -1230,11 +1230,13 @@ function updateAuthUI() {
     }
   } else {
     DOM.openAuthModalBtn.innerHTML = `
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      <span class="header-btn-text">Sign In / Sync</span>
+      <span class="user-avatar-circle auth-default-avatar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </span>
+      <span class="header-btn-text">Sign In</span>
     `;
     DOM.openAuthModalBtn.title = "Sign in to sync across devices (Optional)";
     if (DOM.userMenuDropdown) DOM.userMenuDropdown.style.display = 'none';
