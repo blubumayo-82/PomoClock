@@ -1,5 +1,5 @@
 """
-PomoClock - Pomodoro Study Timer Backend Application
+PomoHaven - Cozy & Deep Study Flow Pomodoro Backend Application
 Flask application providing SQLite persistence, optional user authentication,
 Guest Mode fallback, productivity statistics calculation, and user preferences management.
 """
@@ -26,7 +26,7 @@ except ImportError:
 
 # Initialize Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.getenv('SECRET_KEY', 'pomoclock-study-secret-key-2026')
+app.secret_key = os.getenv('SECRET_KEY', 'pomohaven-study-secret-key-2026')
 
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')

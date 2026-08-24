@@ -1,5 +1,5 @@
 """
-Unit and Integration Tests for PomoClock Flask Backend & Authentication
+Unit and Integration Tests for PomoHaven Flask Backend & Authentication
 """
 
 import os
@@ -38,11 +38,11 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertTrue(data.get('guest_mode'))
 
     def test_index_page(self):
-        """Test index page returns HTML with 200 OK and PomoClock branding."""
+        """Test index page returns HTML with 200 OK and PomoHaven branding."""
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'PomoClock', response.data)
-        self.assertIn(b'Study & Deep Work', response.data)
+        self.assertIn(b'PomoHaven', response.data)
+        self.assertIn(b'YOUR COZY FOCUS HAVEN', response.data)
 
     def test_user_register_and_login(self):
         """Test registering a new user account and subsequent login."""

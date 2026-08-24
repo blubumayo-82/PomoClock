@@ -1,8 +1,8 @@
 /**
- * PomoClock - Pomodoro Study Timer
+ * PomoHaven - Your Cozy Focus Haven & Pomodoro Study Timer
  * Core JavaScript Engine: Timer Mechanics, Web Audio Chime,
  * Theme Management, Confetti Celebration, Hybrid Local Storage Persistence,
- * Optional User Authentication & Analytics Dashboard
+ * Optional User Authentication, PDF/CSV Reports & Analytics Dashboard
  */
 
 // ==========================================================================
@@ -11,7 +11,7 @@
 
 const CIRCLE_RADIUS = 140;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS; // ~879.6459
-const LOCAL_STORAGE_KEY_SESSIONS = 'pomoclock_local_sessions';
+const LOCAL_STORAGE_KEY_SESSIONS = 'pomohaven_local_sessions';
 
 const state = {
   // Mode durations in seconds
@@ -157,6 +157,8 @@ const DOM = {
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
   exportCsvSettingsBtn: document.getElementById('exportCsvSettingsBtn'),
+  exportPdfBtn: document.getElementById('exportPdfBtn'),
+  exportPdfSettingsBtn: document.getElementById('exportPdfSettingsBtn'),
 
   // Auth modal elements
   authModal: document.getElementById('authModal'),
@@ -471,9 +473,17 @@ function updateTimerDisplay() {
   const formatted = formatTime(state.timeLeft);
   DOM.timeDisplay.textContent = formatted;
 
-  // Dynamic Browser Tab Title: (MM:SS) PomoClock
-  const modeName = MODE_CONFIG[state.currentMode].title;
-  document.title = `(${formatted}) PomoClock`;
+  // Dynamic Browser Tab Title formatting:
+  // - When running: (MM:SS) PomoHaven (e.g., (24:59) PomoHaven)
+  // - When paused/idle: PomoHaven - Cozy & Deep Study Flow
+  // - When break active: ☕ Break Time! - PomoHaven (or 🌴 Long Break! - PomoHaven)
+  if (state.isRunning) {
+    document.title = `(${formatted}) PomoHaven`;
+  } else if (state.currentMode === 'short_break' || state.currentMode === 'long_break') {
+    document.title = `☕ Break Time! - PomoHaven`;
+  } else {
+    document.title = `PomoHaven - Cozy & Deep Study Flow`;
+  }
 
   // Update circular SVG progress ring
   if (DOM.progressCircle) {
@@ -723,7 +733,13 @@ function transitionToNextMode(isNaturalCompletion = true) {
 
 function getLocalSessions() {
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS) || '[]');
+    return JSON.parse(
+      localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS) ||
+      localStorage.getItem('pomoclock_local_sessions') ||
+      localStorage.getItem('focusflow_local_sessions') ||
+      localStorage.getItem('focusflow_sessions') ||
+      '[]'
+    );
   } catch (e) {
     return [];
   }
@@ -1372,9 +1388,10 @@ function applyTheme(themeName, customColors = null, save = true) {
   }
 
   if (save) {
+    localStorage.setItem('pomohaven_theme', themeName);
     localStorage.setItem('pomoclock_theme', themeName);
     if (customColors) {
-      localStorage.setItem('pomoclock_custom_colors', JSON.stringify(customColors));
+      localStorage.setItem('pomohaven_custom_colors', JSON.stringify(customColors));
     }
     syncPreferences({ theme: themeName });
   }
@@ -1462,22 +1479,22 @@ function updateModeBadges(pomoSeconds, shortBreakSeconds, longBreakSeconds) {
 }
 
 function loadStoredSettings() {
-  const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
-  const savedCustom = localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
+  const savedTheme = localStorage.getItem('pomohaven_theme') || localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
+  const savedCustom = localStorage.getItem('pomohaven_custom_colors') || localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
   if (savedTheme === 'custom' && savedCustom) {
     applyTheme('custom', JSON.parse(savedCustom), false);
   } else {
     applyTheme(savedTheme, null, false);
   }
 
-  const savedPomo = parseInt(localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
-  const savedShort = parseInt(localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
-  const savedLong = parseInt(localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
-  const savedInterval = parseInt(localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
-  const savedAutoBreaks = (localStorage.getItem('pomoclock_auto_breaks') || localStorage.getItem('focusflow_auto_breaks')) === 'true';
-  const savedAutoPomo = (localStorage.getItem('pomoclock_auto_pomo') || localStorage.getItem('focusflow_auto_pomo')) === 'true';
-  const savedSound = localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
-  const savedVolume = parseFloat(localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
+  const savedPomo = parseInt(localStorage.getItem('pomohaven_dur_pomo') || localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
+  const savedShort = parseInt(localStorage.getItem('pomohaven_dur_short') || localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
+  const savedLong = parseInt(localStorage.getItem('pomohaven_dur_long') || localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
+  const savedInterval = parseInt(localStorage.getItem('pomohaven_cycle_interval') || localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
+  const savedAutoBreaks = (localStorage.getItem('pomohaven_auto_breaks') || localStorage.getItem('pomoclock_auto_breaks') || localStorage.getItem('focusflow_auto_breaks')) === 'true';
+  const savedAutoPomo = (localStorage.getItem('pomohaven_auto_pomo') || localStorage.getItem('pomoclock_auto_pomo') || localStorage.getItem('focusflow_auto_pomo')) === 'true';
+  const savedSound = localStorage.getItem('pomohaven_sound_type') || localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
+  const savedVolume = parseFloat(localStorage.getItem('pomohaven_sound_volume') || localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
 
   if (!isNaN(savedPomo) && savedPomo > 0) state.durations.pomodoro = savedPomo * 60;
   if (!isNaN(savedShort) && savedShort > 0) state.durations.short_break = savedShort * 60;
@@ -1513,19 +1530,19 @@ function saveSettingsFromModal() {
 
   if (pomoMins > 0) {
     state.durations.pomodoro = pomoMins * 60;
-    localStorage.setItem('pomoclock_dur_pomo', pomoMins);
+    localStorage.setItem('pomohaven_dur_pomo', pomoMins);
   }
   if (shortMins > 0) {
     state.durations.short_break = shortMins * 60;
-    localStorage.setItem('pomoclock_dur_short', shortMins);
+    localStorage.setItem('pomohaven_dur_short', shortMins);
   }
   if (longMins > 0) {
     state.durations.long_break = longMins * 60;
-    localStorage.setItem('pomoclock_dur_long', longMins);
+    localStorage.setItem('pomohaven_dur_long', longMins);
   }
   if (interval >= 2) {
     state.longBreakInterval = interval;
-    localStorage.setItem('pomoclock_cycle_interval', interval);
+    localStorage.setItem('pomohaven_cycle_interval', interval);
   }
 
   state.autoStartBreaks = DOM.settingAutoStartBreaks.checked;
@@ -1533,10 +1550,10 @@ function saveSettingsFromModal() {
   state.soundType = DOM.settingSoundType.value;
   state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
 
-  localStorage.setItem('pomoclock_auto_breaks', state.autoStartBreaks);
-  localStorage.setItem('pomoclock_auto_pomo', state.autoStartPomodoro);
-  localStorage.setItem('pomoclock_sound_type', state.soundType);
-  localStorage.setItem('pomoclock_sound_volume', state.soundVolume);
+  localStorage.setItem('pomohaven_auto_breaks', state.autoStartBreaks);
+  localStorage.setItem('pomohaven_auto_pomo', state.autoStartPomodoro);
+  localStorage.setItem('pomohaven_sound_type', state.soundType);
+  localStorage.setItem('pomohaven_sound_volume', state.soundVolume);
 
   if (!state.isRunning) {
     state.totalDuration = state.durations[state.currentMode];
@@ -1804,6 +1821,12 @@ function setupEventListeners() {
   if (DOM.exportCsvSettingsBtn) {
     DOM.exportCsvSettingsBtn.addEventListener('click', exportSessionsToCsv);
   }
+  if (DOM.exportPdfBtn) {
+    DOM.exportPdfBtn.addEventListener('click', exportDashboardToPdf);
+  }
+  if (DOM.exportPdfSettingsBtn) {
+    DOM.exportPdfSettingsBtn.addEventListener('click', exportDashboardToPdf);
+  }
 
   // Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
@@ -1907,8 +1930,8 @@ function toggleZenMode(forcedState = null) {
 // ==========================================================================
 
 function checkFirstTimeUser() {
-  const isTourComplete = localStorage.getItem('pomoClockTourComplete');
-  const isThemeClicked = localStorage.getItem('pomoClockThemeClicked');
+  const isTourComplete = localStorage.getItem('pomoHavenTourComplete') || localStorage.getItem('pomoClockTourComplete');
+  const isThemeClicked = localStorage.getItem('pomoHavenThemeClicked') || localStorage.getItem('pomoClockThemeClicked');
 
   // Pulse theme button if user hasn't clicked it or completed tour
   if (!isTourComplete && !isThemeClicked && DOM.openThemeModalBtn) {
@@ -1927,6 +1950,7 @@ function stopThemePulse() {
   if (DOM.openThemeModalBtn) {
     DOM.openThemeModalBtn.classList.remove('first-time-theme-pulse');
   }
+  localStorage.setItem('pomoHavenThemeClicked', 'true');
   localStorage.setItem('pomoClockThemeClicked', 'true');
 }
 
@@ -1936,7 +1960,7 @@ function checkGuestSyncPrompt() {
 
   const localSessions = getLocalSessions();
   const completedPomodoros = localSessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed').length;
-  const lastPromptCount = parseInt(localStorage.getItem('pomoclock_guest_prompt_last_count') || '0', 10);
+  const lastPromptCount = parseInt(localStorage.getItem('pomohaven_guest_prompt_last_count') || localStorage.getItem('pomoclock_guest_prompt_last_count') || '0', 10);
 
   // Trigger on 4th session (and multiples of 4: 4, 8, 12...)
   if (completedPomodoros >= 4 && (completedPomodoros % 4 === 0) && completedPomodoros !== lastPromptCount) {
@@ -1951,6 +1975,7 @@ function checkGuestSyncPrompt() {
 function dismissGuestSyncPrompt() {
   const localSessions = getLocalSessions();
   const completedPomodoros = localSessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed').length;
+  localStorage.setItem('pomohaven_guest_prompt_last_count', completedPomodoros.toString());
   localStorage.setItem('pomoclock_guest_prompt_last_count', completedPomodoros.toString());
 }
 
@@ -1969,7 +1994,7 @@ function startOnboardingTour(isManual = false) {
     overlayColor: 'rgba(0, 0, 0, 0.78)',
     stagePadding: 8,
     stageRadius: 14,
-    popoverClass: 'driverjs-theme-popover pomoclock-driver-popover',
+    popoverClass: 'driverjs-theme-popover pomohaven-driver-popover',
     nextBtnText: 'Next →',
     prevBtnText: '← Back',
     doneBtnText: 'Got It! 🚀',
@@ -1985,6 +2010,7 @@ function startOnboardingTour(isManual = false) {
       }
     },
     onDestroyStarted: () => {
+      localStorage.setItem('pomoHavenTourComplete', 'true');
       localStorage.setItem('pomoClockTourComplete', 'true');
       stopThemePulse();
       driverObj.destroy();
@@ -2022,7 +2048,7 @@ function startOnboardingTour(isManual = false) {
         stagePadding: 4,
         popover: {
           title: '🎨 Your Aesthetic',
-          description: 'Customize PomoClock to match your mood here. Choose Classic Pomodoro, Sage, Cyberpunk, or create a custom palette!',
+          description: 'Customize PomoHaven to match your mood here. Choose Classic Pomodoro, Sage, Cyberpunk, or create a custom palette!',
           side: 'bottom',
           align: 'end',
           popoverClass: 'driverjs-theme-popover'
@@ -2039,12 +2065,16 @@ function startOnboardingTour(isManual = false) {
 // 16. Multi-Task Queue & Study Target Engine
 // ==========================================================================
 
-const LOCAL_STORAGE_KEY_TASK_QUEUE = 'pomoclock_task_queue';
+const LOCAL_STORAGE_KEY_TASK_QUEUE = 'pomohaven_task_queue';
 let taskTargetStepperCount = 2;
 
 function getTaskQueue() {
   try {
-    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_TASK_QUEUE) || '[]');
+    return JSON.parse(
+      localStorage.getItem(LOCAL_STORAGE_KEY_TASK_QUEUE) ||
+      localStorage.getItem('pomoclock_task_queue') ||
+      '[]'
+    );
   } catch (e) {
     return [];
   }
@@ -2286,8 +2316,103 @@ function incrementActiveTaskProgress() {
 
 
 // ==========================================================================
-// 17. Free One-Click CSV Focus Report Exporter
+// 17. Free One-Click PDF & CSV Focus Report Exporters
 // ==========================================================================
+
+async function exportDashboardToPdf() {
+  if (typeof html2pdf === 'undefined') {
+    showToast('PDF generator is initializing, please try again in a moment.', 'info');
+    return;
+  }
+
+  showToast('📄 Generating PomoHaven Focus Report PDF...', 'info');
+
+  const reportContainer = document.getElementById('pdfReportContainer');
+  if (!reportContainer) return;
+
+  // Populate dynamic dates & user info
+  const dateElem = document.getElementById('pdfReportDate');
+  if (dateElem) {
+    dateElem.textContent = new Date().toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  const userElem = document.getElementById('pdfReportUser');
+  if (userElem) {
+    const activeUserName = state.currentUser ? (state.currentUser.name || state.currentUser.username || state.currentUser.email) : 'Guest Scholar';
+    userElem.textContent = activeUserName;
+  }
+
+  // Populate metric values from live dashboard
+  const totalHrsElem = document.getElementById('pdfTotalHours');
+  if (totalHrsElem && DOM.statTotalHours) totalHrsElem.textContent = DOM.statTotalHours.textContent;
+  const totalMinsElem = document.getElementById('pdfTotalMinutes');
+  if (totalMinsElem && DOM.statTotalMinutes) totalMinsElem.textContent = DOM.statTotalMinutes.textContent;
+  const compCountElem = document.getElementById('pdfCompletedCount');
+  if (compCountElem && DOM.statCompletedCount) compCountElem.textContent = DOM.statCompletedCount.textContent;
+  const compSubElem = document.getElementById('pdfTotalSessions');
+  if (compSubElem && DOM.statTotalSessions) compSubElem.textContent = DOM.statTotalSessions.textContent;
+  const todayMinElem = document.getElementById('pdfTodayMinutes');
+  if (todayMinElem && DOM.statTodayMinutes) todayMinElem.textContent = DOM.statTodayMinutes.textContent;
+  const todaySubElem = document.getElementById('pdfTodaySessions');
+  if (todaySubElem && DOM.statTodaySessions) todaySubElem.textContent = DOM.statTodaySessions.textContent;
+  const streakDaysElem = document.getElementById('pdfStreakDays');
+  if (streakDaysElem && DOM.statStreakDays) streakDaysElem.textContent = DOM.statStreakDays.textContent;
+
+  // Populate weekly activity chart
+  const pdfChart = document.getElementById('pdfActivityChart');
+  if (pdfChart && DOM.activityChart) {
+    pdfChart.innerHTML = DOM.activityChart.innerHTML;
+  }
+
+  // Populate recent sessions table
+  const pdfTableBody = document.getElementById('pdfHistoryTableBody');
+  const sessions = getLocalSessions();
+  if (pdfTableBody) {
+    if (sessions && sessions.length > 0) {
+      pdfTableBody.innerHTML = sessions.slice(0, 15).map(s => {
+        const modeLabel = s.mode === 'pomodoro' ? 'Focus 🎯' : (s.mode === 'short_break' ? 'Short Break ☕' : 'Long Break 🌴');
+        const duration = s.duration_minutes || (s.duration ? Math.round(s.duration / 60) : 25);
+        const taskName = escapeHtml(s.task_name || 'Focus Session');
+        const status = s.status || 'completed';
+        const dateStr = s.start_time ? new Date(s.start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+          <tr>
+            <td><strong>${modeLabel}</strong></td>
+            <td>${taskName}</td>
+            <td>${duration}m</td>
+            <td><span class="status-badge ${status}">${status}</span></td>
+            <td>${dateStr}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      pdfTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888; padding: 12px;">No study sessions logged yet.</td></tr>';
+    }
+  }
+
+  // Display template container momentarily for html2pdf rendering
+  reportContainer.style.display = 'block';
+
+  const opt = {
+    margin: [8, 8, 8, 8],
+    filename: `PomoHaven_Focus_Report.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#181112' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  try {
+    await html2pdf().set(opt).from(reportContainer).save();
+    showToast('✅ PDF Report downloaded: PomoHaven_Focus_Report.pdf', 'success');
+  } catch (err) {
+    console.error('PDF export error:', err);
+    showToast('Failed to generate PDF report.', 'error');
+  } finally {
+    reportContainer.style.display = 'none';
+  }
+}
 
 function exportSessionsToCsv() {
   const sessions = getLocalSessions();
@@ -2316,7 +2441,7 @@ function exportSessionsToCsv() {
   const url = URL.createObjectURL(blob);
 
   const todayStr = getLocalDateString();
-  const filename = `pomoclock_study_report_${todayStr}.csv`;
+  const filename = `PomoHaven_study_report_${todayStr}.csv`;
 
   const link = document.createElement('a');
   link.setAttribute('href', url);
