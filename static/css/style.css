@@ -3554,64 +3554,49 @@ body.zen-mode-active .zen-corner-btn {
   color: var(--text-muted, #94A3B8);
 }
 
-/* 2. Cute & Compact Metric Badges (4-Column Full-Width Grid) */
+/* 2. Cute & Compact Metric Badges (4-Column Full-Width Horizontal Pills) */
 .share-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   width: 100%;
   margin-bottom: 16px;
   box-sizing: border-box;
 }
 
-.share-metric-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(var(--accent-rgb, 224, 83, 68), 0.2);
-  border-radius: 12px;
-  padding: 9px 10px;
+.share-stat-pill, .share-metric-card {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #FFFFFF);
   box-sizing: border-box;
   min-width: 0;
-  overflow: hidden;
+  white-space: nowrap;
 }
 
-.share-metric-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
+.share-pill-icon, .share-metric-icon {
+  font-size: 1.15rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
-.share-metric-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-}
-
-.share-metric-label {
-  font-size: 0.7rem;
-  color: var(--text-muted, #94A3B8);
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.share-metric-val {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: var(--accent-color, #FF6B50);
+.share-pill-val, .share-metric-val {
   font-family: 'JetBrains Mono', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent-color, #FF6B50);
   line-height: 1.2;
-  margin-top: 1px;
   white-space: nowrap;
 }
 
-.share-metric-val small {
+.share-pill-val small, .share-metric-val small {
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--accent-color, #FFA28B);

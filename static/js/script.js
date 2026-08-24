@@ -2416,22 +2416,23 @@ async function exportShareableFocusCard() {
     scholarElem.textContent = activeUserName;
   }
 
-  // 3. Populate highlight metrics from active stats
+  // 3. Populate highlight metric pills from active stats
+  const stats = computeLocalStats();
   const totalHrsElem = document.getElementById('shareTotalHours');
-  if (totalHrsElem && DOM.statTotalHours) {
-    totalHrsElem.innerHTML = DOM.statTotalHours.innerHTML;
+  if (totalHrsElem) {
+    totalHrsElem.textContent = `${stats.total_focus_hours} hrs`;
   }
   const streakElem = document.getElementById('shareStreakDays');
-  if (streakElem && DOM.statStreakDays) {
-    streakElem.innerHTML = DOM.statStreakDays.innerHTML;
+  if (streakElem) {
+    streakElem.textContent = `${stats.current_streak_days} days`;
   }
   const todayMinElem = document.getElementById('shareTodayMinutes');
-  if (todayMinElem && DOM.statTodayMinutes) {
-    todayMinElem.innerHTML = DOM.statTodayMinutes.innerHTML;
+  if (todayMinElem) {
+    todayMinElem.textContent = `${stats.today_focus_minutes} min`;
   }
   const compCountElem = document.getElementById('shareCompletedCount');
-  if (compCountElem && DOM.statCompletedCount) {
-    compCountElem.textContent = DOM.statCompletedCount.textContent;
+  if (compCountElem) {
+    compCountElem.textContent = `${stats.completed_pomodoros} pomos`;
   }
 
   // 4. Populate weekly focus activity summary badge & 7-day single-row column chart
@@ -2442,7 +2443,6 @@ async function exportShareableFocusCard() {
 
   const chartContentElem = document.getElementById('shareChartContent');
   if (chartContentElem) {
-    const stats = computeLocalStats();
     const activity = stats.weekly_activity || [];
     const todayStr = getLocalDateString();
     const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
