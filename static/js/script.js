@@ -1038,21 +1038,30 @@ async function syncPreferences(prefsObj) {
 // 8. User Authentication Module (Google OAuth 2.0 & Email/Password)
 // ==========================================================================
 
+let googleSignInRetryCount = 0;
+
 function initGoogleSignIn() {
-  const clientId = (window.POMOCLOCK_CONFIG && window.POMOCLOCK_CONFIG.googleClientId) || '';
+  const clientId = (
+    window.GOOGLE_CLIENT_ID ||
+    (window.POMOHAVEN_CONFIG && window.POMOHAVEN_CONFIG.googleClientId) ||
+    (window.POMOCLOCK_CONFIG && window.POMOCLOCK_CONFIG.googleClientId) ||
+    ''
+  ).trim();
+
   const googleBtnContainer = document.getElementById('googleSignInBtn');
   if (!googleBtnContainer) return;
 
   if (window.google && window.google.accounts && window.google.accounts.id) {
     try {
-      window.google.accounts.id.initialize({
-        client_id: clientId || 'dummy-client-id.apps.googleusercontent.com',
-        callback: handleGoogleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true
-      });
-
       if (clientId) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true
+        });
+
+        googleBtnContainer.innerHTML = '';
         window.google.accounts.id.renderButton(
           googleBtnContainer,
           {
@@ -1085,6 +1094,12 @@ function initGoogleSignIn() {
       }
     } catch (err) {
       console.warn('Google Identity Services initialization warning:', err);
+    }
+  } else {
+    // If Google Client library is still loading, retry
+    if (googleSignInRetryCount < 10) {
+      googleSignInRetryCount++;
+      setTimeout(initGoogleSignIn, 300);
     }
   }
 }
@@ -1579,6 +1594,10 @@ function openModal(modal) {
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
+
+  if (modal === DOM.authModal) {
+    initGoogleSignIn();
+  }
 }
 
 function closeModal(modal) {

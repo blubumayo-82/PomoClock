@@ -166,14 +166,16 @@ def get_current_user_id():
 @app.route('/')
 def index():
     """Renders the main Pomodoro Study Timer single-page application."""
-    return render_template('index.html', google_client_id=GOOGLE_CLIENT_ID)
+    google_id = os.environ.get('GOOGLE_CLIENT_ID', GOOGLE_CLIENT_ID)
+    return render_template('index.html', google_client_id=google_id)
 
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Returns public client configuration for frontend initialization."""
+    google_id = os.environ.get('GOOGLE_CLIENT_ID', GOOGLE_CLIENT_ID)
     return jsonify({
-        "google_client_id": GOOGLE_CLIENT_ID
+        "google_client_id": google_id
     }), 200
 
 

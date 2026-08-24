@@ -43,9 +43,11 @@
   <!-- Google Identity Services (Google OAuth 2.0) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
+    window.GOOGLE_CLIENT_ID = "{{ google_client_id | default('') }}";
     window.POMOHAVEN_CONFIG = {
-      googleClientId: "{{ google_client_id | default('') }}"
+      googleClientId: window.GOOGLE_CLIENT_ID
     };
+    window.POMOCLOCK_CONFIG = window.POMOHAVEN_CONFIG;
   </script>
 
   <!-- html2canvas for High-Resolution Shareable Card Export -->
