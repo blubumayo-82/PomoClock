@@ -39,13 +39,13 @@ const state = {
   soundType: 'zen', // 'zen' | 'bell' | 'digital' | 'marimba' | 'beep'
   audioContext: null,
 
-  // Theme settings (Default: Matcha Dark)
-  theme: 'matcha',
+  // Theme settings (Default: Classic Pomodoro)
+  theme: 'pomodoro',
   customColors: {
-    bg: '#18221b',
-    card: '#223027',
-    accent: '#4ade80',
-    text: '#f0fdf4'
+    bg: '#1A1212',
+    card: '#2A181A',
+    accent: '#E05344',
+    text: '#FFF5F5'
   },
 
   // Task goal
@@ -1025,15 +1025,25 @@ async function handleUserLogout() {
 // ==========================================================================
 
 const THEME_PRESETS = {
-  matcha: { bg: '#18221b', card: '#223027', accent: '#4ade80', text: '#f0fdf4' },
-  coffee: { bg: '#1e1713', card: '#2d221c', accent: '#f59e0b', text: '#fef3c7' },
-  cyberpunk: { bg: '#090a10', card: '#141724', accent: '#00f0ff', text: '#f8fafc' },
-  midnight: { bg: '#000000', card: '#14141c', accent: '#6366f1', text: '#ffffff' },
-  sakura: { bg: '#23161c', card: '#34202a', accent: '#f472b6', text: '#fff1f2' },
-  sage: { bg: '#F4F7F4', card: '#FFFFFF', accent: '#608066', text: '#2D3748' },
-  blush: { bg: '#FAF5F5', card: '#FFFFFF', accent: '#C07D88', text: '#3B2E31' },
-  cerulean: { bg: '#F0F4F8', card: '#FFFFFF', accent: '#5B82A6', text: '#253342' }
+  pomodoro: { bg: '#1A1212', card: '#2A181A', accent: '#E05344', text: '#FFF5F5', rgb: '224, 83, 68' },
+  matcha: { bg: '#18221b', card: '#223027', accent: '#4ade80', text: '#f0fdf4', rgb: '74, 222, 128' },
+  coffee: { bg: '#1e1713', card: '#2d221c', accent: '#f59e0b', text: '#fef3c7', rgb: '245, 158, 11' },
+  cyberpunk: { bg: '#090a10', card: '#141724', accent: '#00f0ff', text: '#f8fafc', rgb: '0, 240, 255' },
+  midnight: { bg: '#000000', card: '#14141c', accent: '#6366f1', text: '#ffffff', rgb: '99, 102, 241' },
+  sakura: { bg: '#23161c', card: '#34202a', accent: '#f472b6', text: '#fff1f2', rgb: '244, 114, 182' },
+  sunset: { bg: '#120d1c', card: '#241834', accent: '#fb923c', text: '#fff7ed', rgb: '251, 146, 60' },
+  sage: { bg: '#F4F7F4', card: '#FFFFFF', accent: '#608066', text: '#2D3748', rgb: '96, 128, 102' },
+  blush: { bg: '#FAF5F5', card: '#FFFFFF', accent: '#C07D88', text: '#3B2E31', rgb: '192, 125, 136' },
+  cerulean: { bg: '#F0F4F8', card: '#FFFFFF', accent: '#5B82A6', text: '#253342', rgb: '91, 130, 166' }
 };
+
+function hexToRgbValues(hex) {
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return '224, 83, 68';
+  return `${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}`;
+}
 
 function applyTheme(themeName, customColors = null, save = true) {
   state.theme = themeName;
@@ -1045,17 +1055,22 @@ function applyTheme(themeName, customColors = null, save = true) {
 
   if (themeName === 'custom' && customColors) {
     state.customColors = { ...customColors };
+    const rgbStr = hexToRgbValues(customColors.accent);
     document.documentElement.style.setProperty('--bg-primary', customColors.bg);
     document.documentElement.style.setProperty('--bg-secondary', adjustColorBrightness(customColors.bg, 10));
     document.documentElement.style.setProperty('--bg-card', hexToRgba(customColors.card, 0.9));
     document.documentElement.style.setProperty('--bg-card-hover', customColors.card);
     document.documentElement.style.setProperty('--accent-color', customColors.accent);
     document.documentElement.style.setProperty('--accent-secondary', adjustColorBrightness(customColors.accent, -15));
-    document.documentElement.style.setProperty('--accent-glow', hexToRgba(customColors.accent, 0.35));
-    document.documentElement.style.setProperty('--border-color', hexToRgba(customColors.accent, 0.22));
+    document.documentElement.style.setProperty('--accent-rgb', rgbStr);
+    document.documentElement.style.setProperty('--accent-glow', `rgba(${rgbStr}, 0.22)`);
+    document.documentElement.style.setProperty('--card-border', `rgba(${rgbStr}, 0.18)`);
+    document.documentElement.style.setProperty('--border-color', `rgba(${rgbStr}, 0.18)`);
+    document.documentElement.style.setProperty('--border-hover', `rgba(${rgbStr}, 0.38)`);
+    document.documentElement.style.setProperty('--badge-bg', `rgba(${rgbStr}, 0.12)`);
     document.documentElement.style.setProperty('--text-primary', customColors.text);
     document.documentElement.style.setProperty('--text-secondary', hexToRgba(customColors.text, 0.85));
-    document.documentElement.style.setProperty('--text-muted', hexToRgba(customColors.text, 0.6));
+    document.documentElement.style.setProperty('--text-muted', hexToRgba(customColors.text, 0.65));
 
     DOM.customBgColor.value = customColors.bg;
     DOM.customCardColor.value = customColors.card;
@@ -1065,11 +1080,15 @@ function applyTheme(themeName, customColors = null, save = true) {
   } else {
     [
       '--bg-primary', '--bg-secondary', '--bg-card', '--bg-card-hover',
-      '--accent-color', '--accent-secondary', '--accent-glow', '--border-color',
+      '--accent-color', '--accent-secondary', '--accent-rgb', '--accent-glow',
+      '--card-border', '--border-color', '--border-hover', '--badge-bg',
       '--text-primary', '--text-secondary', '--text-muted'
     ].forEach(prop => document.documentElement.style.removeProperty(prop));
 
-    const preset = THEME_PRESETS[themeName] || THEME_PRESETS.matcha;
+    const preset = THEME_PRESETS[themeName] || THEME_PRESETS.pomodoro;
+    if (preset.rgb) {
+      document.documentElement.style.setProperty('--accent-rgb', preset.rgb);
+    }
     DOM.customBgColor.value = preset.bg;
     DOM.customCardColor.value = preset.card;
     DOM.customAccentColor.value = preset.accent;
@@ -1158,7 +1177,7 @@ function showDesktopNotification(mode) {
 // ==========================================================================
 
 function loadStoredSettings() {
-  const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'matcha';
+  const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
   const savedCustom = localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
   if (savedTheme === 'custom' && savedCustom) {
     applyTheme('custom', JSON.parse(savedCustom), false);
@@ -1431,8 +1450,8 @@ function setupEventListeners() {
   });
 
   DOM.resetDefaultThemeBtn.addEventListener('click', () => {
-    applyTheme('matcha', null, true);
-    showToast('Reset to Matcha Dark theme', 'info');
+    applyTheme('pomodoro', null, true);
+    showToast('Reset to Classic Pomodoro theme', 'info');
   });
 
   // Sound Test & Notifications

@@ -37,10 +37,10 @@
 
   <!-- Main Stylesheet -->
   <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='pomoGrad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%234ade80'/%3E%3Cstop offset='100%25' stop-color='%2316a34a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='52' r='42' fill='url(%23pomoGrad)'/%3E%3Cpath d='M50 10 C48 18 42 22 36 24 C45 27 50 30 50 30 C50 30 55 27 64 24 C58 22 52 18 50 10 Z' fill='%2314532d'/%3E%3Ccircle cx='50' cy='52' r='32' fill='%23121a15'/%3E%3Ccircle cx='50' cy='52' r='3' fill='%234ade80'/%3E%3Cline x1='50' y1='52' x2='50' y2='32' stroke='%234ade80' stroke-width='3.5' stroke-linecap='round'/%3E%3Cline x1='50' y1='52' x2='64' y2='52' stroke='%234ade80' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='pomoGrad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23E05344'/%3E%3Cstop offset='100%25' stop-color='%23C93B2C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='52' r='42' fill='url(%23pomoGrad)'/%3E%3Cpath d='M50 10 C48 18 42 22 36 24 C45 27 50 30 50 30 C50 30 55 27 64 24 C58 22 52 18 50 10 Z' fill='%23166534'/%3E%3Ccircle cx='50' cy='52' r='32' fill='%231A1212'/%3E%3Ccircle cx='50' cy='52' r='3' fill='%23E05344'/%3E%3Cline x1='50' y1='52' x2='50' y2='32' stroke='%23E05344' stroke-width='3.5' stroke-linecap='round'/%3E%3Cline x1='50' y1='52' x2='64' y2='52' stroke='%23E05344' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 
-<body data-theme="matcha">
+<body data-theme="pomodoro">
 
   <!-- Top Ambient Glow -->
   <div class="ambient-glow" aria-hidden="true"></div>
@@ -443,37 +443,49 @@
         <h3 class="section-heading">Preset Themes</h3>
 
         <div class="theme-presets-grid" id="themePresetsGrid">
-          <!-- 1. Matcha Dark (Default) -->
-          <button class="theme-card-btn active" data-preset="matcha">
-            <div class="theme-swatch" style="background: linear-gradient(135deg, #18221b 50%, #4ade80 50%);"></div>
+          <!-- 1. Classic Pomodoro (Default Signature Theme) -->
+          <button class="theme-card-btn active" data-preset="pomodoro">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #1A1212 50%, #E05344 50%); border-color: rgba(224,83,68,0.4);"></div>
+            <span class="theme-name">Classic Pomodoro</span>
+          </button>
+
+          <!-- 2. Matcha Dark -->
+          <button class="theme-card-btn" data-preset="matcha">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #18221b 50%, #4ade80 50%); border-color: rgba(74,222,128,0.4);"></div>
             <span class="theme-name">Matcha Dark</span>
           </button>
 
-          <!-- 2. Cozy Coffee -->
+          <!-- 3. Cozy Coffee -->
           <button class="theme-card-btn" data-preset="coffee">
-            <div class="theme-swatch" style="background: linear-gradient(135deg, #1e1713 50%, #f59e0b 50%);"></div>
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #1e1713 50%, #f59e0b 50%); border-color: rgba(245,158,11,0.4);"></div>
             <span class="theme-name">Cozy Coffee</span>
           </button>
 
-          <!-- 3. Cyberpunk -->
+          <!-- 4. Cyberpunk -->
           <button class="theme-card-btn" data-preset="cyberpunk">
-            <div class="theme-swatch" style="background: linear-gradient(135deg, #090a10 50%, #00f0ff 50%);"></div>
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #090a10 50%, #00f0ff 50%); border-color: rgba(0,240,255,0.4);"></div>
             <span class="theme-name">Cyberpunk</span>
           </button>
 
-          <!-- 4. Midnight OLED -->
+          <!-- 5. Midnight OLED -->
           <button class="theme-card-btn" data-preset="midnight">
-            <div class="theme-swatch" style="background: linear-gradient(135deg, #000000 50%, #6366f1 50%);"></div>
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #000000 50%, #6366f1 50%); border-color: rgba(99,102,241,0.4);"></div>
             <span class="theme-name">Midnight OLED</span>
           </button>
 
-          <!-- 5. Pastel Sakura -->
+          <!-- 6. Pastel Sakura -->
           <button class="theme-card-btn" data-preset="sakura">
-            <div class="theme-swatch" style="background: linear-gradient(135deg, #23161c 50%, #f472b6 50%);"></div>
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #23161c 50%, #f472b6 50%); border-color: rgba(244,114,182,0.4);"></div>
             <span class="theme-name">Pastel Sakura</span>
           </button>
 
-          <!-- 6. Sage Focus -->
+          <!-- 7. Sunset Amber -->
+          <button class="theme-card-btn" data-preset="sunset">
+            <div class="theme-swatch" style="background: linear-gradient(135deg, #120d1c 50%, #fb923c 50%); border-color: rgba(251,146,60,0.4);"></div>
+            <span class="theme-name">Sunset Amber</span>
+          </button>
+
+          <!-- 8. Sage Focus -->
           <button class="theme-card-btn" data-preset="sage">
             <div class="theme-swatch"
               style="background: linear-gradient(135deg, #F4F7F4 50%, #608066 50%); border-color: rgba(96,128,102,0.35);">
@@ -481,7 +493,7 @@
             <span class="theme-name">Sage Focus</span>
           </button>
 
-          <!-- 7. Calm Blush -->
+          <!-- 9. Calm Blush -->
           <button class="theme-card-btn" data-preset="blush">
             <div class="theme-swatch"
               style="background: linear-gradient(135deg, #FAF5F5 50%, #C07D88 50%); border-color: rgba(192,125,136,0.35);">
@@ -489,7 +501,7 @@
             <span class="theme-name">Calm Blush</span>
           </button>
 
-          <!-- 8. Cerulean Serenity -->
+          <!-- 10. Cerulean Serenity -->
           <button class="theme-card-btn" data-preset="cerulean">
             <div class="theme-swatch"
               style="background: linear-gradient(135deg, #F0F4F8 50%, #5B82A6 50%); border-color: rgba(91,130,166,0.35);">
@@ -505,39 +517,39 @@
           <div class="color-picker-item">
             <label for="customBgColor">Background</label>
             <div class="picker-input-wrap">
-              <input type="color" id="customBgColor" value="#18221b">
-              <span class="color-hex-label" id="customBgHex">#18221b</span>
+              <input type="color" id="customBgColor" value="#1A1212">
+              <span class="color-hex-label" id="customBgHex">#1A1212</span>
             </div>
           </div>
 
           <div class="color-picker-item">
             <label for="customCardColor">Card Surface</label>
             <div class="picker-input-wrap">
-              <input type="color" id="customCardColor" value="#223027">
-              <span class="color-hex-label" id="customCardHex">#223027</span>
+              <input type="color" id="customCardColor" value="#2A181A">
+              <span class="color-hex-label" id="customCardHex">#2A181A</span>
             </div>
           </div>
 
           <div class="color-picker-item">
             <label for="customAccentColor">Accent Color</label>
             <div class="picker-input-wrap">
-              <input type="color" id="customAccentColor" value="#4ade80">
-              <span class="color-hex-label" id="customAccentHex">#4ade80</span>
+              <input type="color" id="customAccentColor" value="#E05344">
+              <span class="color-hex-label" id="customAccentHex">#E05344</span>
             </div>
           </div>
 
           <div class="color-picker-item">
             <label for="customTextColor">Text Primary</label>
             <div class="picker-input-wrap">
-              <input type="color" id="customTextColor" value="#f0fdf4">
-              <span class="color-hex-label" id="customTextHex">#f0fdf4</span>
+              <input type="color" id="customTextColor" value="#FFF5F5">
+              <span class="color-hex-label" id="customTextHex">#FFF5F5</span>
             </div>
           </div>
         </div>
 
         <div class="custom-theme-actions">
           <button id="applyCustomThemeBtn" class="modal-btn primary">Apply Custom Colors</button>
-          <button id="resetDefaultThemeBtn" class="modal-btn secondary">Reset to Matcha Dark</button>
+          <button id="resetDefaultThemeBtn" class="modal-btn secondary">Reset to Classic Pomodoro</button>
         </div>
       </div>
     </div>
@@ -550,80 +562,102 @@
     <div class="modal-card modal-large" role="dialog" aria-labelledby="scienceModalTitle">
       <div class="modal-header">
         <div class="modal-header-text">
-          <h2 id="scienceModalTitle" class="modal-title">How PomoClock Works & The Science Behind It</h2>
-          <span class="modal-subtitle">Evidence-based productivity methodology & color ergonomics</span>
+          <h2 id="scienceModalTitle" class="modal-title">Mastering the Pomodoro Method 🍅</h2>
+          <span class="modal-subtitle">Simple steps, brain hacks, and the science of deep focus.</span>
         </div>
         <button class="close-modal-btn" id="closeScienceModalBtn" aria-label="Close modal">&times;</button>
       </div>
 
       <div class="modal-body science-modal-content">
         <article class="science-guide">
+          <!-- SECTION 1: THE 4-STEP GAMEPLAN -->
           <section class="science-section">
-            <div class="science-badge">🧠 Focus Science</div>
-            <h3>The 25/5 Pomodoro Technique Protocol</h3>
-            <p>
-              The Pomodoro Technique, developed by Francesco Cirillo, aligns with human <strong>ultradian biological
-                rhythms</strong>. High-intensity cognitive performance naturally ebbs every 20 to 30 minutes due to
-              neurotransmitter depletion in the prefrontal cortex.
-            </p>
-            <div class="science-grid">
-              <div class="science-card">
-                <span class="science-card-icon">🎯</span>
-                <h4>25-Min Focus Sprint</h4>
-                <p>Single-tasking with zero context switching maximizes deep working memory and promotes flow state.</p>
+            <div class="science-section-header">
+              <span class="science-badge">🎯 The 4-Step Gameplan</span>
+            </div>
+            <div class="gameplan-grid">
+              <div class="gameplan-card">
+                <div class="gameplan-header">
+                  <span class="gameplan-num">1</span>
+                  <span class="gameplan-icon">🎯</span>
+                  <h4>Pick One Target</h4>
+                </div>
+                <p>Type your focus topic in the input bar. Single-tasking only—no multitasking allowed!</p>
               </div>
-              <div class="science-card">
-                <span class="science-card-icon">☕</span>
-                <h4>5-Min Diffuse Break</h4>
-                <p>Allows the brain's Default Mode Network (DMN) to passively consolidate memories and solve complex
-                  problems.</p>
+
+              <div class="gameplan-card">
+                <div class="gameplan-header">
+                  <span class="gameplan-num">2</span>
+                  <span class="gameplan-icon">⏱️</span>
+                  <h4>25-Min Sprint</h4>
+                </div>
+                <p>Hit Start. Dive deep until the gentle singing bowl chime signals time's up.</p>
               </div>
-              <div class="science-card">
-                <span class="science-card-icon">🌴</span>
-                <h4>15-Min Long Break</h4>
-                <p>Triggered every 4 cycles to reset mental fatigue and prevent burnout across extended study days.</p>
+
+              <div class="gameplan-card">
+                <div class="gameplan-header">
+                  <span class="gameplan-num">3</span>
+                  <span class="gameplan-icon">☕</span>
+                  <h4>5-Min Reset</h4>
+                </div>
+                <p>Step away! Stretch, grab water, or rest your eyes. Don't scroll social media.</p>
+              </div>
+
+              <div class="gameplan-card">
+                <div class="gameplan-header">
+                  <span class="gameplan-num">4</span>
+                  <span class="gameplan-icon">🌴</span>
+                  <h4>15-Min Long Break</h4>
+                </div>
+                <p>After 4 focus cycles, enjoy a longer recharge to reset your mental battery.</p>
               </div>
             </div>
           </section>
 
+          <!-- SECTION 2: BRAIN SCIENCE FUN FACTS -->
           <section class="science-section">
-            <div class="science-badge">👁️ Color Ergonomics</div>
-            <h3>Low Visual Fatigue Theme Science</h3>
-            <p>
-              Standard digital screens often use stark `#000000` text on `#FFFFFF` backgrounds, which causes photopic
-              contrast glare, pupil spasms, and ocular fatigue over hours of continuous study.
-            </p>
-            <ul class="science-list">
-              <li>
-                <strong>Sage Focus (#F4F7F4 / #608066):</strong> Muted green wavelengths (520–560nm) fall directly at
-                the peak of human photopic sensitivity, reducing optical strain while subtly lowering sympathetic heart
-                rate.
-              </li>
-              <li>
-                <strong>Calm Blush (#FAF5F5 / #C07D88):</strong> Low-saturation warm rose tones reduce
-                blue-light-induced retinal stimulation and encourage parasympathetic relaxation during stressful study
-                periods.
-              </li>
-              <li>
-                <strong>Cerulean Serenity (#F0F4F8 / #5B82A6):</strong> Desaturated atmospheric sky-slate tones evoke
-                natural horizons, proven in environmental psychology to support analytical problem-solving and cognitive
-                stamina.
-              </li>
-            </ul>
-          </section>
+            <div class="science-section-header">
+              <span class="science-badge">🧠 Brain Science Fun Facts</span>
+            </div>
+            <div class="facts-grid">
+              <div class="science-fact-card">
+                <div class="fact-header">
+                  <span class="fact-icon">🍅</span>
+                  <h4>Why "Pomodoro"?</h4>
+                </div>
+                <p>Francesco Cirillo invented this in the late 1980s as a university student using a literal tomato-shaped kitchen mechanical timer (<em>pomodoro</em> is Italian for tomato!).</p>
+              </div>
 
-          <section class="science-section">
-            <div class="science-badge">⚡ Study Best Practices</div>
-            <div class="tips-box">
-              <p>💡 <strong>Pro Tip:</strong> During 5-minute short breaks, physically look away from all screens at an
-                object 20+ feet away (the 20-20-20 rule) and hydrate to refresh cognitive focus.</p>
+              <div class="science-fact-card">
+                <div class="fact-header">
+                  <span class="fact-icon">⚡</span>
+                  <h4>Beat Parkinson’s Law</h4>
+                </div>
+                <p><em>"Work expands to fill the time available for its completion."</em> Giving yourself a strict 25-minute limit tricks your brain into immediate action and crushes procrastination.</p>
+              </div>
+
+              <div class="science-fact-card">
+                <div class="fact-header">
+                  <span class="fact-icon">🧠</span>
+                  <h4>Default Mode Network (DMN)</h4>
+                </div>
+                <p>Your brain actually consolidates memory and solves complex bugs while you're daydreaming on your 5-minute break, not while actively staring at the problem.</p>
+              </div>
+
+              <div class="science-fact-card">
+                <div class="fact-header">
+                  <span class="fact-icon">👁️</span>
+                  <h4>The 20-20-20 Rule</h4>
+                </div>
+                <p>Every break, gaze at something 20 feet away for 20 seconds to prevent eye muscle spasms and visual fatigue.</p>
+              </div>
             </div>
           </section>
         </article>
       </div>
 
-      <div class="modal-footer">
-        <button id="closeScienceModalBtnBottom" class="modal-btn primary">Got it, Let's Study!</button>
+      <div class="modal-footer science-modal-footer">
+        <button id="closeScienceModalBtnBottom" class="modal-btn primary">Got it, Let's Lock In! 🚀</button>
       </div>
     </div>
   </div>
