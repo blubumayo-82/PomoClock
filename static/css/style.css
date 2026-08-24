@@ -1,3 +1,30 @@
+Please fix the data synchronization and layout discrepancies between the live dashboard and the Share Card (`#shareCardContainer`) in `app.js`,
+`style.css`,
+and `index.html`: 1. Perfect Chart & Metric Data Synchronization: - In `app.js`,
+ensure the export function populates the Share Card using the exact same calculated 7-day dataset and session counts as the live Weekly Focus Activity chart. - If the live site shows specific sessions per day (e.g. Sunday: 1, Monday: 2),
+the exported card must reflect identical day columns,
+bar heights,
+and tomato badges. 2. Simplify Share Card Metric Badges (Emoji + Value Only): - Remove the small upper uppercase labels ("TOTAL STUDY", "STUDY STREAK", "TODAY'S FOCUS", "COMPLETED") from the 4 pills in `#shareCardContainer`. - Structure each pill as a sleek,
+cute horizontal capsule containing only the Emoji icon and the bold value/unit: * Pill 1: ⏱️ [X.XX] hrs * Pill 2: 🔥 [X] days * Pill 3: 📅 [X] min * Pill 4: 🍅 [X] pomos - Style each pill with: ```css .share-stat-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+``` - Set the share card metric container to: `display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 8px;
+width: 100%;
+`.
 /* ==========================================================================
    PomoClock - Pomodoro Study Timer Stylesheet
    Design System, CSS Variables, Curated Themes, Glassmorphism & Animations
@@ -32,7 +59,7 @@
   --danger-bg: rgba(229, 62, 62, 0.12);
   --success-color: #38a169;
   --warning-color: #d69e2e;
-  
+
   /* Layout & Sizing Tokens */
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -279,7 +306,8 @@ body[data-theme="sunset"] {
    2. Reset & Global Base Styles
    -------------------------------------------------------------------------- */
 
-html, body {
+html,
+body {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
@@ -288,7 +316,9 @@ html, body {
   box-sizing: border-box;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: inherit;
 }
 
@@ -325,7 +355,7 @@ body {
   transform: translateX(-50%);
   width: 700px;
   height: 500px;
-  background: radial-gradient(circle, var(--accent-glow) 0%, rgba(0,0,0,0) 70%);
+  background: radial-gradient(circle, var(--accent-glow) 0%, rgba(0, 0, 0, 0) 70%);
   filter: blur(60px);
   pointer-events: none;
   z-index: 0;
@@ -357,7 +387,9 @@ body {
    3. Common Components & Glassmorphism Cards
    -------------------------------------------------------------------------- */
 
-.app-wrapper, .app-container, .main-container {
+.app-wrapper,
+.app-container,
+.main-container {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -373,13 +405,27 @@ body {
 }
 
 @media (min-width: 768px) {
-  .app-wrapper, .app-container, .main-container {
+
+  .app-wrapper,
+  .app-container,
+  .main-container {
     max-width: 1200px;
     padding: 1.25rem 1.5rem 3rem 1.5rem;
   }
 }
 
-.card, .timer-section, .timer-card, .main-timer-section, .dashboard-section, .stats-grid, .stats-card-grid, .activity-card, .weekly-activity-card, .history-card, .recent-sessions-card, .dashboard-grid {
+.card,
+.timer-section,
+.timer-card,
+.main-timer-section,
+.dashboard-section,
+.stats-grid,
+.stats-card-grid,
+.activity-card,
+.weekly-activity-card,
+.history-card,
+.recent-sessions-card,
+.dashboard-grid {
   width: 100% !important;
   max-width: min(92vw, 440px) !important;
   margin-left: auto !important;
@@ -390,7 +436,19 @@ body {
 }
 
 @media (min-width: 768px) {
-  .card, .timer-section, .timer-card, .main-timer-section, .dashboard-section, .stats-grid, .stats-card-grid, .activity-card, .weekly-activity-card, .history-card, .recent-sessions-card, .dashboard-grid {
+
+  .card,
+  .timer-section,
+  .timer-card,
+  .main-timer-section,
+  .dashboard-section,
+  .stats-grid,
+  .stats-card-grid,
+  .activity-card,
+  .weekly-activity-card,
+  .history-card,
+  .recent-sessions-card,
+  .dashboard-grid {
     max-width: 100% !important;
   }
 }
@@ -432,7 +490,10 @@ body {
    4. Header & Navigation
    -------------------------------------------------------------------------- */
 
-header, .app-header, .header, .top-bar {
+header,
+.app-header,
+.header,
+.top-bar {
   display: flex !important;
   flex-direction: row !important;
   justify-content: space-between !important;
@@ -446,7 +507,11 @@ header, .app-header, .header, .top-bar {
 }
 
 @media (min-width: 768px) {
-  header, .app-header, .header, .top-bar {
+
+  header,
+  .app-header,
+  .header,
+  .top-bar {
     max-width: 1200px !important;
     padding: 0.75rem 0 !important;
     margin-bottom: 1.75rem !important;
@@ -483,8 +548,15 @@ header, .app-header, .header, .top-bar {
 }
 
 @keyframes floatIcon {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 .brand-text {
@@ -517,12 +589,14 @@ header, .app-header, .header, .top-bar {
   .brand-text h1 {
     font-size: 1.35rem;
   }
+
   .brand-tagline {
     font-size: 0.65rem;
   }
 }
 
-.header-actions, .nav-icons {
+.header-actions,
+.nav-icons {
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
@@ -532,7 +606,9 @@ header, .app-header, .header, .top-bar {
   flex-shrink: 0 !important;
 }
 
-.icon-btn, .header-text-btn, .auth-btn {
+.icon-btn,
+.header-text-btn,
+.auth-btn {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -561,12 +637,14 @@ header, .app-header, .header, .top-bar {
     max-width: none !important;
     padding: 0 0.8rem !important;
   }
+
   .header-btn-text {
     display: inline-block !important;
   }
 }
 
-.icon-btn:hover, .header-text-btn:hover {
+.icon-btn:hover,
+.header-text-btn:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent-color);
   color: var(--accent-color);
@@ -574,7 +652,8 @@ header, .app-header, .header, .top-bar {
   box-shadow: 0 4px 12px var(--accent-glow);
 }
 
-.icon-btn .icon, .header-text-btn .icon {
+.icon-btn .icon,
+.header-text-btn .icon {
   width: 18px !important;
   height: 18px !important;
 }
@@ -584,7 +663,10 @@ header, .app-header, .header, .top-bar {
    5. Main Responsive Grid Layout
    -------------------------------------------------------------------------- */
 
-.main-layout, .app-layout, .dashboard-container, .main-content {
+.main-layout,
+.app-layout,
+.dashboard-container,
+.main-content {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -612,7 +694,8 @@ header, .app-header, .header, .top-bar {
 @media (min-width: 992px) {
   .main-layout {
     display: grid !important;
-    grid-template-columns: 1.55fr 1fr !important; /* ~61% : ~39% */
+    grid-template-columns: 1.55fr 1fr !important;
+    /* ~61% : ~39% */
     gap: 2rem !important;
     align-items: start !important;
     max-width: 1240px !important;
@@ -631,7 +714,8 @@ header, .app-header, .header, .top-bar {
 
 @media (min-width: 1200px) {
   .main-layout {
-    grid-template-columns: 1.6fr 1fr !important; /* ~61.5% : ~38.5% */
+    grid-template-columns: 1.6fr 1fr !important;
+    /* ~61.5% : ~38.5% */
     max-width: 1280px !important;
     gap: 2.25rem !important;
   }
@@ -647,7 +731,9 @@ header, .app-header, .header, .top-bar {
    6. Focus Timer Section
    -------------------------------------------------------------------------- */
 
-.timer-section, .timer-card, .main-timer-section {
+.timer-section,
+.timer-card,
+.main-timer-section {
   padding: 2rem 1.5rem 2rem 1.5rem !important;
   display: flex;
   flex-direction: column;
@@ -661,7 +747,8 @@ header, .app-header, .header, .top-bar {
 }
 
 /* Active Focus Task Bar & Consolidated Queue */
-.active-task-bar, .task-bar {
+.active-task-bar,
+.task-bar {
   width: 100%;
   max-width: calc(100% - 3.5rem);
   box-sizing: border-box;
@@ -1008,12 +1095,12 @@ header, .app-header, .header, .top-bar {
   transition: all var(--transition-fast);
 }
 
-.task-checkbox:checked + .custom-checkbox {
+.task-checkbox:checked+.custom-checkbox {
   background: var(--accent-color);
   border-color: var(--accent-color);
 }
 
-.task-checkbox:checked + .custom-checkbox::after {
+.task-checkbox:checked+.custom-checkbox::after {
   content: '✓';
   color: var(--btn-primary-text, #18221b);
   font-size: 11px;
@@ -1189,6 +1276,7 @@ header, .app-header, .header, .top-bar {
   .mode-duration-badge {
     display: none;
   }
+
   .mode-tab {
     padding: 0.4rem 0.15rem;
     font-size: clamp(0.68rem, 2.8vw, 0.78rem);
@@ -1254,7 +1342,8 @@ button.mode-tab:disabled {
   stroke: url(#progressGradient);
   stroke-width: 14;
   stroke-linecap: round;
-  stroke-dasharray: 879.64; /* 2 * PI * 140 */
+  stroke-dasharray: 879.64;
+  /* 2 * PI * 140 */
   stroke-dashoffset: 0;
   transition: stroke-dashoffset 0.85s linear, stroke var(--transition-normal);
   filter: drop-shadow(0 0 10px var(--accent-glow));
@@ -1293,8 +1382,17 @@ button.mode-tab:disabled {
 }
 
 @keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.75; transform: scale(0.97); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.75;
+    transform: scale(0.97);
+  }
 }
 
 .time-display {
@@ -1339,7 +1437,8 @@ button.mode-tab:disabled {
 /* --------------------------------------------------------------------------
    Dynamic Finish Target & ETA Badge Styles (Repositioned above controls)
    -------------------------------------------------------------------------- */
-.eta-badge, .eta-pill-repositioned {
+.eta-badge,
+.eta-pill-repositioned {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1374,7 +1473,9 @@ button.mode-tab:disabled {
 }
 
 /* Timer Control Buttons */
-.timer-controls, .controls-wrapper, .timer-buttons {
+.timer-controls,
+.controls-wrapper,
+.timer-buttons {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1402,7 +1503,9 @@ button.mode-tab:disabled {
   box-sizing: border-box;
 }
 
-.primary-btn, .start-btn, #startPauseBtn {
+.primary-btn,
+.start-btn,
+#startPauseBtn {
   background: var(--accent-color);
   color: var(--btn-primary-text, #18221b);
   border: none;
@@ -1414,17 +1517,21 @@ button.mode-tab:disabled {
   box-shadow: 0 6px 20px var(--accent-glow);
 }
 
-.primary-btn:hover, #startPauseBtn:hover {
+.primary-btn:hover,
+#startPauseBtn:hover {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 0 10px 25px var(--accent-glow);
   filter: brightness(1.08);
 }
 
-.primary-btn:active, #startPauseBtn:active {
+.primary-btn:active,
+#startPauseBtn:active {
   transform: translateY(1px) scale(0.98);
 }
 
-.secondary-btn, #resetBtn, #skipBtn {
+.secondary-btn,
+#resetBtn,
+#skipBtn {
   background: rgba(0, 0, 0, 0.25);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
@@ -1435,14 +1542,18 @@ button.mode-tab:disabled {
   padding: 0 0.85rem;
 }
 
-.secondary-btn:hover, #resetBtn:hover, #skipBtn:hover {
+.secondary-btn:hover,
+#resetBtn:hover,
+#skipBtn:hover {
   background: var(--bg-card-hover);
   border-color: var(--accent-color);
   color: var(--accent-color);
   transform: translateY(-2px);
 }
 
-.secondary-btn:active, #resetBtn:active, #skipBtn:active {
+.secondary-btn:active,
+#resetBtn:active,
+#skipBtn:active {
   transform: translateY(1px);
 }
 
@@ -1499,19 +1610,25 @@ button.mode-tab:disabled {
 }
 
 @media (max-width: 480px) {
-  .timer-controls, .controls-wrapper, .timer-buttons {
+
+  .timer-controls,
+  .controls-wrapper,
+  .timer-buttons {
     gap: clamp(0.35rem, 2vw, 0.65rem);
     padding: 0 0.25rem;
   }
 
-  .primary-btn, #startPauseBtn {
+  .primary-btn,
+  #startPauseBtn {
     flex: 0 1 120px;
     height: 44px;
     font-size: 0.9rem;
     padding: 0 0.85rem;
   }
 
-  .secondary-btn, #resetBtn, #skipBtn {
+  .secondary-btn,
+  #resetBtn,
+  #skipBtn {
     flex: 0 1 80px;
     height: 40px;
     font-size: 0.78rem;
@@ -1531,11 +1648,16 @@ button.mode-tab:disabled {
 }
 
 @media (max-width: 390px) {
-  .timer-controls, .controls-wrapper, .timer-buttons {
+
+  .timer-controls,
+  .controls-wrapper,
+  .timer-buttons {
     gap: 0.5rem;
   }
 
-  .secondary-btn, #resetBtn, #skipBtn {
+  .secondary-btn,
+  #resetBtn,
+  #skipBtn {
     flex: 0 0 40px;
     width: 40px;
     height: 40px;
@@ -1586,7 +1708,8 @@ button.mode-tab:disabled {
 }
 
 /* Touch & Mobile Screen Optimization: Hide keyboard shortcuts */
-@media (max-width: 640px), (hover: none) {
+@media (max-width: 640px),
+(hover: none) {
   .shortcuts-hint {
     display: none !important;
   }
@@ -1644,7 +1767,9 @@ button.mode-tab:disabled {
   flex: 1;
 }
 
-.stat-label, .stat-card-title, .metric-title {
+.stat-label,
+.stat-card-title,
+.metric-title {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1709,7 +1834,8 @@ button.mode-tab:disabled {
   align-items: center;
 }
 
-.chart-summary-badge, .weekly-hours-badge {
+.chart-summary-badge,
+.weekly-hours-badge {
   font-size: 0.74rem;
   font-weight: 700;
   padding: 0.2rem 0.65rem;
@@ -1726,7 +1852,9 @@ button.mode-tab:disabled {
   padding: 1.5rem;
 }
 
-.weekly-chart-container, .chart-wrapper, .activity-chart {
+.weekly-chart-container,
+.chart-wrapper,
+.activity-chart {
   margin-top: 0.75rem;
   height: 165px;
   display: flex;
@@ -1868,7 +1996,8 @@ button.mode-tab:disabled {
   text-decoration: underline;
 }
 
-.history-table-wrapper, .table-responsive {
+.history-table-wrapper,
+.table-responsive {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -2264,7 +2393,9 @@ button.mode-tab:disabled {
   margin-bottom: 0.35rem;
 }
 
-.input-field input, .inline-input, .select-input {
+.input-field input,
+.inline-input,
+.select-input {
   width: 100%;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
@@ -2277,7 +2408,9 @@ button.mode-tab:disabled {
   transition: border-color var(--transition-fast);
 }
 
-.input-field input:focus, .inline-input:focus, .select-input:focus {
+.input-field input:focus,
+.inline-input:focus,
+.select-input:focus {
   border-color: var(--accent-color);
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
@@ -2331,7 +2464,8 @@ button.mode-tab:disabled {
   width: 110px;
 }
 
-.test-sound-btn, .mini-btn {
+.test-sound-btn,
+.mini-btn {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -2344,7 +2478,8 @@ button.mode-tab:disabled {
   transition: all var(--transition-fast);
 }
 
-.test-sound-btn:hover, .mini-btn:hover {
+.test-sound-btn:hover,
+.mini-btn:hover {
   background: var(--accent-color);
   color: var(--bg-primary);
   border-color: var(--accent-color);
@@ -2368,7 +2503,10 @@ button.mode-tab:disabled {
 .slider {
   position: absolute;
   cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-color: rgba(255, 255, 255, 0.15);
   transition: var(--transition-fast);
   border-radius: var(--radius-full);
@@ -2386,11 +2524,11 @@ button.mode-tab:disabled {
   border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
   background-color: var(--accent-color);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
   transform: translateX(20px);
   background-color: var(--bg-primary);
 }
@@ -2443,8 +2581,15 @@ input:checked + .slider:before {
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .toast.success {
@@ -2491,7 +2636,8 @@ input:checked + .slider:before {
   text-align: center;
 }
 
-.footer-link, .footer-link-btn {
+.footer-link,
+.footer-link-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -2508,7 +2654,8 @@ input:checked + .slider:before {
   border-radius: var(--radius-sm);
 }
 
-.footer-link:hover, .footer-link-btn:hover {
+.footer-link:hover,
+.footer-link-btn:hover {
   color: var(--accent-color);
   background: var(--badge-bg);
   transform: translateY(-1px);
@@ -2556,6 +2703,7 @@ input:checked + .slider:before {
   .header-btn-text {
     display: none;
   }
+
   .header-text-btn {
     padding: 0;
     width: 42px;
@@ -2849,6 +2997,7 @@ input:checked + .slider:before {
   .user-badge-btn .user-badge-name {
     display: none;
   }
+
   .user-badge-btn {
     padding: 0;
     width: 36px;
@@ -2878,6 +3027,7 @@ input:checked + .slider:before {
     opacity: 0;
     transform: translateY(-6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -3089,11 +3239,13 @@ input:checked + .slider:before {
     border-color: var(--accent-color);
     transform: scale(1);
   }
+
   50% {
     box-shadow: 0 0 0 8px var(--accent-glow), 0 0 14px var(--accent-color);
     border-color: var(--accent-color);
     transform: scale(1.08);
   }
+
   100% {
     box-shadow: 0 0 0 0 var(--accent-glow), 0 0 0 1px var(--accent-color);
     border-color: var(--accent-color);
@@ -3117,7 +3269,7 @@ input:checked + .slider:before {
   color: var(--text-primary) !important;
   border: 1px solid var(--card-border, rgba(255, 255, 255, 0.15)) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: 0 12px 36px var(--accent-glow, rgba(0,0,0,0.5)) !important;
+  box-shadow: 0 12px 36px var(--accent-glow, rgba(0, 0, 0, 0.5)) !important;
   font-family: var(--font-main) !important;
   padding: 1.15rem 1.25rem !important;
   max-width: 320px !important;
@@ -3240,16 +3392,19 @@ input:checked + .slider:before {
 .driver-popover.driverjs-theme-popover .driver-popover-arrow-side-top.driver-popover-arrow {
   border-top-color: var(--bg-card) !important;
 }
+
 .driver-popover.pomohaven-driver-popover .driver-popover-arrow-side-bottom.driver-popover-arrow,
 .driver-popover.pomoclock-driver-popover .driver-popover-arrow-side-bottom.driver-popover-arrow,
 .driver-popover.driverjs-theme-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
   border-bottom-color: var(--bg-card) !important;
 }
+
 .driver-popover.pomohaven-driver-popover .driver-popover-arrow-side-left.driver-popover-arrow,
 .driver-popover.pomoclock-driver-popover .driver-popover-arrow-side-left.driver-popover-arrow,
 .driver-popover.driverjs-theme-popover .driver-popover-arrow-side-left.driver-popover-arrow {
   border-left-color: var(--bg-card) !important;
 }
+
 .driver-popover.pomohaven-driver-popover .driver-popover-arrow-side-right.driver-popover-arrow,
 .driver-popover.pomoclock-driver-popover .driver-popover-arrow-side-right.driver-popover-arrow,
 .driver-popover.driverjs-theme-popover .driver-popover-arrow-side-right.driver-popover-arrow {
@@ -3470,7 +3625,7 @@ body.zen-mode-active .zen-corner-btn {
   width: 600px;
   background: var(--bg-primary, #171214);
   background-image: radial-gradient(circle at 90% 10%, rgba(var(--accent-rgb, 224, 83, 68), 0.16) 0%, transparent 60%),
-                    radial-gradient(circle at 10% 90%, rgba(34, 197, 94, 0.08) 0%, transparent 50%);
+    radial-gradient(circle at 10% 90%, rgba(34, 197, 94, 0.08) 0%, transparent 50%);
   color: var(--text-primary, #FFF5F5);
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   padding: 26px 28px;
@@ -3564,7 +3719,8 @@ body.zen-mode-active .zen-corner-btn {
   box-sizing: border-box;
 }
 
-.share-stat-pill, .share-metric-card {
+.share-stat-pill,
+.share-metric-card {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3581,13 +3737,15 @@ body.zen-mode-active .zen-corner-btn {
   white-space: nowrap;
 }
 
-.share-pill-icon, .share-metric-icon {
+.share-pill-icon,
+.share-metric-icon {
   font-size: 1.15rem;
   line-height: 1;
   flex-shrink: 0;
 }
 
-.share-pill-val, .share-metric-val {
+.share-pill-val,
+.share-metric-val {
   font-family: 'JetBrains Mono', monospace;
   font-size: 1.05rem;
   font-weight: 700;
@@ -3596,7 +3754,8 @@ body.zen-mode-active .zen-corner-btn {
   white-space: nowrap;
 }
 
-.share-pill-val small, .share-metric-val small {
+.share-pill-val small,
+.share-metric-val small {
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--accent-color, #FFA28B);

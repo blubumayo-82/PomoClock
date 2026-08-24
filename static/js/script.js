@@ -914,6 +914,7 @@ async function fetchStatistics() {
 }
 
 function renderStatistics(stats) {
+  state.currentStats = stats;
   DOM.statTotalHours.innerHTML = `${stats.total_focus_hours} <small>hrs</small>`;
   DOM.statTotalMinutes.textContent = `${stats.total_focus_minutes} mins recorded`;
   DOM.statCompletedCount.textContent = stats.completed_pomodoros;
@@ -931,6 +932,7 @@ function renderStatistics(stats) {
 
 function renderWeeklyChart(activity) {
   if (!DOM.activityChart) return;
+  state.currentActivity = activity;
 
   if (!activity.length) {
     DOM.activityChart.innerHTML = `<div class="chart-loading">No activity recorded this week</div>`;
@@ -2416,26 +2418,30 @@ async function exportShareableFocusCard() {
     scholarElem.textContent = activeUserName;
   }
 
-  // 3. Populate highlight metric pills from active stats
-  const stats = computeLocalStats();
+  // 3. Populate highlight metric pills from active stats (100% sync with live site)
+  const stats = state.currentStats || computeLocalStats();
   const totalHrsElem = document.getElementById('shareTotalHours');
   if (totalHrsElem) {
-    totalHrsElem.textContent = `${stats.total_focus_hours} hrs`;
+    const hrsVal = stats.total_focus_hours !== undefined ? stats.total_focus_hours : (DOM.statTotalHours ? DOM.statTotalHours.textContent.replace('hrs', '').trim() : '0.0');
+    totalHrsElem.textContent = `${hrsVal} hrs`;
   }
   const streakElem = document.getElementById('shareStreakDays');
   if (streakElem) {
-    streakElem.textContent = `${stats.current_streak_days} days`;
+    const streakVal = stats.current_streak_days !== undefined ? stats.current_streak_days : (DOM.statStreakDays ? DOM.statStreakDays.textContent.replace('days', '').trim() : '0');
+    streakElem.textContent = `${streakVal} days`;
   }
   const todayMinElem = document.getElementById('shareTodayMinutes');
   if (todayMinElem) {
-    todayMinElem.textContent = `${stats.today_focus_minutes} min`;
+    const minVal = stats.today_focus_minutes !== undefined ? stats.today_focus_minutes : (DOM.statTodayMinutes ? DOM.statTodayMinutes.textContent.replace('min', '').trim() : '0');
+    todayMinElem.textContent = `${minVal} min`;
   }
   const compCountElem = document.getElementById('shareCompletedCount');
   if (compCountElem) {
-    compCountElem.textContent = `${stats.completed_pomodoros} pomos`;
+    const compVal = stats.completed_pomodoros !== undefined ? stats.completed_pomodoros : (DOM.statCompletedCount ? DOM.statCompletedCount.textContent.trim() : '0');
+    compCountElem.textContent = `${compVal} pomos`;
   }
 
-  // 4. Populate weekly focus activity summary badge & 7-day single-row column chart
+  // 4. Populate weekly focus activity summary badge & 7-day single-row column chart (100% sync with live site)
   const weekTotalElem = document.getElementById('shareWeekTotal');
   if (weekTotalElem && DOM.chartWeekTotal) {
     weekTotalElem.textContent = DOM.chartWeekTotal.textContent;
@@ -2443,7 +2449,7 @@ async function exportShareableFocusCard() {
 
   const chartContentElem = document.getElementById('shareChartContent');
   if (chartContentElem) {
-    const activity = stats.weekly_activity || [];
+    const activity = (state.currentStats && state.currentStats.weekly_activity) || state.currentActivity || stats.weekly_activity || [];
     const todayStr = getLocalDateString();
     const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
     const maxMins = Math.max(...recordedMins, 25);
@@ -2456,9 +2462,11 @@ async function exportShareableFocusCard() {
 
       let heightPercent = 0;
       let minHeight = '0px';
+      let fillOpacity = 0.25;
       if (mins > 0) {
         heightPercent = Math.min(100, Math.max(8, Math.round((mins / maxMins) * 100)));
         minHeight = '8px';
+        fillOpacity = 1;
       }
 
       const badgeContent = count > 0 ? `🍅 ${count}` : '&nbsp;';
@@ -2467,7 +2475,7 @@ async function exportShareableFocusCard() {
         <div class="share-day-col ${isToday ? 'today' : ''}">
           <div class="share-bar-badge ${count > 0 ? 'active' : ''}">${badgeContent}</div>
           <div class="share-bar-track">
-            <div class="share-bar-fill" style="height: ${heightPercent}%; min-height: ${minHeight};"></div>
+            <div class="share-bar-fill" style="height: ${heightPercent}%; min-height: ${minHeight}; opacity: ${fillOpacity};"></div>
           </div>
           <span class="share-day-label">${item.day_name}</span>
         </div>
