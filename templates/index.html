@@ -843,6 +843,53 @@
     </div>
   </div>
 
+  <!-- ======================================================== -->
+  <!-- MODAL: 4-Pomodoro Guest Account Sync Prompt             -->
+  <!-- ======================================================== -->
+  <div id="guestSyncModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card modal-compact guest-sync-card" role="dialog" aria-labelledby="guestSyncTitle">
+      <div class="modal-header">
+        <div class="modal-header-text">
+          <div class="guest-sync-badge">🎉 4 Focus Cycles Complete!</div>
+          <h2 id="guestSyncTitle" class="modal-title">Sync Your Streaks & Stats</h2>
+          <span class="modal-subtitle">Never lose your study history or custom presets.</span>
+        </div>
+        <button class="close-modal-btn" id="closeGuestSyncModalBtn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="guest-sync-features">
+          <div class="guest-feature-item">
+            <span class="feature-icon">☁️</span>
+            <div>
+              <strong>Cloud Persistence</strong>
+              <p>Sync your study statistics and logs safely across desktop, laptop, and mobile.</p>
+            </div>
+          </div>
+          <div class="guest-feature-item">
+            <span class="feature-icon">🔥</span>
+            <div>
+              <strong>Protect Daily Streaks</strong>
+              <p>Keep your focus consistency alive even when clearing browser cache.</p>
+            </div>
+          </div>
+          <div class="guest-feature-item">
+            <span class="feature-icon">🎨</span>
+            <div>
+              <strong>Saved Theme Presets</strong>
+              <p>Your custom palettes and sounds stay preserved everywhere.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="guest-sync-actions">
+          <button id="guestSyncSignupBtn" class="modal-btn primary guest-sync-primary-btn">Create Free Account / Sign In 🚀</button>
+          <button id="guestSyncDismissBtn" class="modal-btn secondary guest-sync-dismiss-btn">Keep Studying as Guest</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Canvas for celebration confetti -->
   <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
 

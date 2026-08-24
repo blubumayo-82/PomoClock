@@ -201,6 +201,12 @@ const DOM = {
   closeFeedbackModalBtn: document.getElementById('closeFeedbackModalBtn'),
   feedbackForm: document.getElementById('feedbackForm'),
 
+  // 4-Pomodoro Guest Sync modal elements
+  guestSyncModal: document.getElementById('guestSyncModal'),
+  closeGuestSyncModalBtn: document.getElementById('closeGuestSyncModalBtn'),
+  guestSyncSignupBtn: document.getElementById('guestSyncSignupBtn'),
+  guestSyncDismissBtn: document.getElementById('guestSyncDismissBtn'),
+
   // Feedback & Canvas
   confettiCanvas: document.getElementById('confettiCanvas'),
   toastContainer: document.getElementById('toastContainer')
@@ -591,6 +597,7 @@ async function handleTimerComplete() {
   if (completedMode === 'pomodoro') {
     triggerConfettiBurst();
     showToast(`🎉 Great job! Completed ${durationMins}m focus session.`, 'success');
+    checkGuestSyncPrompt();
   } else {
     showToast(`⚡ Break finished! Ready for another round?`, 'info');
   }
@@ -1480,8 +1487,31 @@ function setupEventListeners() {
     DOM.closeFeedbackModalBtn.addEventListener('click', () => closeModal(DOM.feedbackModal));
   }
 
+  // 4-Pomodoro Guest Sync Modal Actions
+  if (DOM.closeGuestSyncModalBtn) {
+    DOM.closeGuestSyncModalBtn.addEventListener('click', () => {
+      dismissGuestSyncPrompt();
+      closeModal(DOM.guestSyncModal);
+    });
+  }
+  if (DOM.guestSyncDismissBtn) {
+    DOM.guestSyncDismissBtn.addEventListener('click', () => {
+      dismissGuestSyncPrompt();
+      closeModal(DOM.guestSyncModal);
+      showToast('Continuing in Guest Mode ✨', 'info');
+    });
+  }
+  if (DOM.guestSyncSignupBtn) {
+    DOM.guestSyncSignupBtn.addEventListener('click', () => {
+      dismissGuestSyncPrompt();
+      closeModal(DOM.guestSyncModal);
+      setAuthMode('register');
+      openModal(DOM.authModal);
+    });
+  }
+
   // Backdrop click to close any modal
-  [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(modal => {
+  [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal].forEach(modal => {
     if (modal) {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal(modal);
@@ -1567,7 +1597,7 @@ function setupEventListeners() {
       if (document.body.classList.contains('zen-mode-active')) {
         toggleZenMode(false);
       }
-      [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(m => {
+      [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal].forEach(m => {
         if (m && m.classList.contains('open')) closeModal(m);
       });
     }
@@ -1660,6 +1690,30 @@ function stopThemePulse() {
   localStorage.setItem('pomoClockThemeClicked', 'true');
 }
 
+function checkGuestSyncPrompt() {
+  // If user is already authenticated, don't prompt
+  if (state.currentUser && state.currentUser.authenticated) return;
+
+  const localSessions = getLocalSessions();
+  const completedPomodoros = localSessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed').length;
+  const lastPromptCount = parseInt(localStorage.getItem('pomoclock_guest_prompt_last_count') || '0', 10);
+
+  // Trigger on 4th session (and multiples of 4: 4, 8, 12...)
+  if (completedPomodoros >= 4 && (completedPomodoros % 4 === 0) && completedPomodoros !== lastPromptCount) {
+    setTimeout(() => {
+      if (DOM.guestSyncModal) {
+        openModal(DOM.guestSyncModal);
+      }
+    }, 1200);
+  }
+}
+
+function dismissGuestSyncPrompt() {
+  const localSessions = getLocalSessions();
+  const completedPomodoros = localSessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed').length;
+  localStorage.setItem('pomoclock_guest_prompt_last_count', completedPomodoros.toString());
+}
+
 function startOnboardingTour(isManual = false) {
   if (typeof window.driver === 'undefined' || !window.driver.js || !window.driver.js.driver) {
     console.warn('Driver.js is not loaded yet');
@@ -1675,13 +1729,19 @@ function startOnboardingTour(isManual = false) {
     overlayColor: 'rgba(0, 0, 0, 0.78)',
     stagePadding: 8,
     stageRadius: 14,
-    popoverClass: 'pomoclock-driver-popover',
+    popoverClass: 'driverjs-theme-popover pomoclock-driver-popover',
     nextBtnText: 'Next →',
     prevBtnText: '← Back',
     doneBtnText: 'Got It! 🚀',
+    scrollIntoViewOptions: { behavior: 'smooth', block: 'center' },
     onHighlightStarted: (element) => {
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        setTimeout(() => {
+          if (driverObj && typeof driverObj.recalculate === 'function') {
+            driverObj.recalculate();
+          }
+        }, 250);
       }
     },
     onDestroyStarted: () => {
@@ -1724,7 +1784,8 @@ function startOnboardingTour(isManual = false) {
           title: '🎨 Your Aesthetic',
           description: 'Customize PomoClock to match your mood here. Choose Classic Pomodoro, Sage, Cyberpunk, or create a custom palette!',
           side: 'bottom',
-          align: 'end'
+          align: 'end',
+          popoverClass: 'driverjs-theme-popover'
         }
       }
     ]
