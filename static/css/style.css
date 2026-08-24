@@ -716,30 +716,50 @@ header,
 
 .header-actions .icon-btn,
 .header-right .icon-btn {
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  max-width: 36px !important;
-  border-radius: 12px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  border-radius: 10px !important;
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  color: #e2d4dc !important;
+  padding: 0 !important;
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0 !important;
   box-sizing: border-box;
-  padding: 0 !important;
+}
+
+.header-actions .icon-btn svg,
+.header-actions .icon-btn i,
+.header-right .icon-btn svg,
+.header-right .icon-btn i,
+.header-actions .icon-btn .icon,
+.header-right .icon-btn .icon {
+  width: 15px !important;
+  height: 15px !important;
+  font-size: 14px !important;
+  stroke-width: 1.6px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.2s ease;
 }
 
 .header-actions .icon-btn:hover,
 .header-right .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.09) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+.header-actions .icon-btn:hover svg,
+.header-actions .icon-btn:hover i,
+.header-right .icon-btn:hover svg,
+.header-right .icon-btn:hover i,
+.header-actions .icon-btn:hover .icon,
+.header-right .icon-btn:hover .icon {
   color: #ffffff !important;
-  transform: translateY(-1px);
 }
 
 .header-btn-text {
@@ -1699,25 +1719,27 @@ button.mode-tab:disabled {
 /* --------------------------------------------------------------------------
    Dynamic Finish Target & ETA Badge Styles (Repositioned above controls)
    -------------------------------------------------------------------------- */
-.eta-badge,
-.eta-pill-repositioned,
+.finish-target-badge,
 .finish-target,
-.finish-target-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-color);
-  padding: 8px 18px !important;
+.eta-badge,
+.eta-pill-repositioned {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 3px 10px !important;
+  min-height: unset !important;
+  height: auto !important;
+  margin: 6px auto 0.8rem auto !important;
+  font-size: 0.68rem !important;
+  line-height: 1.2 !important;
   border-radius: 9999px !important;
-  margin: 1.2rem auto 0.8rem auto;
-  letter-spacing: 0.01em;
+  background: rgba(0, 0, 0, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 14px var(--accent-glow);
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
   transition: all var(--transition-fast);
   z-index: 2;
   position: relative;
@@ -1726,17 +1748,25 @@ button.mode-tab:disabled {
   box-sizing: border-box;
 }
 
-.eta-badge .eta-icon,
-.finish-target .eta-icon {
-  font-size: 0.85rem;
+.finish-target-badge svg,
+.finish-target .target-icon,
+.finish-target-badge .eta-icon,
+.finish-target .eta-icon,
+.eta-badge .eta-icon {
+  width: 12px !important;
+  height: 12px !important;
+  font-size: 11px !important;
   line-height: 1;
 }
 
-.eta-badge .eta-target,
-.eta-badge .eta-text,
+.finish-target-badge .target-time,
 .finish-target .target-time,
-.finish-target-badge .target-time {
-  font-weight: 700;
+.finish-target-badge .eta-target,
+.finish-target .eta-target,
+.eta-badge .eta-target,
+.eta-badge .eta-text {
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
   color: var(--accent-color);
 }
 
@@ -1745,17 +1775,17 @@ button.mode-tab:disabled {
   .finish-target,
   .eta-badge,
   .eta-pill-repositioned {
-    padding: 5px 12px !important;
-    font-size: 0.75rem !important;
+    padding: 3px 8px !important;
+    font-size: 0.65rem !important;
     max-width: 90% !important;
-    margin: 0.8rem auto 0.4rem auto !important;
+    margin: 4px auto 0.4rem auto !important;
   }
 
   .finish-target-badge .target-time,
   .finish-target .target-time,
   .eta-badge .eta-target,
   .eta-badge .eta-text {
-    font-size: 0.8rem !important;
+    font-size: 0.7rem !important;
   }
 }
 
