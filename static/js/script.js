@@ -646,6 +646,24 @@ function clearLocalSessions() {
   localStorage.removeItem(LOCAL_STORAGE_KEY_SESSIONS);
 }
 
+function getLocalDateString(dateObj = new Date()) {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getSessionLocalDateString(startTimeStr) {
+  if (!startTimeStr) return '';
+  try {
+    const d = new Date(startTimeStr);
+    if (isNaN(d.getTime())) return startTimeStr.split('T')[0];
+    return getLocalDateString(d);
+  } catch (e) {
+    return startTimeStr.split('T')[0];
+  }
+}
+
 function computeLocalStats() {
   const sessions = getLocalSessions();
   const completedPomodoros = sessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed');
@@ -653,8 +671,8 @@ function computeLocalStats() {
   const totalFocusHours = Math.round((totalFocusMinutes / 60) * 100) / 100;
   const totalSessions = sessions.length;
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayPomodoros = completedPomodoros.filter(s => s.start_time && s.start_time.startsWith(todayStr));
+  const todayStr = getLocalDateString();
+  const todayPomodoros = completedPomodoros.filter(s => getSessionLocalDateString(s.start_time) === todayStr);
   const todayFocusMinutes = todayPomodoros.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
 
   // 7-day activity
@@ -663,10 +681,10 @@ function computeLocalStats() {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const dayStr = d.toISOString().split('T')[0];
+    const dayStr = getLocalDateString(d);
     const dayName = d.toLocaleDateString([], { weekday: 'short' });
 
-    const daySessions = completedPomodoros.filter(s => s.start_time && s.start_time.startsWith(dayStr));
+    const daySessions = completedPomodoros.filter(s => getSessionLocalDateString(s.start_time) === dayStr);
     const dayMinutes = daySessions.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
 
     weeklyActivity.push({
@@ -685,8 +703,8 @@ function computeLocalStats() {
   while (true) {
     const pd = new Date(now);
     pd.setDate(pd.getDate() - offset);
-    const pdStr = pd.toISOString().split('T')[0];
-    const hasDay = completedPomodoros.some(s => s.start_time && s.start_time.startsWith(pdStr));
+    const pdStr = getLocalDateString(pd);
+    const hasDay = completedPomodoros.some(s => getSessionLocalDateString(s.start_time) === pdStr);
     if (hasDay) {
       streakDays++;
       offset++;
@@ -734,10 +752,14 @@ async function syncLocalSessionsWithServer() {
 // ==========================================================================
 
 async function recordSession(payload) {
-  // 1. Store in localStorage first for 100% hybrid persistence
+  // 1. Store in localStorage immediately for 100% hybrid persistence
   saveLocalSession(payload);
 
-  // 2. Attempt server sync
+  // 2. Instantly update UI statistics & chart locally
+  const localStats = computeLocalStats();
+  renderStatistics(localStats);
+
+  // 3. Attempt server sync
   try {
     const response = await fetch('/api/sessions', {
       method: 'POST',
@@ -753,6 +775,11 @@ async function recordSession(payload) {
 }
 
 async function fetchStatistics() {
+  // 1. Instantly render from local storage for 0ms initial load
+  const localStats = computeLocalStats();
+  renderStatistics(localStats);
+
+  // 2. Fetch authoritative database statistics if available
   try {
     const response = await fetch('/api/stats');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -765,10 +792,6 @@ async function fetchStatistics() {
   } catch (err) {
     console.warn('Backend stats unavailable, using local calculation fallback:', err);
   }
-
-  // Fallback to local statistics calculation
-  const localStats = computeLocalStats();
-  renderStatistics(localStats);
 }
 
 function renderStatistics(stats) {
@@ -780,7 +803,7 @@ function renderStatistics(stats) {
   DOM.statTodaySessions.textContent = `${stats.today_pomodoros} sessions today`;
   DOM.statStreakDays.innerHTML = `${stats.current_streak_days} <small>days</small>`;
 
-  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + d.focus_minutes, 0);
+  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + (d.focus_minutes || 0), 0);
   DOM.chartWeekTotal.textContent = `${(weekTotalMins / 60).toFixed(1)}h this week`;
 
   renderWeeklyChart(stats.weekly_activity || []);
@@ -795,19 +818,31 @@ function renderWeeklyChart(activity) {
     return;
   }
 
-  const maxMinutes = Math.max(...activity.map(a => a.focus_minutes), 30);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
+  const maxMinutes = Math.max(...recordedMins, 25);
+  const todayStr = getLocalDateString();
 
   let html = '';
   activity.forEach(item => {
-    const heightPercent = Math.min(100, Math.round((item.focus_minutes / maxMinutes) * 100));
+    const mins = parseFloat(item.focus_minutes) || 0;
     const isToday = item.date === todayStr;
+    let heightPercent = 0;
+    let minHeightPx = '0px';
+    let barOpacity = 0.25;
+
+    if (mins > 0) {
+      // Smart visual minimum fill so any logged session (even 1m) shows a clear active indicator
+      const rawPercent = (mins / maxMinutes) * 100;
+      heightPercent = Math.min(100, Math.max(8, Math.round(rawPercent)));
+      minHeightPx = '8px';
+      barOpacity = 1;
+    }
 
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
-        <div class="chart-tooltip">${item.focus_minutes} mins (${item.completed_count} 🍅)</div>
+        <div class="chart-tooltip">${mins} mins (${item.completed_count || 0} 🍅)</div>
         <div class="chart-bar-wrap">
-          <div class="chart-bar" style="height: ${Math.max(6, heightPercent)}%;"></div>
+          <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>
         <span class="chart-day-label">${item.day_name}</span>
       </div>
@@ -1181,6 +1216,16 @@ function showDesktopNotification(mode) {
 // 11. Settings & Preferences Management
 // ==========================================================================
 
+function updateModeBadges(pomoSeconds, shortBreakSeconds, longBreakSeconds) {
+  const pomoMins = Math.round((pomoSeconds !== undefined ? pomoSeconds : state.durations.pomodoro) / 60);
+  const shortMins = Math.round((shortBreakSeconds !== undefined ? shortBreakSeconds : state.durations.short_break) / 60);
+  const longMins = Math.round((longBreakSeconds !== undefined ? longBreakSeconds : state.durations.long_break) / 60);
+
+  if (DOM.badgePomodoro) DOM.badgePomodoro.textContent = `${pomoMins}m`;
+  if (DOM.badgeShortBreak) DOM.badgeShortBreak.textContent = `${shortMins}m`;
+  if (DOM.badgeLongBreak) DOM.badgeLongBreak.textContent = `${longMins}m`;
+}
+
 function loadStoredSettings() {
   const savedTheme = localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
   const savedCustom = localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
@@ -1220,6 +1265,9 @@ function loadStoredSettings() {
   DOM.settingSoundType.value = state.soundType;
   DOM.settingVolume.value = Math.round(state.soundVolume * 100);
   DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
+
+  // Dynamically update mode badges from loaded settings
+  updateModeBadges();
 }
 
 function saveSettingsFromModal() {
@@ -1261,6 +1309,8 @@ function saveSettingsFromModal() {
     updateTimerDisplay();
   }
 
+  // Update mode badges with newly saved durations
+  updateModeBadges();
   updateCycleIndicators();
   closeModal(DOM.settingsModal);
   showToast('Settings saved successfully', 'success');
@@ -1620,6 +1670,7 @@ function startOnboardingTour(isManual = false) {
   const driverObj = driver({
     showProgress: true,
     animate: true,
+    smoothScroll: true,
     allowClose: true,
     overlayColor: 'rgba(0, 0, 0, 0.78)',
     stagePadding: 8,
@@ -1628,6 +1679,11 @@ function startOnboardingTour(isManual = false) {
     nextBtnText: 'Next →',
     prevBtnText: '← Back',
     doneBtnText: 'Got It! 🚀',
+    onHighlightStarted: (element) => {
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }
+    },
     onDestroyStarted: () => {
       localStorage.setItem('pomoClockTourComplete', 'true');
       stopThemePulse();
@@ -1663,6 +1719,7 @@ function startOnboardingTour(isManual = false) {
       },
       {
         element: '#openThemeModalBtn',
+        stagePadding: 4,
         popover: {
           title: '🎨 Your Aesthetic',
           description: 'Customize PomoClock to match your mood here. Choose Classic Pomodoro, Sage, Cyberpunk, or create a custom palette!',
