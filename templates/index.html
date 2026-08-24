@@ -204,19 +204,21 @@
         </button>
 
         <!-- Consolidated Active Focus Task Bar & Queue Dropdown -->
-        <div class="active-task-bar" id="activeTaskBar">
+        <div class="active-task-bar task-bar-container" id="activeTaskBar">
           <div class="task-input-wrapper">
             <span class="task-icon" title="Active Focus Goal">🎯</span>
             <input type="text" id="currentTaskInput" class="task-input"
-              placeholder="What are you focusing on right now?" maxlength="80" aria-label="Active focus task">
+              placeholder="Focusing on..." maxlength="80" aria-label="Active focus task">
             <button id="clearTaskBtn" class="task-clear-btn" title="Clear task" aria-label="Clear task">&times;</button>
             <div class="task-input-divider"></div>
-            <button type="button" id="toggleTaskQueueBtn" class="task-queue-pill-btn" aria-expanded="false" title="View study queue / upcoming tasks">
-              <span class="queue-icon">📋</span>
-              <span class="queue-badge" id="taskQueueBadge">0</span>
-              <span id="queueArrow" class="queue-arrow">▾</span>
-            </button>
-            <button type="button" id="openAddTaskBtn" class="task-quick-add-btn" title="Add new task to queue">+ Queue</button>
+            <div class="task-queue-actions">
+              <button type="button" id="toggleTaskQueueBtn" class="task-queue-pill-btn" aria-expanded="false" title="View study queue / upcoming tasks">
+                <span class="queue-icon">📋</span>
+                <span class="queue-badge" id="taskQueueBadge">0</span>
+                <span id="queueArrow" class="queue-arrow">▾</span>
+              </button>
+              <button type="button" id="openAddTaskBtn" class="task-quick-add-btn" title="Add new task to queue">+ Queue</button>
+            </div>
           </div>
 
           <!-- Collapsible Dropdown Queue Panel -->
@@ -357,7 +359,7 @@
         <div class="stats-grid">
           <!-- Total Focus Hours -->
           <div class="stat-card card">
-            <div class="stat-icon-wrap focus-icon">⏱️</div>
+            <div class="stat-icon-pod stat-icon-wrap focus-icon">⏱️</div>
             <div class="stat-info">
               <span class="stat-label">Total Study Time</span>
               <span class="stat-value" id="statTotalHours">0.0 <small>hrs</small></span>
@@ -367,7 +369,7 @@
 
           <!-- Completed Pomodoros -->
           <div class="stat-card card">
-            <div class="stat-icon-wrap pomodoro-icon">🍅</div>
+            <div class="stat-icon-pod stat-icon-wrap pomodoro-icon">🍅</div>
             <div class="stat-info">
               <span class="stat-label">Completed</span>
               <span class="stat-value" id="statCompletedCount">0</span>
@@ -377,7 +379,7 @@
 
           <!-- Today's Focus -->
           <div class="stat-card card">
-            <div class="stat-icon-wrap today-icon">📅</div>
+            <div class="stat-icon-pod stat-icon-wrap today-icon">📅</div>
             <div class="stat-info">
               <span class="stat-label">Today's Focus</span>
               <span class="stat-value" id="statTodayMinutes">0 <small>min</small></span>
@@ -387,7 +389,7 @@
 
           <!-- Streak -->
           <div class="stat-card card">
-            <div class="stat-icon-wrap streak-icon">🔥</div>
+            <div class="stat-icon-pod stat-icon-wrap streak-icon">🔥</div>
             <div class="stat-info">
               <span class="stat-label">Study Streak</span>
               <span class="stat-value" id="statStreakDays">0 <small>days</small></span>
