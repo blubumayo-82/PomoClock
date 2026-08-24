@@ -97,9 +97,11 @@ const DOM = {
   zenModeBtn: document.getElementById('zenModeBtn'),
   zenExpandIcon: document.getElementById('zenExpandIcon'),
   zenCompressIcon: document.getElementById('zenCompressIcon'),
-  zenBtnText: document.getElementById('zenBtnText'),
+  // ETA & Cycle
   cycleIndicator: document.getElementById('cycleIndicator'),
   cycleLabel: document.getElementById('cycleLabel'),
+  etaBadge: document.getElementById('etaBadge'),
+  etaText: document.getElementById('etaText'),
   
   // Tabs & Badges
   tabPomodoro: document.getElementById('tabPomodoro'),
@@ -109,9 +111,22 @@ const DOM = {
   badgeShortBreak: document.getElementById('badgeShortBreak'),
   badgeLongBreak: document.getElementById('badgeLongBreak'),
   
-  // Task input
+  // Task input & Multi-Task Queue
   currentTaskInput: document.getElementById('currentTaskInput'),
   clearTaskBtn: document.getElementById('clearTaskBtn'),
+  taskQueueContainer: document.getElementById('taskQueueContainer'),
+  toggleTaskQueueBtn: document.getElementById('toggleTaskQueueBtn'),
+  taskQueueBadge: document.getElementById('taskQueueBadge'),
+  queueArrow: document.getElementById('queueArrow'),
+  openAddTaskBtn: document.getElementById('openAddTaskBtn'),
+  addTaskForm: document.getElementById('addTaskForm'),
+  newTaskTitleInput: document.getElementById('newTaskTitleInput'),
+  stepperDecBtn: document.getElementById('stepperDecBtn'),
+  stepperIncBtn: document.getElementById('stepperIncBtn'),
+  newTargetPomoCount: document.getElementById('newTargetPomoCount'),
+  confirmAddTaskBtn: document.getElementById('confirmAddTaskBtn'),
+  cancelAddTaskBtn: document.getElementById('cancelAddTaskBtn'),
+  taskQueueList: document.getElementById('taskQueueList'),
 
   // Header controls & Auth
   authContainer: document.getElementById('authContainer'),
@@ -128,7 +143,7 @@ const DOM = {
   openThemeModalBtn: document.getElementById('openThemeModalBtn'),
   openSettingsModalBtn: document.getElementById('openSettingsModalBtn'),
 
-  // Stats elements
+  // Stats & History elements
   statTotalHours: document.getElementById('statTotalHours'),
   statTotalMinutes: document.getElementById('statTotalMinutes'),
   statCompletedCount: document.getElementById('statCompletedCount'),
@@ -140,6 +155,8 @@ const DOM = {
   activityChart: document.getElementById('activityChart'),
   historyTableBody: document.getElementById('historyTableBody'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+  exportCsvBtn: document.getElementById('exportCsvBtn'),
+  exportCsvSettingsBtn: document.getElementById('exportCsvSettingsBtn'),
 
   // Auth modal elements
   authModal: document.getElementById('authModal'),
@@ -408,6 +425,48 @@ function formatTime(seconds) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function calculateSessionEta() {
+  if (!DOM.etaText) return;
+
+  const totalCycles = state.longBreakInterval || 4;
+  const currentCycle = state.cycleCount || 1;
+  const currentMode = state.currentMode || 'pomodoro';
+  const remainingCurrentSecs = Math.max(0, state.timeLeft);
+
+  let totalRemainingSecs = remainingCurrentSecs;
+
+  if (currentMode === 'pomodoro') {
+    // Remaining subsequent pomodoros in this 4-cycle block
+    const remainingSubsequentPomos = Math.max(0, totalCycles - currentCycle);
+    // Remaining short breaks in this 4-cycle block
+    const remainingShortBreaks = Math.max(0, totalCycles - currentCycle);
+    totalRemainingSecs += (remainingSubsequentPomos * state.durations.pomodoro) +
+                          (remainingShortBreaks * state.durations.short_break);
+  } else if (currentMode === 'short_break') {
+    // Current short break is active. Remaining pomodoros to complete the 4-cycle block:
+    const remainingPomos = Math.max(0, totalCycles - currentCycle + 1);
+    const remainingShortBreaks = Math.max(0, remainingPomos - 1);
+    totalRemainingSecs += (remainingPomos * state.durations.pomodoro) +
+                          (remainingShortBreaks * state.durations.short_break);
+  } else if (currentMode === 'long_break') {
+    totalRemainingSecs = remainingCurrentSecs;
+  }
+
+  const finishDate = new Date(Date.now() + totalRemainingSecs * 1000);
+  const timeStr = finishDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  let remainingStr = '';
+  if (totalRemainingSecs >= 3600) {
+    const hours = (totalRemainingSecs / 3600).toFixed(1);
+    remainingStr = `~${hours}h remaining`;
+  } else {
+    const mins = Math.max(1, Math.ceil(totalRemainingSecs / 60));
+    remainingStr = `~${mins}m remaining`;
+  }
+
+  DOM.etaText.innerHTML = `Finish Target: <span class="eta-target">${timeStr}</span> • ${remainingStr}`;
+}
+
 function updateTimerDisplay() {
   const formatted = formatTime(state.timeLeft);
   DOM.timeDisplay.textContent = formatted;
@@ -422,6 +481,9 @@ function updateTimerDisplay() {
     const offset = CIRCUMFERENCE * (1 - fraction);
     DOM.progressCircle.style.strokeDashoffset = offset;
   }
+
+  // Calculate real-time finish ETA
+  calculateSessionEta();
 }
 
 function updateStatusBadge() {
@@ -447,6 +509,8 @@ function updateCycleIndicators() {
       dot.classList.add('active');
     }
   });
+
+  calculateSessionEta();
 }
 
 function updateModeTabs() {
@@ -618,6 +682,12 @@ async function handleTimerComplete() {
   if (completedMode === 'pomodoro') {
     triggerConfettiBurst();
     showToast(`🎉 Great job! Completed ${durationMins}m focus session.`, 'success');
+    
+    // Automatically increment multi-task queue target progress
+    if (typeof incrementActiveTaskProgress === 'function') {
+      incrementActiveTaskProgress();
+    }
+
     checkGuestSyncPrompt();
   } else {
     showToast(`⚡ Break finished! Ready for another round?`, 'info');
@@ -950,8 +1020,115 @@ async function syncPreferences(prefsObj) {
 
 
 // ==========================================================================
-// 8. User Authentication Module
+// 8. User Authentication Module (Google OAuth 2.0 & Email/Password)
 // ==========================================================================
+
+function initGoogleSignIn() {
+  const clientId = (window.POMOCLOCK_CONFIG && window.POMOCLOCK_CONFIG.googleClientId) || '';
+  const googleBtnContainer = document.getElementById('googleSignInBtn');
+  if (!googleBtnContainer) return;
+
+  if (window.google && window.google.accounts && window.google.accounts.id) {
+    try {
+      window.google.accounts.id.initialize({
+        client_id: clientId || 'dummy-client-id.apps.googleusercontent.com',
+        callback: handleGoogleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+
+      if (clientId) {
+        window.google.accounts.id.renderButton(
+          googleBtnContainer,
+          {
+            theme: 'filled_black',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'pill',
+            width: 320,
+            logo_alignment: 'left'
+          }
+        );
+      } else {
+        googleBtnContainer.innerHTML = `
+          <button type="button" class="modal-btn secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.6rem; border-radius: var(--radius-full); padding: 0.65rem 1rem;" id="googleDemoBtn">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 1.9 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.6 2.8C6.4 7.2 8.9 5 12 5z"/>
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+              <path fill="#FBBC05" d="M5.5 14.1c-.2-.7-.4-1.4-.4-2.1s.2-1.4.4-2.1L1.9 7.1C.7 9.5 0 10.7 0 12s.7 2.5 1.9 4.9l3.6-2.8z"/>
+              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.6-2.2-6.5-5.1L1.9 16C3.7 19.7 7.5 23 12 23z"/>
+            </svg>
+            <span style="font-size: 0.85rem; font-weight: 600;">Sign in with Google</span>
+          </button>
+        `;
+        const demoBtn = document.getElementById('googleDemoBtn');
+        if (demoBtn) {
+          demoBtn.addEventListener('click', () => {
+            showToast('Configure GOOGLE_CLIENT_ID in .env to activate live Google login', 'info');
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Google Identity Services initialization warning:', err);
+    }
+  }
+}
+
+async function handleGoogleCredentialResponse(response) {
+  if (!response || !response.credential) {
+    showToast('Google Sign-In failed or was cancelled.', 'error');
+    return;
+  }
+
+  DOM.authErrorAlert.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      DOM.authErrorAlert.textContent = data.error || 'Google authentication failed';
+      DOM.authErrorAlert.style.display = 'block';
+      return;
+    }
+
+    state.currentUser = data.user;
+    updateAuthUI();
+    closeModal(DOM.authModal);
+    showToast(`Welcome, ${data.user.name || data.user.email}! Google Cloud Sync active ✨`, 'success');
+
+    // Auto-sync guest sessions to account
+    await syncLocalSessionsWithServer();
+    await fetchStatistics();
+  } catch (err) {
+    DOM.authErrorAlert.textContent = 'Network error during Google sign-in';
+    DOM.authErrorAlert.style.display = 'block';
+  }
+}
+
+async function syncLocalSessionsWithServer() {
+  const localSessions = getLocalSessions();
+  if (!localSessions || localSessions.length === 0) return;
+
+  try {
+    const res = await fetch('/api/sessions/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessions: localSessions })
+    });
+    const data = await res.json();
+    if (data.success && data.synced_count > 0) {
+      showToast(`Synced ${data.synced_count} offline sessions to your cloud profile!`, 'success');
+    }
+  } catch (err) {
+    console.warn('Could not sync local sessions:', err);
+  }
+}
 
 async function checkAuthStatus() {
   try {
@@ -972,14 +1149,43 @@ function updateAuthUI() {
   if (!DOM.openAuthModalBtn) return;
 
   if (state.currentUser) {
-    const initial = state.currentUser.username ? state.currentUser.username.charAt(0).toUpperCase() : 'U';
-    DOM.openAuthModalBtn.innerHTML = `
-      <div class="user-avatar-circle">${initial}</div>
-      <span class="header-btn-text">${escapeHtml(state.currentUser.username)}</span>
-    `;
-    DOM.openAuthModalBtn.title = `Logged in as ${state.currentUser.username}`;
-    DOM.userMenuName.textContent = state.currentUser.username;
-    DOM.userMenuEmail.textContent = state.currentUser.email;
+    const displayName = state.currentUser.name || state.currentUser.username || state.currentUser.email.split('@')[0];
+    const initial = displayName.charAt(0).toUpperCase();
+    const avatarUrl = state.currentUser.avatar_url;
+
+    if (avatarUrl) {
+      DOM.openAuthModalBtn.innerHTML = `
+        <span class="auth-avatar-pill">
+          <img src="${escapeHtml(avatarUrl)}" class="avatar-img-round" alt="Avatar" referrerpolicy="no-referrer">
+        </span>
+        <span class="header-btn-text">${escapeHtml(displayName)}</span>
+      `;
+    } else {
+      DOM.openAuthModalBtn.innerHTML = `
+        <span class="auth-avatar-pill">
+          <span class="avatar-initials-badge">${initial}</span>
+        </span>
+        <span class="header-btn-text">${escapeHtml(displayName)}</span>
+      `;
+    }
+
+    DOM.openAuthModalBtn.title = `Logged in as ${displayName} (${state.currentUser.email})`;
+    if (DOM.userMenuName) DOM.userMenuName.textContent = displayName;
+    if (DOM.userMenuEmail) DOM.userMenuEmail.textContent = state.currentUser.email;
+
+    const dropdownAvatarImg = document.getElementById('dropdownAvatarImg');
+    const dropdownAvatarInitials = document.getElementById('dropdownAvatarInitials');
+    if (dropdownAvatarImg && dropdownAvatarInitials) {
+      if (avatarUrl) {
+        dropdownAvatarImg.src = avatarUrl;
+        dropdownAvatarImg.classList.remove('hidden');
+        dropdownAvatarInitials.classList.add('hidden');
+      } else {
+        dropdownAvatarInitials.textContent = initial;
+        dropdownAvatarInitials.classList.remove('hidden');
+        dropdownAvatarImg.classList.add('hidden');
+      }
+    }
   } else {
     DOM.openAuthModalBtn.innerHTML = `
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
@@ -1004,7 +1210,7 @@ function setAuthMode(mode) {
     DOM.authUsername.required = true;
     DOM.authEmailLabel.textContent = 'Email Address';
     DOM.authEmailOrLogin.type = 'email';
-    DOM.authEmailOrLogin.placeholder = 'you@example.com';
+    DOM.authEmailOrLogin.placeholder = 'alex@university.edu';
     DOM.authSubmitBtn.textContent = 'Create Account & Sync';
     DOM.authSubtext.textContent = 'Create a free account to sync your study streaks and stats seamlessly across multiple devices.';
   } else {
@@ -1012,9 +1218,9 @@ function setAuthMode(mode) {
     DOM.tabRegisterBtn.classList.remove('active');
     DOM.usernameFieldGroup.style.display = 'none';
     DOM.authUsername.required = false;
-    DOM.authEmailLabel.textContent = 'Email or Username';
+    DOM.authEmailLabel.textContent = 'Email Address';
     DOM.authEmailOrLogin.type = 'text';
-    DOM.authEmailOrLogin.placeholder = 'Enter your email or username';
+    DOM.authEmailOrLogin.placeholder = 'alex@university.edu';
     DOM.authSubmitBtn.textContent = 'Sign In';
     DOM.authSubtext.textContent = 'Sign in to sync your study streaks and stats across multiple devices. (Optional — Guest data stays saved locally).';
   }
@@ -1024,18 +1230,18 @@ async function handleAuthFormSubmit() {
   DOM.authErrorAlert.style.display = 'none';
   const emailOrLogin = DOM.authEmailOrLogin.value.trim();
   const password = DOM.authPassword.value;
-  const username = DOM.authUsername.value.trim();
+  const name = DOM.authUsername.value.trim();
 
   DOM.authSubmitBtn.disabled = true;
   DOM.authSubmitBtn.textContent = 'Please wait...';
 
   try {
     let endpoint = '/api/auth/login';
-    let payload = { login: emailOrLogin, password };
+    let payload = { email: emailOrLogin, login: emailOrLogin, password };
 
     if (state.authMode === 'register') {
       endpoint = '/api/auth/register';
-      payload = { username, email: emailOrLogin, password };
+      payload = { name, username: name, email: emailOrLogin, password };
     }
 
     const res = await fetch(endpoint, {
@@ -1059,7 +1265,8 @@ async function handleAuthFormSubmit() {
     closeModal(DOM.authModal);
     DOM.authForm.reset();
 
-    showToast(`Welcome, ${data.user.username}! Syncing sessions...`, 'success');
+    const welcomeName = data.user.name || data.user.username || data.user.email;
+    showToast(`Welcome, ${welcomeName}! Syncing sessions...`, 'success');
 
     // Auto-sync guest sessions to account
     await syncLocalSessionsWithServer();
@@ -1416,11 +1623,17 @@ function setupEventListeners() {
   // Task Input
   DOM.currentTaskInput.addEventListener('input', (e) => {
     state.currentTask = e.target.value.trim();
+    if (typeof renderTaskQueue === 'function') {
+      renderTaskQueue();
+    }
   });
   DOM.clearTaskBtn.addEventListener('click', () => {
     DOM.currentTaskInput.value = '';
     state.currentTask = '';
     DOM.currentTaskInput.focus();
+    if (typeof renderTaskQueue === 'function') {
+      renderTaskQueue();
+    }
   });
 
   // Sound Toggle (Mute / Unmute)
@@ -1583,8 +1796,14 @@ function setupEventListeners() {
 
   DOM.requestNotificationBtn.addEventListener('click', requestNotificationPermission);
 
-  // Stats Actions
+  // Stats Actions & Export
   DOM.clearHistoryBtn.addEventListener('click', handleClearHistory);
+  if (DOM.exportCsvBtn) {
+    DOM.exportCsvBtn.addEventListener('click', exportSessionsToCsv);
+  }
+  if (DOM.exportCsvSettingsBtn) {
+    DOM.exportCsvSettingsBtn.addEventListener('click', exportSessionsToCsv);
+  }
 
   // Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
@@ -1817,7 +2036,303 @@ function startOnboardingTour(isManual = false) {
 
 
 // ==========================================================================
-// 16. App Initialization
+// 16. Multi-Task Queue & Study Target Engine
+// ==========================================================================
+
+const LOCAL_STORAGE_KEY_TASK_QUEUE = 'pomoclock_task_queue';
+let taskTargetStepperCount = 2;
+
+function getTaskQueue() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_TASK_QUEUE) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveTaskQueue(tasks) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_TASK_QUEUE, JSON.stringify(tasks));
+  } catch (e) {}
+  renderTaskQueue();
+}
+
+function renderTaskQueue() {
+  if (!DOM.taskQueueList || !DOM.taskQueueBadge) return;
+
+  const tasks = getTaskQueue();
+  const activeTaskTitle = (DOM.currentTaskInput ? DOM.currentTaskInput.value : '').trim();
+  const uncompletedCount = tasks.filter(t => !t.completed).length;
+
+  DOM.taskQueueBadge.textContent = uncompletedCount;
+
+  if (tasks.length === 0) {
+    DOM.taskQueueList.innerHTML = '<div class="task-queue-empty">No tasks in queue. Add your first study target above!</div>';
+    return;
+  }
+
+  DOM.taskQueueList.innerHTML = tasks.map(task => {
+    const isActive = activeTaskTitle && task.title.toLowerCase() === activeTaskTitle.toLowerCase();
+    return `
+      <div class="task-item ${isActive ? 'active-task' : ''} ${task.completed ? 'completed-task' : ''}" data-task-id="${task.id}">
+        <label class="task-checkbox-wrap" title="${task.completed ? 'Mark uncompleted' : 'Mark completed'}">
+          <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${task.completed ? 'checked' : ''}>
+          <span class="custom-checkbox"></span>
+        </label>
+        <div class="task-details" data-task-id="${task.id}" title="Click to set as focus target">
+          <span class="task-name">${escapeHtml(task.title)}</span>
+          <div class="task-pomo-progress">
+            <span class="pomo-count">${task.completedPomos || 0}/${task.targetPomos || 1} 🍅</span>
+            <div class="task-mini-stepper">
+              <button type="button" class="pomo-adjust-btn dec-pomo" data-task-id="${task.id}" title="Decrease target pomodoros">−</button>
+              <button type="button" class="pomo-adjust-btn inc-pomo" data-task-id="${task.id}" title="Increase target pomodoros">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="task-actions">
+          <button type="button" class="task-select-btn" data-task-id="${task.id}" title="Set as active focus task">${isActive ? 'Active' : '🎯 Focus'}</button>
+          <button type="button" class="task-delete-btn" data-task-id="${task.id}" title="Delete task">&times;</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function initTaskQueue() {
+  if (!DOM.taskQueueContainer) return;
+
+  // Toggle drawer
+  if (DOM.toggleTaskQueueBtn) {
+    DOM.toggleTaskQueueBtn.addEventListener('click', () => {
+      const isHidden = DOM.taskQueueList.classList.contains('hidden');
+      if (isHidden) {
+        DOM.taskQueueList.classList.remove('hidden');
+        DOM.queueArrow.classList.add('open');
+        DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
+      } else {
+        DOM.taskQueueList.classList.add('hidden');
+        DOM.queueArrow.classList.remove('open');
+        DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  // Open add task form
+  if (DOM.openAddTaskBtn) {
+    DOM.openAddTaskBtn.addEventListener('click', () => {
+      DOM.addTaskForm.classList.remove('hidden');
+      DOM.taskQueueList.classList.remove('hidden');
+      DOM.queueArrow.classList.add('open');
+      DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
+      if (DOM.newTaskTitleInput) {
+        DOM.newTaskTitleInput.focus();
+      }
+    });
+  }
+
+  // Cancel add task
+  if (DOM.cancelAddTaskBtn) {
+    DOM.cancelAddTaskBtn.addEventListener('click', () => {
+      DOM.addTaskForm.classList.add('hidden');
+      if (DOM.newTaskTitleInput) DOM.newTaskTitleInput.value = '';
+    });
+  }
+
+  // Stepper controls for new task target
+  if (DOM.stepperDecBtn && DOM.stepperIncBtn && DOM.newTargetPomoCount) {
+    DOM.stepperDecBtn.addEventListener('click', () => {
+      if (taskTargetStepperCount > 1) {
+        taskTargetStepperCount--;
+        DOM.newTargetPomoCount.textContent = taskTargetStepperCount;
+      }
+    });
+    DOM.stepperIncBtn.addEventListener('click', () => {
+      if (taskTargetStepperCount < 20) {
+        taskTargetStepperCount++;
+        DOM.newTargetPomoCount.textContent = taskTargetStepperCount;
+      }
+    });
+  }
+
+  // Confirm add task
+  if (DOM.confirmAddTaskBtn) {
+    DOM.confirmAddTaskBtn.addEventListener('click', submitNewTask);
+  }
+
+  if (DOM.newTaskTitleInput) {
+    DOM.newTaskTitleInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitNewTask();
+      } else if (e.key === 'Escape') {
+        DOM.addTaskForm.classList.add('hidden');
+      }
+    });
+  }
+
+  // Task list event delegation
+  if (DOM.taskQueueList) {
+    DOM.taskQueueList.addEventListener('click', (e) => {
+      const target = e.target;
+      const taskId = target.getAttribute('data-task-id') || target.closest('[data-task-id]')?.getAttribute('data-task-id');
+      if (!taskId) return;
+
+      const tasks = getTaskQueue();
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      // Checkbox click (mark complete)
+      if (target.classList.contains('task-checkbox')) {
+        task.completed = target.checked;
+        if (task.completed) {
+          playChimeSound('bell');
+          showToast(`✅ "${task.title}" completed!`, 'success');
+        }
+        saveTaskQueue(tasks);
+        return;
+      }
+
+      // Delete button
+      if (target.classList.contains('task-delete-btn')) {
+        const updated = tasks.filter(t => t.id !== taskId);
+        saveTaskQueue(updated);
+        showToast('Task removed from queue', 'info');
+        return;
+      }
+
+      // Target Pomodoro decrement
+      if (target.classList.contains('dec-pomo')) {
+        if (task.targetPomos > 1) {
+          task.targetPomos--;
+          saveTaskQueue(tasks);
+        }
+        return;
+      }
+
+      // Target Pomodoro increment
+      if (target.classList.contains('inc-pomo')) {
+        if (task.targetPomos < 20) {
+          task.targetPomos++;
+          saveTaskQueue(tasks);
+        }
+        return;
+      }
+
+      // Focus / Select task
+      if (target.classList.contains('task-select-btn') || target.classList.contains('task-name') || target.closest('.task-details')) {
+        selectQueuedTask(task);
+      }
+    });
+  }
+
+  renderTaskQueue();
+}
+
+function submitNewTask() {
+  if (!DOM.newTaskTitleInput) return;
+  const title = DOM.newTaskTitleInput.value.trim();
+  if (!title) {
+    showToast('Please enter a task title', 'warning');
+    return;
+  }
+
+  const tasks = getTaskQueue();
+  const newTask = {
+    id: 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    title: title,
+    targetPomos: taskTargetStepperCount,
+    completedPomos: 0,
+    completed: false,
+    createdAt: new Date().toISOString()
+  };
+
+  tasks.push(newTask);
+  saveTaskQueue(tasks);
+
+  // If active task input is empty, automatically select
+  if (!DOM.currentTaskInput.value.trim()) {
+    selectQueuedTask(newTask);
+  }
+
+  DOM.newTaskTitleInput.value = '';
+  DOM.addTaskForm.classList.add('hidden');
+  showToast(`🎯 Added "${title}" (${taskTargetStepperCount} Pomos) to queue`, 'success');
+}
+
+function selectQueuedTask(task) {
+  if (DOM.currentTaskInput) {
+    DOM.currentTaskInput.value = task.title;
+    state.currentTask = task.title;
+    renderTaskQueue();
+    showToast(`🎯 Locked target: "${task.title}"`, 'info');
+  }
+}
+
+function incrementActiveTaskProgress() {
+  const currentTaskName = (state.currentTask || (DOM.currentTaskInput ? DOM.currentTaskInput.value : '')).trim().toLowerCase();
+  if (!currentTaskName) return;
+
+  const tasks = getTaskQueue();
+  const matchedTask = tasks.find(t => t.title.trim().toLowerCase() === currentTaskName);
+  if (matchedTask) {
+    matchedTask.completedPomos = (matchedTask.completedPomos || 0) + 1;
+    if (matchedTask.completedPomos >= matchedTask.targetPomos && !matchedTask.completed) {
+      matchedTask.completed = true;
+      showToast(`🏆 Goal reached for "${matchedTask.title}"!`, 'success');
+    }
+    saveTaskQueue(tasks);
+  }
+}
+
+
+// ==========================================================================
+// 17. Free One-Click CSV Focus Report Exporter
+// ==========================================================================
+
+function exportSessionsToCsv() {
+  const sessions = getLocalSessions();
+  if (!sessions || sessions.length === 0) {
+    showToast('No logged study sessions found to export.', 'info');
+    return;
+  }
+
+  // Format CSV headers
+  const headers = ['Date', 'Timestamp', 'Task/Subject Name', 'Duration (Minutes)', 'Mode', 'Status'];
+  const rows = [headers.join(',')];
+
+  sessions.forEach(s => {
+    const dateStr = s.start_time ? getSessionLocalDateString(s.start_time) : (s.date || getLocalDateString());
+    const timestamp = s.start_time || '';
+    const taskName = `"${(s.task_name || 'Focus Session').replace(/"/g, '""')}"`;
+    const duration = s.duration_minutes || (s.duration ? Math.round(s.duration / 60) : 0);
+    const mode = s.mode || 'pomodoro';
+    const status = s.status || 'completed';
+
+    rows.push([dateStr, timestamp, taskName, duration, mode, status].join(','));
+  });
+
+  const csvString = rows.join('\r\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const todayStr = getLocalDateString();
+  const filename = `pomoclock_study_report_${todayStr}.csv`;
+
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  showToast(`📊 Exported ${sessions.length} sessions to ${filename}`, 'success');
+}
+
+
+// ==========================================================================
+// 18. App Initialization
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1827,13 +2342,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadStoredSettings();
   setupEventListeners();
+  initTaskQueue();
   updateModeTabs();
   updateCycleIndicators();
   updateTimerDisplay();
   updateStatusBadge();
 
-  // Check auth session & load statistics
+  // Check auth session, init Google Sign-In & load statistics
   checkAuthStatus();
+  initGoogleSignIn();
   fetchStatistics();
 
   // Check for first-time user tour & pulse

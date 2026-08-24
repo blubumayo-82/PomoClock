@@ -279,6 +279,51 @@ class PomodoroAppTestCase(unittest.TestCase):
         data = json.loads(get_res.data)
         self.assertEqual(data['count'], 0)
 
+    def test_public_config_endpoint(self):
+        """Test /api/config returns google_client_id."""
+        response = self.client.get('/api/config')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn('google_client_id', data)
+
+    def test_google_auth_missing_payload(self):
+        """Test /api/auth/google without token returns 400."""
+        response = self.client.post('/api/auth/google', data=json.dumps({}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_google_auth_success(self):
+        """Test successful Google OAuth token verification and login."""
+        from unittest.mock import patch
+
+        mock_idinfo = {
+            "sub": "google-oauth-123456789",
+            "email": "alex.student@gmail.com",
+            "name": "Alex Rivera",
+            "picture": "https://lh3.googleusercontent.com/a/mock-photo"
+        }
+
+        with patch('app.id_token.verify_oauth2_token', return_value=mock_idinfo):
+            payload = {"credential": "mock-google-id-token-xyz"}
+            response = self.client.post(
+                '/api/auth/google',
+                data=json.dumps(payload),
+                content_type='application/json'
+            )
+            self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data)
+            self.assertTrue(data.get('success'))
+            self.assertEqual(data['user']['email'], 'alex.student@gmail.com')
+            self.assertEqual(data['user']['name'], 'Alex Rivera')
+            self.assertEqual(data['user']['avatar_url'], 'https://lh3.googleusercontent.com/a/mock-photo')
+            self.assertEqual(data['user']['auth_provider'], 'google')
+
+            # Verify session is active in /api/auth/me
+            res_me = self.client.get('/api/auth/me')
+            self.assertEqual(res_me.status_code, 200)
+            data_me = json.loads(res_me.data)
+            self.assertTrue(data_me['authenticated'])
+            self.assertEqual(data_me['user']['email'], 'alex.student@gmail.com')
+
 
 if __name__ == '__main__':
     unittest.main()

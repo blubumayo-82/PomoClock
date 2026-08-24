@@ -11,9 +11,25 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, jsonify, g, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    def load_dotenv(): pass
+
+try:
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+except ImportError:
+    id_token = None
+    google_requests = None
+
 # Initialize Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get('SECRET_KEY', 'pomoclock-study-secret-key-2026')
+app.secret_key = os.getenv('SECRET_KEY', 'pomoclock-study-secret-key-2026')
+
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 
 # Database path configuration
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -45,6 +61,7 @@ def init_db():
     """
     Initializes database tables if they do not exist.
     Creates 'users', 'sessions', 'preferences', and 'user_preferences' tables.
+    Also handles schema migrations for Google OAuth columns.
     """
     db = sqlite3.connect(DATABASE)
     cursor = db.cursor()
@@ -53,12 +70,28 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
+            username TEXT,
+            name TEXT,
             email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
+            password_hash TEXT,
+            avatar_url TEXT,
+            auth_provider TEXT DEFAULT 'local',
+            google_id TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
+
+    # Schema migration check for users table
+    cursor.execute("PRAGMA table_info(users);")
+    existing_user_cols = [row[1] for row in cursor.fetchall()]
+    if 'name' not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN name TEXT;")
+    if 'avatar_url' not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT;")
+    if 'auth_provider' not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';")
+    if 'google_id' not in existing_user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN google_id TEXT;")
 
     # Create sessions table
     cursor.execute("""
@@ -127,39 +160,135 @@ def get_current_user_id():
 
 
 # ----------------------------------------------------------------------
-# Page Routes
+# Page Routes & Config
 # ----------------------------------------------------------------------
 
 @app.route('/')
 def index():
     """Renders the main Pomodoro Study Timer single-page application."""
-    return render_template('index.html')
+    return render_template('index.html', google_client_id=GOOGLE_CLIENT_ID)
+
+
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    """Returns public client configuration for frontend initialization."""
+    return jsonify({
+        "google_client_id": GOOGLE_CLIENT_ID
+    }), 200
 
 
 # ----------------------------------------------------------------------
-# Authentication Endpoints
+# Authentication Endpoints (Email/Password & Google OAuth 2.0)
 # ----------------------------------------------------------------------
+
+@app.route('/api/auth/google', methods=['POST'])
+def google_auth():
+    """
+    Authenticates a user via Google OAuth 2.0 Identity Services credential ID token.
+    Payload: {"credential": "...", "token": "..."}
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Missing Google authentication payload"}), 400
+
+    token = data.get('credential') or data.get('token') or data.get('id_token')
+    if not token:
+        return jsonify({"success": False, "error": "Google credential ID token is required"}), 400
+
+    try:
+        req = google_requests.Request()
+        if GOOGLE_CLIENT_ID:
+            idinfo = id_token.verify_oauth2_token(token, req, GOOGLE_CLIENT_ID)
+        else:
+            idinfo = id_token.verify_oauth2_token(token, req)
+
+        google_id = idinfo.get('sub')
+        email = (idinfo.get('email') or '').strip().lower()
+        name = idinfo.get('name') or idinfo.get('given_name') or email.split('@')[0]
+        avatar_url = idinfo.get('picture') or ''
+
+        if not email:
+            return jsonify({"success": False, "error": "Google profile did not provide an email"}), 400
+
+    except Exception as err:
+        return jsonify({"success": False, "error": f"Google authentication failed: {str(err)}"}), 401
+
+    db = get_db()
+    cursor = db.cursor()
+
+    # Look up existing user by google_id or email
+    cursor.execute("""
+        SELECT id, username, name, email, avatar_url, auth_provider, created_at
+        FROM users
+        WHERE google_id = ? OR LOWER(email) = ?
+    """, (google_id, email))
+    user = cursor.fetchone()
+
+    if user:
+        user_id = user['id']
+        cursor.execute("""
+            UPDATE users
+            SET google_id = COALESCE(google_id, ?),
+                name = COALESCE(?, name),
+                avatar_url = COALESCE(?, avatar_url),
+                auth_provider = CASE WHEN auth_provider IS NULL OR auth_provider = 'local' THEN 'google' ELSE auth_provider END
+            WHERE id = ?
+        """, (google_id, name, avatar_url, user_id))
+        db.commit()
+    else:
+        username = name or email.split('@')[0]
+        cursor.execute("""
+            INSERT INTO users (username, name, email, avatar_url, auth_provider, google_id, password_hash)
+            VALUES (?, ?, ?, ?, 'google', ?, NULL)
+        """, (username, name, email, avatar_url, google_id))
+        db.commit()
+        user_id = cursor.lastrowid
+
+    session['user_id'] = user_id
+
+    # Fetch updated user record
+    cursor.execute("SELECT id, username, name, email, avatar_url, auth_provider, created_at FROM users WHERE id = ?", (user_id,))
+    updated_user = cursor.fetchone()
+    display_name = updated_user['name'] or updated_user['username'] or updated_user['email'].split('@')[0]
+
+    return jsonify({
+        "success": True,
+        "message": "Google authentication successful",
+        "user": {
+            "id": updated_user['id'],
+            "username": display_name,
+            "name": display_name,
+            "email": updated_user['email'],
+            "avatar_url": updated_user['avatar_url'] or '',
+            "auth_provider": updated_user['auth_provider'] or 'google',
+            "created_at": updated_user['created_at']
+        }
+    }), 200
+
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     """
-    Registers a new user account.
-    Payload: {"username": "...", "email": "...", "password": "..."}
+    Registers a new user account with email and password.
+    Payload: {"email": "...", "password": "...", "name": "..."} or {"username": "...", ...}
     """
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Missing registration data"}), 400
 
-    username = (data.get('username') or '').strip()
     email = (data.get('email') or '').strip().lower()
+    name = (data.get('name') or data.get('username') or '').strip()
     password = data.get('password') or ''
 
     # Validation
-    if len(username) < 3 or len(username) > 30:
-        return jsonify({"success": False, "error": "Username must be between 3 and 30 characters"}), 400
-
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+    if not email or not re.match(r"[^@]+@[^@]+\.[^@]+", email):
         return jsonify({"success": False, "error": "Please provide a valid email address"}), 400
+
+    if not name:
+        name = email.split('@')[0]
+
+    if len(name) < 2 or len(name) > 50:
+        return jsonify({"success": False, "error": "Name must be between 2 and 50 characters"}), 400
 
     if len(password) < 6:
         return jsonify({"success": False, "error": "Password must be at least 6 characters"}), 400
@@ -167,19 +296,19 @@ def register():
     db = get_db()
     cursor = db.cursor()
 
-    # Check for duplicate username or email
-    cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
+    # Check for duplicate email
+    cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
     existing = cursor.fetchone()
     if existing:
-        return jsonify({"success": False, "error": "Username or email already registered"}), 409
+        return jsonify({"success": False, "error": "Email is already registered"}), 409
 
     password_hash = generate_password_hash(password)
 
     try:
         cursor.execute("""
-            INSERT INTO users (username, email, password_hash)
-            VALUES (?, ?, ?)
-        """, (username, email, password_hash))
+            INSERT INTO users (username, name, email, password_hash, auth_provider)
+            VALUES (?, ?, ?, ?, 'local')
+        """, (name, name, email, password_hash))
         db.commit()
 
         user_id = cursor.lastrowid
@@ -190,8 +319,11 @@ def register():
             "message": "Account created successfully",
             "user": {
                 "id": user_id,
-                "username": username,
-                "email": email
+                "username": name,
+                "name": name,
+                "email": email,
+                "avatar_url": "",
+                "auth_provider": "local"
             }
         }), 201
 
@@ -202,40 +334,53 @@ def register():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """
-    Authenticates an existing user via username/email and password.
-    Payload: {"login": "email_or_username", "password": "..."}
+    Authenticates an existing user via email/username and password.
+    Payload: {"email": "...", "password": "..."} or {"login": "...", "password": "..."}
     """
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Missing login credentials"}), 400
 
-    login_identifier = (data.get('login') or '').strip().lower()
+    login_identifier = (data.get('email') or data.get('login') or '').strip().lower()
     password = data.get('password') or ''
 
     if not login_identifier or not password:
-        return jsonify({"success": False, "error": "Username/email and password are required"}), 400
+        return jsonify({"success": False, "error": "Email/username and password are required"}), 400
 
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        SELECT id, username, email, password_hash 
+        SELECT id, username, name, email, password_hash, avatar_url, auth_provider, created_at 
         FROM users 
-        WHERE LOWER(username) = ? OR LOWER(email) = ?
-    """, (login_identifier, login_identifier))
+        WHERE LOWER(email) = ? OR LOWER(username) = ? OR LOWER(name) = ?
+    """, (login_identifier, login_identifier, login_identifier))
     user = cursor.fetchone()
 
-    if not user or not check_password_hash(user['password_hash'], password):
-        return jsonify({"success": False, "error": "Invalid username/email or password"}), 401
+    if not user:
+        return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
+
+    if not user['password_hash']:
+        if user['auth_provider'] == 'google':
+            return jsonify({"success": False, "error": "This account was created with Google Sign-In. Please sign in with Google."}), 400
+        return jsonify({"success": False, "error": "Account has no password set"}), 401
+
+    if not check_password_hash(user['password_hash'], password):
+        return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
 
     session['user_id'] = user['id']
+    display_name = user['name'] or user['username'] or user['email'].split('@')[0]
 
     return jsonify({
         "success": True,
         "message": "Login successful",
         "user": {
             "id": user['id'],
-            "username": user['username'],
-            "email": user['email']
+            "username": display_name,
+            "name": display_name,
+            "email": user['email'],
+            "avatar_url": user['avatar_url'] or '',
+            "auth_provider": user['auth_provider'] or 'local',
+            "created_at": user['created_at']
         }
     }), 200
 
@@ -243,7 +388,7 @@ def login():
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
     """Logs out current user session."""
-    session.pop('user_id', None)
+    session.clear()
     return jsonify({"success": True, "message": "Logged out successfully"}), 200
 
 
@@ -256,19 +401,28 @@ def get_current_user():
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id, username, email, created_at FROM users WHERE id = ?", (user_id,))
+    cursor.execute("""
+        SELECT id, username, name, email, avatar_url, auth_provider, created_at 
+        FROM users 
+        WHERE id = ?
+    """, (user_id,))
     user = cursor.fetchone()
 
     if not user:
-        session.pop('user_id', None)
+        session.clear()
         return jsonify({"authenticated": False, "user": None}), 200
+
+    display_name = user['name'] or user['username'] or user['email'].split('@')[0]
 
     return jsonify({
         "authenticated": True,
         "user": {
             "id": user['id'],
-            "username": user['username'],
+            "username": display_name,
+            "name": display_name,
             "email": user['email'],
+            "avatar_url": user['avatar_url'] or '',
+            "auth_provider": user['auth_provider'] or 'local',
             "created_at": user['created_at']
         }
     }), 200
