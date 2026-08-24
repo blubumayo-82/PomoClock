@@ -512,12 +512,13 @@ header,
   flex-direction: row !important;
   justify-content: space-between !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 12px !important;
   width: 100% !important;
   padding: 8px 12px !important;
   margin: 0 auto 1.25rem auto !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   box-sizing: border-box !important;
+  position: relative !important;
 }
 
 @media (min-width: 768px) {
@@ -715,29 +716,30 @@ header,
 
 .header-actions .icon-btn,
 .header-right .icon-btn {
-  width: 34px !important;
-  height: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
-  border-radius: 50% !important;
-  background: transparent !important;
-  border: none !important;
-  color: #c9b6c0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  color: #e2d4dc !important;
   cursor: pointer;
-  transition: color 0.2s ease, transform 0.15s ease, background 0.2s ease;
-  padding: 0 !important;
+  transition: all 0.2s ease;
   flex-shrink: 0 !important;
   box-sizing: border-box;
+  padding: 0 !important;
 }
 
 .header-actions .icon-btn:hover,
 .header-right .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
   color: #ffffff !important;
-  transform: scale(1.08);
-  background: rgba(255, 255, 255, 0.06) !important;
+  transform: translateY(-1px);
 }
 
 .header-btn-text {
@@ -747,54 +749,95 @@ header,
 @media (max-width: 640px) {
   header,
   .app-header {
-    padding: 8px 12px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 10px 14px !important;
+    position: relative !important;
     gap: 8px !important;
   }
 
+  /* Brand container on the left */
   .brand-container,
   .brand {
     display: flex !important;
+    align-items: flex-start !important;
     flex-direction: column !important;
+    gap: 2px !important;
     min-width: 0 !important;
     flex-shrink: 1 !important;
   }
 
+  .brand-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
   .brand-title,
   .brand-header h1 {
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
+    font-size: 1.2rem !important;
     white-space: nowrap !important;
+    font-weight: 700 !important;
   }
 
   .brand-tagline {
-    display: none !important;
+    display: none !important; /* Hide long tagline to avoid vertical stacking collision */
   }
 
+  /* Action container on the right: Icons ONLY, no wide text buttons */
   .header-right,
   .header-actions {
-    gap: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    flex-wrap: nowrap !important;
   }
 
-  .user-pill,
-  .header-text-btn.auth-btn {
-    padding: 3px 8px 3px 3px !important;
-    font-size: 0.78rem !important;
-    gap: 5px !important;
-  }
-
+  /* Hide long text pills on mobile to prevent overcrowding */
   .guide-btn,
   .science-btn,
   #openScienceModalHeaderBtn {
-    padding: 5px 8px !important;
-    font-size: 0.78rem !important;
+    display: none !important;
   }
 
+  /* Compact user avatar icon only */
+  .user-pill,
+  .header-text-btn.auth-btn {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  .user-pill .user-name,
+  .user-pill .header-btn-text,
+  .user-pill .user-name-text {
+    display: none !important;
+  }
+
+  /* Semi-circular glass pods for all mobile icons */
   .header-actions .icon-btn,
-  .header-right .icon-btn {
-    width: 30px !important;
-    height: 30px !important;
-    min-width: 30px !important;
-    max-width: 30px !important;
+  .header-right .icon-btn,
+  .user-avatar-circle,
+  .auth-avatar-pill {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+    min-height: 32px !important;
+    max-height: 32px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-size: 0.85rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .header-actions .icon,
