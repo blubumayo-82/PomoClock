@@ -28,11 +28,11 @@
   <meta name="twitter:description"
     content="PomoHaven is your cozy, ergonomic, and distraction-free Pomodoro study timer featuring eye-friendly color science and session tracking.">
 
-  <!-- Google Fonts: Outfit for sleek typography & JetBrains Mono for jitter-free timer digits -->
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit for cozy typography & JetBrains Mono for monospace -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
 
   <!-- Main Stylesheet -->
@@ -68,32 +68,32 @@
 
     <!-- Navigation Header -->
     <header class="app-header">
-      <div class="brand">
-        <!-- Compact 28px Tomato on Cloud (🍅☁️) Logo -->
-        <div class="brand-icon" title="PomoHaven (🍅☁️)">
-          <svg class="brand-logo-svg" viewBox="0 0 100 100" width="28" height="28" aria-hidden="true">
-            <defs>
-              <linearGradient id="brandPomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#FF6B6B"/>
-                <stop offset="100%" stop-color="#E05344"/>
-              </linearGradient>
-              <linearGradient id="brandCloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#FFFFFF"/>
-                <stop offset="100%" stop-color="#CBD5E1"/>
-              </linearGradient>
-            </defs>
-            <!-- Tomato Body & Leaves -->
-            <circle cx="50" cy="42" r="28" fill="url(#brandPomoGrad)"/>
-            <path d="M50 14 C48 21 44 24 39 25 C45 28 49 30 49 30 C49 30 53 27 60 25 C55 24 52 21 50 14 Z" fill="#22C55E"/>
-            <path d="M50 14 C51 10 54 8 57 7" stroke="#15803D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-            <!-- Fluffy Haven Cloud -->
-            <path d="M22 75 C16 75 12 70 12 64 C12 59 16 55 21 55 C22 47 28 42 36 42 C40 42 44 44 47 47 C50 43 56 40 62 40 C72 40 80 47 80 56 C85 56 89 60 89 65 C89 70 85 75 80 75 Z" fill="url(#brandCloudGrad)" opacity="0.96"/>
-          </svg>
+      <div class="brand-container brand">
+        <div class="brand-header">
+          <!-- Compact 28px Tomato on Cloud (🍅☁️) Logo -->
+          <div class="brand-icon" title="PomoHaven (🍅☁️)">
+            <svg class="brand-logo-svg" viewBox="0 0 100 100" width="28" height="28" aria-hidden="true">
+              <defs>
+                <linearGradient id="brandPomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#FF6B6B"/>
+                  <stop offset="100%" stop-color="#E05344"/>
+                </linearGradient>
+                <linearGradient id="brandCloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#FFFFFF"/>
+                  <stop offset="100%" stop-color="#CBD5E1"/>
+                </linearGradient>
+              </defs>
+              <!-- Tomato Body & Leaves -->
+              <circle cx="50" cy="42" r="28" fill="url(#brandPomoGrad)"/>
+              <path d="M50 14 C48 21 44 24 39 25 C45 28 49 30 49 30 C49 30 53 27 60 25 C55 24 52 21 50 14 Z" fill="#22C55E"/>
+              <path d="M50 14 C51 10 54 8 57 7" stroke="#15803D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+              <!-- Fluffy Haven Cloud -->
+              <path d="M22 75 C16 75 12 70 12 64 C12 59 16 55 21 55 C22 47 28 42 36 42 C40 42 44 44 47 47 C50 43 56 40 62 40 C72 40 80 47 80 56 C85 56 89 60 89 65 C89 70 85 75 80 75 Z" fill="url(#brandCloudGrad)" opacity="0.96"/>
+            </svg>
+          </div>
+          <h1 class="brand-title">PomoHaven</h1>
         </div>
-        <div class="brand-text">
-          <h1>PomoHaven</h1>
-          <span class="brand-tagline">YOUR COZY FOCUS HAVEN</span>
-        </div>
+        <span class="brand-tagline">YOUR COZY FOCUS HAVEN</span>
       </div>
 
       <div class="header-actions">
