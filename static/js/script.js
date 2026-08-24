@@ -459,6 +459,21 @@ function updateModeTabs() {
   });
 }
 
+function updateModeTabsDisabledState(disabled) {
+  const tabs = [DOM.tabPomodoro, DOM.tabShortBreak, DOM.tabLongBreak];
+  tabs.forEach(tab => {
+    if (!tab) return;
+    tab.disabled = disabled;
+    if (disabled) {
+      tab.classList.add('disabled-mode-switch');
+      tab.setAttribute('title', 'Pause or reset timer to switch modes');
+    } else {
+      tab.classList.remove('disabled-mode-switch');
+      tab.removeAttribute('title');
+    }
+  });
+}
+
 function switchMode(newMode, autoStart = false) {
   if (state.isRunning) {
     pauseTimer();
@@ -470,6 +485,7 @@ function switchMode(newMode, autoStart = false) {
   state.sessionStartTime = null;
 
   updateModeTabs();
+  updateModeTabsDisabledState(false);
   updateTimerDisplay();
   updateStatusBadge();
 
@@ -490,6 +506,8 @@ function startTimer() {
   DOM.startPauseText.textContent = 'Pause';
   DOM.startPauseBtn.classList.add('running');
 
+  // Disable mode tabs while timer is running
+  updateModeTabsDisabledState(true);
   updateStatusBadge();
 
   // Drift-free interval timer based on real timestamps
@@ -524,6 +542,8 @@ function pauseTimer() {
   DOM.startPauseText.textContent = 'Start';
   DOM.startPauseBtn.classList.remove('running');
 
+  // Re-enable mode tabs when timer is paused
+  updateModeTabsDisabledState(false);
   updateStatusBadge();
 }
 
@@ -541,6 +561,7 @@ function resetTimer() {
 
   state.timeLeft = state.totalDuration;
   state.sessionStartTime = null;
+  updateModeTabsDisabledState(false);
   updateTimerDisplay();
   updateStatusBadge();
 

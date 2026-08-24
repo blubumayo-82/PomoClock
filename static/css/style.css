@@ -630,7 +630,7 @@ header, .app-header, .header, .top-bar {
 /* Task Bar */
 .task-bar {
   width: 100%;
-  max-width: 100%;
+  max-width: calc(100% - 3.5rem);
   box-sizing: border-box;
   margin-bottom: 1.25rem;
 }
@@ -754,6 +754,16 @@ header, .app-header, .header, .top-bar {
     padding: 0.4rem 0.15rem;
     font-size: clamp(0.68rem, 2.8vw, 0.78rem);
   }
+}
+
+.mode-tab.disabled-mode-switch,
+.mode-pill.disabled-mode-switch,
+button.mode-btn:disabled,
+button.mode-tab:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
 }
 
 /* Circular SVG Progress Ring */
@@ -970,29 +980,30 @@ header, .app-header, .header, .top-bar {
   display: none !important;
 }
 
-/* Zen Corner Button */
+/* Zen Mode Toggle Button */
+.zen-toggle-btn,
 .zen-corner-btn {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.65rem;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-full);
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border, var(--border-color));
   color: var(--text-secondary);
   font-family: var(--font-main);
-  font-size: 0.75rem;
-  font-weight: 600;
   cursor: pointer;
-  z-index: 5;
+  z-index: 10;
   transition: all var(--transition-fast);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
+.zen-toggle-btn:hover,
 .zen-corner-btn:hover {
   background: var(--badge-bg);
   border-color: var(--accent-color);
@@ -1002,9 +1013,13 @@ header, .app-header, .header, .top-bar {
 }
 
 .zen-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+}
+
+.zen-btn-label {
+  display: none;
 }
 
 @media (max-width: 480px) {
@@ -2748,13 +2763,20 @@ body.zen-mode-active .timer-section {
 }
 
 body.zen-mode-active #zenModeBtn,
+body.zen-mode-active .zen-toggle-btn,
 body.zen-mode-active .zen-corner-btn {
   background: var(--badge-bg) !important;
-  border-color: var(--accent-color) !important;
+  border: 1px solid var(--accent-color) !important;
   color: var(--accent-color) !important;
-  box-shadow: 0 0 12px var(--accent-glow) !important;
+  box-shadow: 0 0 14px var(--accent-glow) !important;
   position: fixed !important;
-  top: 1.5rem !important;
-  right: 1.5rem !important;
-  z-index: 100 !important;
+  top: 1.25rem !important;
+  right: 1.25rem !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1000 !important;
 }
