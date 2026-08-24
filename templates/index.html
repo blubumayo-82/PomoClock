@@ -203,27 +203,24 @@
           <span id="zenBtnText" class="zen-btn-label">Zen</span>
         </button>
 
-        <!-- Task Goal Bar -->
-        <div class="task-bar">
+        <!-- Consolidated Active Focus Task Bar & Queue Dropdown -->
+        <div class="active-task-bar" id="activeTaskBar">
           <div class="task-input-wrapper">
-            <span class="task-icon">🎯</span>
+            <span class="task-icon" title="Active Focus Goal">🎯</span>
             <input type="text" id="currentTaskInput" class="task-input"
-              placeholder="What are you focusing on right now?" maxlength="80" aria-label="Current focus task">
+              placeholder="What are you focusing on right now?" maxlength="80" aria-label="Active focus task">
             <button id="clearTaskBtn" class="task-clear-btn" title="Clear task" aria-label="Clear task">&times;</button>
+            <div class="task-input-divider"></div>
+            <button type="button" id="toggleTaskQueueBtn" class="task-queue-pill-btn" aria-expanded="false" title="View study queue / upcoming tasks">
+              <span class="queue-icon">📋</span>
+              <span class="queue-badge" id="taskQueueBadge">0</span>
+              <span id="queueArrow" class="queue-arrow">▾</span>
+            </button>
+            <button type="button" id="openAddTaskBtn" class="task-quick-add-btn" title="Add new task to queue">+ Queue</button>
           </div>
 
-          <!-- Collapsible Task Queue Container -->
-          <div class="task-queue-container" id="taskQueueContainer">
-            <div class="task-queue-bar">
-              <button type="button" id="toggleTaskQueueBtn" class="queue-toggle-btn" aria-expanded="false" title="Toggle study task queue">
-                <span class="queue-icon">📋</span>
-                <span class="queue-label">Study Queue</span>
-                <span class="queue-badge" id="taskQueueBadge">0</span>
-                <span id="queueArrow" class="queue-arrow">▾</span>
-              </button>
-              <button type="button" id="openAddTaskBtn" class="queue-add-btn" title="Add a new target task to queue">+ Add Task</button>
-            </div>
-
+          <!-- Collapsible Dropdown Queue Panel -->
+          <div class="task-queue-container hidden" id="taskQueueContainer">
             <!-- Add Task Input Form -->
             <div id="addTaskForm" class="add-task-form hidden">
               <div class="add-task-row">
@@ -242,8 +239,8 @@
             </div>
 
             <!-- Task Items List -->
-            <div id="taskQueueList" class="task-queue-list hidden">
-              <div class="task-queue-empty">No tasks in queue. Add your first study target above!</div>
+            <div id="taskQueueList" class="task-queue-list">
+              <div class="task-queue-empty">No tasks in queue. Click "+ Queue" to plan upcoming tasks!</div>
             </div>
           </div>
         </div>
@@ -372,7 +369,7 @@
           <div class="stat-card card">
             <div class="stat-icon-wrap pomodoro-icon">🍅</div>
             <div class="stat-info">
-              <span class="stat-label">Completed Pomodoros</span>
+              <span class="stat-label">Completed</span>
               <span class="stat-value" id="statCompletedCount">0</span>
               <span class="stat-sub" id="statTotalSessions">0 total sessions</span>
             </div>
@@ -1073,7 +1070,7 @@
       <div class="share-metric-card">
         <div class="share-metric-icon">🍅</div>
         <div class="share-metric-body">
-          <span class="share-metric-label">Completed Cycles</span>
+          <span class="share-metric-label">Completed</span>
           <span class="share-metric-val" id="shareCompletedCount">0</span>
         </div>
       </div>

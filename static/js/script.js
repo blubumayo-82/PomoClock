@@ -647,6 +647,9 @@ function skipSession() {
   const previousMode = state.currentMode;
   pauseTimer();
 
+  const activeTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
+  state.currentTask = activeTask;
+
   // Log skipped session if had ran partially
   if (state.sessionStartTime && (state.totalDuration - state.timeLeft) > 10) {
     const durationMins = Math.round(((state.totalDuration - state.timeLeft) / 60) * 10) / 10;
@@ -656,7 +659,7 @@ function skipSession() {
       start_time: state.sessionStartTime,
       end_time: new Date().toISOString(),
       status: 'skipped',
-      task_name: state.currentTask || 'Study Session'
+      task_name: activeTask || 'Study Session'
     });
   }
 
@@ -671,6 +674,9 @@ async function handleTimerComplete() {
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
 
+  const activeTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
+  state.currentTask = activeTask;
+
   // 1. Play audio chime
   playChimeSound();
 
@@ -684,7 +690,7 @@ async function handleTimerComplete() {
     start_time: startTime,
     end_time: endTime,
     status: 'completed',
-    task_name: state.currentTask || (completedMode === 'pomodoro' ? 'Focus Session' : 'Break Time')
+    task_name: activeTask || (completedMode === 'pomodoro' ? 'Focus Session' : 'Break Time')
   });
 
   // 4. Confetti & Celebration for completed pomodoro
@@ -938,6 +944,7 @@ function renderWeeklyChart(activity) {
   let html = '';
   activity.forEach(item => {
     const mins = parseFloat(item.focus_minutes) || 0;
+    const count = parseInt(item.completed_count, 10) || 0;
     const isToday = item.date === todayStr;
     let heightPercent = 0;
     let minHeightPx = '0px';
@@ -951,9 +958,12 @@ function renderWeeklyChart(activity) {
       barOpacity = 1;
     }
 
+    const badgeHtml = count > 0 ? `🍅 ${count}` : '&nbsp;';
+
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
-        <div class="chart-tooltip">${mins} mins (${item.completed_count || 0} 🍅)</div>
+        <div class="chart-top-badge ${count > 0 ? 'active' : ''}">${badgeHtml}</div>
+        <div class="chart-tooltip">${mins} mins (${count} 🍅)</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>
@@ -2146,16 +2156,17 @@ function renderTaskQueue() {
 function initTaskQueue() {
   if (!DOM.taskQueueContainer) return;
 
-  // Toggle drawer
+  // Toggle drawer / dropdown
   if (DOM.toggleTaskQueueBtn) {
-    DOM.toggleTaskQueueBtn.addEventListener('click', () => {
-      const isHidden = DOM.taskQueueList.classList.contains('hidden');
+    DOM.toggleTaskQueueBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = DOM.taskQueueContainer.classList.contains('hidden');
       if (isHidden) {
-        DOM.taskQueueList.classList.remove('hidden');
+        DOM.taskQueueContainer.classList.remove('hidden');
         DOM.queueArrow.classList.add('open');
         DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
       } else {
-        DOM.taskQueueList.classList.add('hidden');
+        DOM.taskQueueContainer.classList.add('hidden');
         DOM.queueArrow.classList.remove('open');
         DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'false');
       }
@@ -2164,9 +2175,10 @@ function initTaskQueue() {
 
   // Open add task form
   if (DOM.openAddTaskBtn) {
-    DOM.openAddTaskBtn.addEventListener('click', () => {
+    DOM.openAddTaskBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      DOM.taskQueueContainer.classList.remove('hidden');
       DOM.addTaskForm.classList.remove('hidden');
-      DOM.taskQueueList.classList.remove('hidden');
       DOM.queueArrow.classList.add('open');
       DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
       if (DOM.newTaskTitleInput) {
@@ -2234,6 +2246,7 @@ function initTaskQueue() {
           showToast(`✅ "${task.title}" completed!`, 'success');
         }
         saveTaskQueue(tasks);
+        renderTaskQueue();
         return;
       }
 
@@ -2241,6 +2254,7 @@ function initTaskQueue() {
       if (target.classList.contains('task-delete-btn')) {
         const updated = tasks.filter(t => t.id !== taskId);
         saveTaskQueue(updated);
+        renderTaskQueue();
         showToast('Task removed from queue', 'info');
         return;
       }
@@ -2250,6 +2264,7 @@ function initTaskQueue() {
         if (task.targetPomos > 1) {
           task.targetPomos--;
           saveTaskQueue(tasks);
+          renderTaskQueue();
         }
         return;
       }
@@ -2259,6 +2274,7 @@ function initTaskQueue() {
         if (task.targetPomos < 20) {
           task.targetPomos++;
           saveTaskQueue(tasks);
+          renderTaskQueue();
         }
         return;
       }
@@ -2301,6 +2317,7 @@ function submitNewTask() {
 
   DOM.newTaskTitleInput.value = '';
   DOM.addTaskForm.classList.add('hidden');
+  renderTaskQueue();
   showToast(`🎯 Added "${title}" (${taskTargetStepperCount} Pomos) to queue`, 'success');
 }
 
@@ -2309,23 +2326,31 @@ function selectQueuedTask(task) {
     DOM.currentTaskInput.value = task.title;
     state.currentTask = task.title;
     renderTaskQueue();
-    showToast(`🎯 Locked target: "${task.title}"`, 'info');
+    showToast(`🎯 Active focus task: "${task.title}"`, 'info');
   }
 }
 
 function incrementActiveTaskProgress() {
-  const currentTaskName = (state.currentTask || (DOM.currentTaskInput ? DOM.currentTaskInput.value : '')).trim().toLowerCase();
+  const currentTaskName = (state.currentTask || (DOM.currentTaskInput ? DOM.currentTaskInput.value : '')).trim();
   if (!currentTaskName) return;
 
   const tasks = getTaskQueue();
-  const matchedTask = tasks.find(t => t.title.trim().toLowerCase() === currentTaskName);
+  const matchedTask = tasks.find(t => t.title.trim().toLowerCase() === currentTaskName.toLowerCase());
   if (matchedTask) {
     matchedTask.completedPomos = (matchedTask.completedPomos || 0) + 1;
     if (matchedTask.completedPomos >= matchedTask.targetPomos && !matchedTask.completed) {
       matchedTask.completed = true;
       showToast(`🏆 Goal reached for "${matchedTask.title}"!`, 'success');
+
+      // Automatically advance to the next incomplete task in the queue
+      const nextTask = tasks.find(t => !t.completed && t.id !== matchedTask.id);
+      if (nextTask) {
+        selectQueuedTask(nextTask);
+        showToast(`🎯 Advanced to next queued task: "${nextTask.title}"`, 'info');
+      }
     }
     saveTaskQueue(tasks);
+    renderTaskQueue();
   }
 }
 
@@ -2345,7 +2370,39 @@ async function exportShareableFocusCard() {
   const cardContainer = document.getElementById('shareCardContainer');
   if (!cardContainer) return;
 
-  // 1. Populate dynamic dates & user info
+  // 1. Inherit active theme & dynamic CSS custom properties
+  const activeTheme = document.body.getAttribute('data-theme') || 'pomodoro';
+  cardContainer.setAttribute('data-theme', activeTheme);
+
+  const computed = getComputedStyle(document.body);
+  const themeProps = [
+    '--bg-primary',
+    '--bg-secondary',
+    '--bg-card',
+    '--bg-card-hover',
+    '--accent-color',
+    '--accent-secondary',
+    '--accent-rgb',
+    '--accent-glow',
+    '--card-border',
+    '--border-color',
+    '--border-hover',
+    '--badge-bg',
+    '--text-primary',
+    '--text-secondary',
+    '--text-muted'
+  ];
+
+  themeProps.forEach(prop => {
+    const val = computed.getPropertyValue(prop);
+    if (val) {
+      cardContainer.style.setProperty(prop, val.trim());
+    }
+  });
+
+  const activeBgColor = (computed.getPropertyValue('--bg-primary') || '#171214').trim();
+
+  // 2. Populate dynamic dates & user info
   const dateElem = document.getElementById('shareCardDate');
   if (dateElem) {
     dateElem.textContent = new Date().toLocaleDateString(undefined, {
@@ -2359,7 +2416,7 @@ async function exportShareableFocusCard() {
     scholarElem.textContent = activeUserName;
   }
 
-  // 2. Populate highlight metrics from active stats
+  // 3. Populate highlight metrics from active stats
   const totalHrsElem = document.getElementById('shareTotalHours');
   if (totalHrsElem && DOM.statTotalHours) {
     totalHrsElem.innerHTML = DOM.statTotalHours.innerHTML;
@@ -2377,7 +2434,7 @@ async function exportShareableFocusCard() {
     compCountElem.textContent = DOM.statCompletedCount.textContent;
   }
 
-  // 3. Populate weekly focus activity summary badge & 7-day single-row column chart
+  // 4. Populate weekly focus activity summary badge & 7-day single-row column chart
   const weekTotalElem = document.getElementById('shareWeekTotal');
   if (weekTotalElem && DOM.chartWeekTotal) {
     weekTotalElem.textContent = DOM.chartWeekTotal.textContent;
@@ -2420,7 +2477,7 @@ async function exportShareableFocusCard() {
     chartContentElem.innerHTML = chartHtml;
   }
 
-  // 4. Temporarily show container for capture (position off-screen)
+  // 5. Temporarily show container for capture (position off-screen)
   cardContainer.style.display = 'block';
   cardContainer.style.position = 'fixed';
   cardContainer.style.top = '0';
@@ -2432,7 +2489,7 @@ async function exportShareableFocusCard() {
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#171214',
+      backgroundColor: activeBgColor,
       logging: false
     });
 
