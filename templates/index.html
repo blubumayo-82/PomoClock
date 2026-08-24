@@ -1015,19 +1015,19 @@
   <!-- HIDDEN TEMPLATE: PomoHaven Shareable Focus Summary Card  -->
   <!-- ======================================================== -->
   <div id="shareCardContainer" class="shareable-card-template" style="display: none;">
-    <!-- Header -->
+    <!-- Top Header -->
     <div class="share-card-header">
       <div class="share-brand">
         <div class="share-logo-wrap">
-          <svg viewBox="0 0 100 100" width="36" height="36" aria-hidden="true">
+          <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true">
             <defs>
               <linearGradient id="scPomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#FF6B6B"/>
-                <stop offset="100%" stop-color="#E05344"/>
+                <stop offset="0%" stop-color="#FF6B50"/>
+                <stop offset="100%" stop-color="#E04836"/>
               </linearGradient>
               <linearGradient id="scCloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stop-color="#FFFFFF"/>
-                <stop offset="100%" stop-color="#CBD5E1"/>
+                <stop offset="100%" stop-color="#D1D5DB"/>
               </linearGradient>
             </defs>
             <circle cx="50" cy="42" r="28" fill="url(#scPomoGrad)"/>
@@ -1047,7 +1047,7 @@
       </div>
     </div>
 
-    <!-- Highlight Metrics Grid -->
+    <!-- Highlight Metrics Grid (Compact Badges) -->
     <div class="share-metrics-grid">
       <div class="share-metric-card">
         <div class="share-metric-icon">⏱️</div>
@@ -1086,7 +1086,7 @@
         <span class="share-chart-badge" id="shareWeekTotal">0h this week</span>
       </div>
       <div class="share-chart-content" id="shareChartContent">
-        <!-- Populated from live chart -->
+        <!-- Rendered dynamically as 7 vertical columns in a single horizontal row -->
       </div>
     </div>
 
@@ -1096,7 +1096,6 @@
         <span class="share-footer-icon">🍅☁️</span>
         <span>Built with <strong>PomoHaven</strong> • Track your study flow at <strong>pomohaven.com</strong></span>
       </div>
-      <span class="share-footer-tag">Deep Work Analytics</span>
     </div>
   </div>
 

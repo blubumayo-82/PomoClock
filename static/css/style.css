@@ -3429,67 +3429,72 @@ body.zen-mode-active .zen-corner-btn {
 
 /* Dedicated Shareable Social Summary Card Template */
 .shareable-card-template {
-  width: 660px;
-  background: #150E10;
-  background-image: radial-gradient(circle at 85% 10%, rgba(224, 83, 68, 0.18) 0%, transparent 60%),
-                    radial-gradient(circle at 15% 90%, rgba(34, 197, 94, 0.12) 0%, transparent 50%);
+  width: 600px;
+  background: #171214;
+  background-image: radial-gradient(circle at 90% 10%, rgba(255, 107, 80, 0.15) 0%, transparent 60%),
+                    radial-gradient(circle at 10% 90%, rgba(34, 197, 94, 0.08) 0%, transparent 50%);
   color: #FFF5F5;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  padding: 28px 32px;
+  padding: 26px 28px;
   box-sizing: border-box;
-  border-radius: 18px;
-  border: 1px solid rgba(224, 83, 68, 0.3);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 107, 80, 0.22);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
 }
 
 .share-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .share-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  background: none !important;
 }
 
 .share-logo-wrap {
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 107, 80, 0.2);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .share-brand-info {
   display: flex;
   flex-direction: column;
+  background: none !important;
 }
 
 .share-brand-title {
-  font-size: 1.4rem;
+  font-size: 1.45rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0;
-  background: linear-gradient(135deg, #FFFFFF 30%, #FFA8A8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  padding: 0;
+  color: #FFF5F5 !important;
+  background: none !important;
+  -webkit-text-fill-color: #FFF5F5 !important;
+  text-shadow: none !important;
 }
 
 .share-brand-sub {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.14em;
-  color: #CBD5E1;
+  color: #FFA28B !important;
   text-transform: uppercase;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .share-meta {
@@ -3510,76 +3515,83 @@ body.zen-mode-active .zen-corner-btn {
   color: #94A3B8;
 }
 
-/* Highlight Metrics Grid */
+/* 2. Cute & Compact Metric Badges */
 .share-metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .share-metric-card {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 107, 80, 0.15);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
 .share-metric-icon {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   flex-shrink: 0;
+  line-height: 1;
 }
 
 .share-metric-body {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .share-metric-label {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: #94A3B8;
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.03em;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .share-metric-val {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 800;
-  color: #FF6B6B;
+  color: #FF6B50;
   font-family: 'JetBrains Mono', monospace;
   line-height: 1.2;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .share-metric-val small {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  color: #CBD5E1;
+  color: #FFA28B;
 }
 
-/* Main Visual: Weekly Bar Chart */
+/* 3. Weekly Focus Activity Section & 7-Day Chart */
 .share-chart-section {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 16px 18px;
-  margin-bottom: 20px;
+  border: 1px solid rgba(255, 107, 80, 0.15);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  box-sizing: border-box;
 }
 
 .share-chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .share-chart-title {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 700;
   color: #FFFFFF;
   margin: 0;
@@ -3588,69 +3600,90 @@ body.zen-mode-active .zen-corner-btn {
 }
 
 .share-chart-badge {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  background: rgba(224, 83, 68, 0.18);
-  color: #FF7B6B;
-  border: 1px solid rgba(224, 83, 68, 0.3);
-  padding: 3px 10px;
+  background: rgba(255, 107, 80, 0.15);
+  color: #FFA28B;
+  border: 1px solid rgba(255, 107, 80, 0.3);
+  padding: 2px 10px;
   border-radius: 20px;
 }
 
-.share-chart-content .activity-chart {
+.share-chart-row {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: flex-end;
-  height: 110px;
-  gap: 8px;
-  padding: 0 4px;
+  width: 100%;
+  height: 180px;
+  box-sizing: border-box;
+  padding: 6px 4px 4px 4px;
 }
 
-.share-chart-content .chart-bar-item {
+.share-day-col {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   flex: 1;
   height: 100%;
-  justify-content: flex-end;
   gap: 6px;
+  box-sizing: border-box;
 }
 
-.share-chart-content .chart-bar-track {
-  width: 100%;
-  max-width: 32px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  height: 80px;
+.share-bar-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #FFA28B;
+  height: 18px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.share-bar-badge.active {
+  color: #FF6B50;
+  text-shadow: 0 0 8px rgba(255, 107, 80, 0.5);
+}
+
+.share-bar-track {
+  background: rgba(255, 255, 255, 0.05);
+  width: 34px;
+  height: 116px;
+  border-radius: 8px;
   display: flex;
   align-items: flex-end;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
-.share-chart-content .chart-bar-fill {
+.share-bar-fill {
+  background: #FF6B50;
+  border-radius: 8px;
   width: 100%;
-  background: linear-gradient(180deg, #FF6B6B 0%, #E05344 100%);
-  border-radius: 6px 6px 0 0;
-  min-height: 4px;
+  box-shadow: 0 0 12px rgba(255, 107, 80, 0.45);
+  transition: height 0.3s ease;
 }
 
-.share-chart-content .chart-day-label {
-  font-size: 0.72rem;
+.share-day-label {
+  font-size: 0.76rem;
   color: #94A3B8;
   font-weight: 600;
+  margin-top: 2px;
+  text-align: center;
 }
 
-.share-chart-content .chart-val-label {
-  font-size: 0.65rem;
-  color: #E2E8F0;
+.share-day-col.today .share-day-label {
+  color: #FF6B50;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
 }
 
-/* Footer Banner */
+/* 4. Footer Banner */
 .share-card-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 14px;
@@ -3670,14 +3703,4 @@ body.zen-mode-active .zen-corner-btn {
 
 .share-footer-left strong {
   color: #FFFFFF;
-}
-
-.share-footer-tag {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.68rem;
-  color: #CBD5E1;
-  font-weight: 600;
 }

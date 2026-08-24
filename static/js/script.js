@@ -2377,15 +2377,47 @@ async function exportShareableFocusCard() {
     compCountElem.textContent = DOM.statCompletedCount.textContent;
   }
 
-  // 3. Populate weekly focus activity summary badge & chart
+  // 3. Populate weekly focus activity summary badge & 7-day single-row column chart
   const weekTotalElem = document.getElementById('shareWeekTotal');
   if (weekTotalElem && DOM.chartWeekTotal) {
     weekTotalElem.textContent = DOM.chartWeekTotal.textContent;
   }
 
   const chartContentElem = document.getElementById('shareChartContent');
-  if (chartContentElem && DOM.activityChart) {
-    chartContentElem.innerHTML = DOM.activityChart.innerHTML;
+  if (chartContentElem) {
+    const stats = computeLocalStats();
+    const activity = stats.weekly_activity || [];
+    const todayStr = getLocalDateString();
+    const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
+    const maxMins = Math.max(...recordedMins, 25);
+
+    let chartHtml = '<div class="share-chart-row">';
+    activity.forEach(item => {
+      const mins = parseFloat(item.focus_minutes) || 0;
+      const count = parseInt(item.completed_count, 10) || 0;
+      const isToday = item.date === todayStr;
+
+      let heightPercent = 0;
+      let minHeight = '0px';
+      if (mins > 0) {
+        heightPercent = Math.min(100, Math.max(8, Math.round((mins / maxMins) * 100)));
+        minHeight = '8px';
+      }
+
+      const badgeContent = count > 0 ? `🍅 ${count}` : '&nbsp;';
+
+      chartHtml += `
+        <div class="share-day-col ${isToday ? 'today' : ''}">
+          <div class="share-bar-badge ${count > 0 ? 'active' : ''}">${badgeContent}</div>
+          <div class="share-bar-track">
+            <div class="share-bar-fill" style="height: ${heightPercent}%; min-height: ${minHeight};"></div>
+          </div>
+          <span class="share-day-label">${item.day_name}</span>
+        </div>
+      `;
+    });
+    chartHtml += '</div>';
+    chartContentElem.innerHTML = chartHtml;
   }
 
   // 4. Temporarily show container for capture (position off-screen)
@@ -2400,7 +2432,7 @@ async function exportShareableFocusCard() {
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#150E10',
+      backgroundColor: '#171214',
       logging: false
     });
 
