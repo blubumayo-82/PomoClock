@@ -46,12 +46,10 @@
     window.POMOHAVEN_CONFIG = {
       googleClientId: "{{ google_client_id | default('') }}"
     };
-    // Legacy alias
-    window.POMOCLOCK_CONFIG = window.POMOHAVEN_CONFIG;
   </script>
 
-  <!-- html2pdf.js for Client-Side PDF Export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- html2canvas for High-Resolution Shareable Card Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <!-- Driver.js Onboarding Tour -->
   <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
@@ -406,7 +404,17 @@
               <h2 class="card-title">Weekly Focus Activity</h2>
               <p class="card-subtitle">Daily focus minutes over the past 7 days</p>
             </div>
-            <span class="chart-summary-badge" id="chartWeekTotal">0h this week</span>
+            <div class="activity-header-actions">
+              <span class="chart-summary-badge" id="chartWeekTotal">0h this week</span>
+              <button id="shareStatsBtn" class="text-btn share-stats-btn" title="Export & Share Focus Summary Card (PNG)">
+                <svg class="btn-share-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                  <polyline points="16 6 12 2 8 6"></polyline>
+                  <line x1="12" y1="2" x2="12" y2="15"></line>
+                </svg>
+                <span>Share Card</span>
+              </button>
+            </div>
           </div>
 
           <!-- Bar Chart Container -->
@@ -424,7 +432,6 @@
               <p class="card-subtitle">Logged study and break intervals</p>
             </div>
             <div class="history-actions">
-              <button id="exportPdfBtn" class="text-btn export-btn export-pdf-btn" title="Download your analytics summary as a styled PDF report">📄 Export PDF</button>
               <button id="exportCsvBtn" class="text-btn export-btn" title="Download your study logs as a CSV spreadsheet">📊 Export CSV</button>
               <button id="clearHistoryBtn" class="text-btn danger-text" title="Clear all history">Clear Logs</button>
             </div>
@@ -937,14 +944,7 @@
         </div>
 
         <div class="setting-group">
-          <h3 class="setting-group-title">Data & Focus Reports</h3>
-          <div class="setting-row">
-            <div>
-              <label class="setting-label">Export PDF Focus Report</label>
-              <span class="setting-desc">Download a printable single-page PDF study analytics report</span>
-            </div>
-            <button type="button" id="exportPdfSettingsBtn" class="mini-btn export-btn" title="Download PDF report">📄 Export PDF</button>
-          </div>
+          <h3 class="setting-group-title">Data & Session Logs</h3>
           <div class="setting-row">
             <div>
               <label class="setting-label">Export Study Logs (CSV)</label>
@@ -1010,74 +1010,91 @@
   </div>
 
   <!-- ======================================================== -->
-  <!-- HIDDEN TEMPLATE: PomoHaven PDF Focus Report Export       -->
+  <!-- HIDDEN TEMPLATE: PomoHaven Shareable Focus Summary Card  -->
   <!-- ======================================================== -->
-  <div id="pdfReportContainer" class="pdf-export-template" style="display: none;">
-    <div class="pdf-header">
-      <div class="pdf-brand">
-        <span class="pdf-logo">🍅☁️</span>
-        <div>
-          <h1 class="pdf-title">PomoHaven Focus & Productivity Report</h1>
-          <p class="pdf-subtitle">Deep Work & Study Analytics Summary</p>
+  <div id="shareCardContainer" class="shareable-card-template" style="display: none;">
+    <!-- Header -->
+    <div class="share-card-header">
+      <div class="share-brand">
+        <div class="share-logo-wrap">
+          <svg viewBox="0 0 100 100" width="36" height="36" aria-hidden="true">
+            <defs>
+              <linearGradient id="scPomoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FF6B6B"/>
+                <stop offset="100%" stop-color="#E05344"/>
+              </linearGradient>
+              <linearGradient id="scCloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#FFFFFF"/>
+                <stop offset="100%" stop-color="#CBD5E1"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="42" r="28" fill="url(#scPomoGrad)"/>
+            <path d="M50 14 C48 21 44 24 39 25 C45 28 49 30 49 30 C49 30 53 27 60 25 C55 24 52 21 50 14 Z" fill="#22C55E"/>
+            <path d="M50 14 C51 10 54 8 57 7" stroke="#15803D" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M22 75 C16 75 12 70 12 64 C12 59 16 55 21 55 C22 47 28 42 36 42 C40 42 44 44 47 47 C50 43 56 40 62 40 C72 40 80 47 80 56 C85 56 89 60 89 65 C89 70 85 75 80 75 Z" fill="url(#scCloudGrad)" opacity="0.96"/>
+          </svg>
+        </div>
+        <div class="share-brand-info">
+          <h2 class="share-brand-title">PomoHaven</h2>
+          <span class="share-brand-sub">YOUR COZY FOCUS HAVEN</span>
         </div>
       </div>
-      <div class="pdf-meta">
-        <div><strong>Date:</strong> <span id="pdfReportDate">--</span></div>
-        <div><strong>Scholar:</strong> <span id="pdfReportUser">Guest Scholar</span></div>
+      <div class="share-meta">
+        <div class="share-scholar" id="shareScholarName">Guest Scholar</div>
+        <div class="share-date" id="shareCardDate">Aug 24, 2026</div>
       </div>
     </div>
 
-    <!-- Summary Metric Cards -->
-    <div class="pdf-metrics-grid">
-      <div class="pdf-metric-card">
-        <span class="pdf-metric-label">Total Study Time</span>
-        <span class="pdf-metric-val" id="pdfTotalHours">0.0 hrs</span>
-        <span class="pdf-metric-sub" id="pdfTotalMinutes">0 mins recorded</span>
+    <!-- Highlight Metrics Grid -->
+    <div class="share-metrics-grid">
+      <div class="share-metric-card">
+        <div class="share-metric-icon">⏱️</div>
+        <div class="share-metric-body">
+          <span class="share-metric-label">Total Study Time</span>
+          <span class="share-metric-val" id="shareTotalHours">0.0 <small>hrs</small></span>
+        </div>
       </div>
-      <div class="pdf-metric-card">
-        <span class="pdf-metric-label">Completed Pomodoros</span>
-        <span class="pdf-metric-val" id="pdfCompletedCount">0</span>
-        <span class="pdf-metric-sub" id="pdfTotalSessions">0 sessions</span>
+      <div class="share-metric-card">
+        <div class="share-metric-icon">🔥</div>
+        <div class="share-metric-body">
+          <span class="share-metric-label">Study Streak</span>
+          <span class="share-metric-val" id="shareStreakDays">0 <small>days</small></span>
+        </div>
       </div>
-      <div class="pdf-metric-card">
-        <span class="pdf-metric-label">Today's Focus</span>
-        <span class="pdf-metric-val" id="pdfTodayMinutes">0 min</span>
-        <span class="pdf-metric-sub" id="pdfTodaySessions">0 sessions today</span>
+      <div class="share-metric-card">
+        <div class="share-metric-icon">📅</div>
+        <div class="share-metric-body">
+          <span class="share-metric-label">Today's Focus</span>
+          <span class="share-metric-val" id="shareTodayMinutes">0 <small>min</small></span>
+        </div>
       </div>
-      <div class="pdf-metric-card">
-        <span class="pdf-metric-label">Study Streak</span>
-        <span class="pdf-metric-val" id="pdfStreakDays">0 days</span>
-        <span class="pdf-metric-sub">Daily Momentum 🔥</span>
+      <div class="share-metric-card">
+        <div class="share-metric-icon">🍅</div>
+        <div class="share-metric-body">
+          <span class="share-metric-label">Completed Cycles</span>
+          <span class="share-metric-val" id="shareCompletedCount">0</span>
+        </div>
       </div>
     </div>
 
-    <!-- Weekly Focus Activity Section -->
-    <div class="pdf-section">
-      <h3 class="pdf-section-title">Weekly Focus Activity (Past 7 Days)</h3>
-      <div id="pdfActivityChart" class="pdf-chart-wrap"></div>
+    <!-- Main Visual: Weekly Focus Activity Bar Chart -->
+    <div class="share-chart-section">
+      <div class="share-chart-header">
+        <h3 class="share-chart-title">Weekly Focus Activity</h3>
+        <span class="share-chart-badge" id="shareWeekTotal">0h this week</span>
+      </div>
+      <div class="share-chart-content" id="shareChartContent">
+        <!-- Populated from live chart -->
+      </div>
     </div>
 
-    <!-- Recent Session Logs -->
-    <div class="pdf-section">
-      <h3 class="pdf-section-title">Recent Session Logs</h3>
-      <table class="pdf-table">
-        <thead>
-          <tr>
-            <th>Mode</th>
-            <th>Task / Subject</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Timestamp</th>
-          </tr>
-        </thead>
-        <tbody id="pdfHistoryTableBody"></tbody>
-      </table>
-    </div>
-
-    <!-- PDF Footer -->
-    <div class="pdf-footer">
-      <span>Generated with love 💚 by PomoHaven • Your Cozy Focus Haven</span>
-      <span>https://pomohaven.app</span>
+    <!-- Footer Banner -->
+    <div class="share-card-footer">
+      <div class="share-footer-left">
+        <span class="share-footer-icon">🍅☁️</span>
+        <span>Built with <strong>PomoHaven</strong> • Track your study flow at <strong>pomohaven.com</strong></span>
+      </div>
+      <span class="share-footer-tag">Deep Work Analytics</span>
     </div>
   </div>
 

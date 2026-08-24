@@ -3387,185 +3387,297 @@ body.zen-mode-active .zen-corner-btn {
 }
 
 /* ==========================================================================
-   11. PDF Export Feature Styles (html2pdf.js)
+   11. Shareable Focus Summary Card Styles (html2canvas)
    ========================================================================== */
 
-.export-pdf-btn {
+.activity-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.share-stats-btn {
   background: rgba(var(--accent-rgb, 224, 83, 68), 0.12) !important;
   color: var(--accent-color) !important;
-  border: 1px solid rgba(var(--accent-rgb, 224, 83, 68), 0.3) !important;
+  border: 1px solid rgba(var(--accent-rgb, 224, 83, 68), 0.35) !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 0.35rem !important;
+  gap: 0.4rem !important;
+  padding: 0.35rem 0.75rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm) !important;
+  transition: all var(--transition-fast) !important;
+  cursor: pointer;
 }
 
-.export-pdf-btn:hover {
+.share-stats-btn:hover {
   background: var(--accent-color) !important;
-  color: var(--btn-primary-text, #18221b) !important;
-  box-shadow: 0 4px 12px var(--accent-glow) !important;
+  color: var(--btn-primary-text, #181112) !important;
+  box-shadow: 0 4px 14px var(--accent-glow) !important;
+  transform: translateY(-1px);
 }
 
-.pdf-export-template {
-  width: 780px;
-  background: #181112;
+.share-stats-btn .btn-share-icon {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.share-stats-btn:hover .btn-share-icon {
+  transform: scale(1.1);
+}
+
+/* Dedicated Shareable Social Summary Card Template */
+.shareable-card-template {
+  width: 660px;
+  background: #150E10;
+  background-image: radial-gradient(circle at 85% 10%, rgba(224, 83, 68, 0.18) 0%, transparent 60%),
+                    radial-gradient(circle at 15% 90%, rgba(34, 197, 94, 0.12) 0%, transparent 50%);
   color: #FFF5F5;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  padding: 26px 30px;
+  padding: 28px 32px;
   box-sizing: border-box;
-  border-radius: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(224, 83, 68, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
-.pdf-header {
+.share-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid rgba(224, 83, 68, 0.4);
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 16px;
   margin-bottom: 20px;
 }
 
-.pdf-brand {
+.share-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
-.pdf-logo {
-  font-size: 2.2rem;
-  line-height: 1;
+.share-logo-wrap {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pdf-title {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #FFFFFF;
-  margin: 0;
-}
-
-.pdf-subtitle {
-  font-size: 0.82rem;
-  color: #CBD5E1;
-  margin: 2px 0 0 0;
-}
-
-.pdf-meta {
-  text-align: right;
-  font-size: 0.78rem;
-  color: #94A3B8;
-  line-height: 1.5;
-}
-
-.pdf-meta strong {
-  color: #E2E8F0;
-}
-
-.pdf-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 22px;
-}
-
-.pdf-metric-card {
-  background: #241618;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 12px 14px;
+.share-brand-info {
   display: flex;
   flex-direction: column;
 }
 
-.pdf-metric-label {
-  font-size: 0.72rem;
-  color: #94A3B8;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 4px;
+.share-brand-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  background: linear-gradient(135deg, #FFFFFF 30%, #FFA8A8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.pdf-metric-val {
-  font-size: 1.3rem;
+.share-brand-sub {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #CBD5E1;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+.share-meta {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-scholar {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.share-date {
+  font-size: 0.75rem;
+  color: #94A3B8;
+}
+
+/* Highlight Metrics Grid */
+.share-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.share-metric-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-metric-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.share-metric-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.share-metric-label {
+  font-size: 0.68rem;
+  color: #94A3B8;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+.share-metric-val {
+  font-size: 1.25rem;
   font-weight: 800;
   color: #FF6B6B;
-  line-height: 1.1;
   font-family: 'JetBrains Mono', monospace;
+  line-height: 1.2;
+  margin-top: 2px;
 }
 
-.pdf-metric-sub {
-  font-size: 0.68rem;
-  color: #64748B;
-  margin-top: 4px;
+.share-metric-val small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #CBD5E1;
 }
 
-.pdf-section {
-  background: #241618;
+/* Main Visual: Weekly Bar Chart */
+.share-chart-section {
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin-bottom: 18px;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
 }
 
-.pdf-section-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #F1F5F9;
-  margin: 0 0 12px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 6px;
-}
-
-.pdf-chart-wrap {
-  width: 100%;
-}
-
-.pdf-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-}
-
-.pdf-table th {
-  text-align: left;
-  padding: 6px 8px;
-  color: #94A3B8;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-weight: 600;
-}
-
-.pdf-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  color: #E2E8F0;
-}
-
-.pdf-table .status-badge {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.pdf-table .status-badge.completed {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ADE80;
-}
-
-.pdf-table .status-badge.skipped {
-  background: rgba(239, 68, 68, 0.15);
-  color: #F87171;
-}
-
-.pdf-footer {
+.share-chart-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-bottom: 14px;
+}
+
+.share-chart-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.share-chart-badge {
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: rgba(224, 83, 68, 0.18);
+  color: #FF7B6B;
+  border: 1px solid rgba(224, 83, 68, 0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.share-chart-content .activity-chart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 110px;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.share-chart-content .chart-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.share-chart-content .chart-bar-track {
+  width: 100%;
+  max-width: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  height: 80px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.share-chart-content .chart-bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg, #FF6B6B 0%, #E05344 100%);
+  border-radius: 6px 6px 0 0;
+  min-height: 4px;
+}
+
+.share-chart-content .chart-day-label {
+  font-size: 0.72rem;
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.share-chart-content .chart-val-label {
+  font-size: 0.65rem;
+  color: #E2E8F0;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Footer Banner */
+.share-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.7rem;
-  color: #64748B;
+  padding-top: 14px;
+  font-size: 0.74rem;
+  color: #94A3B8;
+}
+
+.share-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-footer-icon {
+  font-size: 1rem;
+}
+
+.share-footer-left strong {
+  color: #FFFFFF;
+}
+
+.share-footer-tag {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  color: #CBD5E1;
+  font-weight: 600;
 }

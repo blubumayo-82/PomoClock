@@ -153,12 +153,11 @@ const DOM = {
   statStreakDays: document.getElementById('statStreakDays'),
   chartWeekTotal: document.getElementById('chartWeekTotal'),
   activityChart: document.getElementById('activityChart'),
+  shareStatsBtn: document.getElementById('shareStatsBtn'),
   historyTableBody: document.getElementById('historyTableBody'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
   exportCsvBtn: document.getElementById('exportCsvBtn'),
   exportCsvSettingsBtn: document.getElementById('exportCsvSettingsBtn'),
-  exportPdfBtn: document.getElementById('exportPdfBtn'),
-  exportPdfSettingsBtn: document.getElementById('exportPdfSettingsBtn'),
 
   // Auth modal elements
   authModal: document.getElementById('authModal'),
@@ -1821,11 +1820,8 @@ function setupEventListeners() {
   if (DOM.exportCsvSettingsBtn) {
     DOM.exportCsvSettingsBtn.addEventListener('click', exportSessionsToCsv);
   }
-  if (DOM.exportPdfBtn) {
-    DOM.exportPdfBtn.addEventListener('click', exportDashboardToPdf);
-  }
-  if (DOM.exportPdfSettingsBtn) {
-    DOM.exportPdfSettingsBtn.addEventListener('click', exportDashboardToPdf);
+  if (DOM.shareStatsBtn) {
+    DOM.shareStatsBtn.addEventListener('click', exportShareableFocusCard);
   }
 
   // Keyboard Shortcuts
@@ -2316,101 +2312,97 @@ function incrementActiveTaskProgress() {
 
 
 // ==========================================================================
-// 17. Free One-Click PDF & CSV Focus Report Exporters
+// 17. Free One-Click Shareable Focus Card (PNG) & CSV Exporters
 // ==========================================================================
 
-async function exportDashboardToPdf() {
-  if (typeof html2pdf === 'undefined') {
-    showToast('PDF generator is initializing, please try again in a moment.', 'info');
+async function exportShareableFocusCard() {
+  if (typeof html2canvas === 'undefined') {
+    showToast('Image renderer is initializing, please try again in a moment.', 'info');
     return;
   }
 
-  showToast('📄 Generating PomoHaven Focus Report PDF...', 'info');
+  showToast('📸 Generating PomoHaven Focus Card...', 'info');
 
-  const reportContainer = document.getElementById('pdfReportContainer');
-  if (!reportContainer) return;
+  const cardContainer = document.getElementById('shareCardContainer');
+  if (!cardContainer) return;
 
-  // Populate dynamic dates & user info
-  const dateElem = document.getElementById('pdfReportDate');
+  // 1. Populate dynamic dates & user info
+  const dateElem = document.getElementById('shareCardDate');
   if (dateElem) {
     dateElem.textContent = new Date().toLocaleDateString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      year: 'numeric', month: 'short', day: 'numeric'
     });
   }
 
-  const userElem = document.getElementById('pdfReportUser');
-  if (userElem) {
+  const scholarElem = document.getElementById('shareScholarName');
+  if (scholarElem) {
     const activeUserName = state.currentUser ? (state.currentUser.name || state.currentUser.username || state.currentUser.email) : 'Guest Scholar';
-    userElem.textContent = activeUserName;
+    scholarElem.textContent = activeUserName;
   }
 
-  // Populate metric values from live dashboard
-  const totalHrsElem = document.getElementById('pdfTotalHours');
-  if (totalHrsElem && DOM.statTotalHours) totalHrsElem.textContent = DOM.statTotalHours.textContent;
-  const totalMinsElem = document.getElementById('pdfTotalMinutes');
-  if (totalMinsElem && DOM.statTotalMinutes) totalMinsElem.textContent = DOM.statTotalMinutes.textContent;
-  const compCountElem = document.getElementById('pdfCompletedCount');
-  if (compCountElem && DOM.statCompletedCount) compCountElem.textContent = DOM.statCompletedCount.textContent;
-  const compSubElem = document.getElementById('pdfTotalSessions');
-  if (compSubElem && DOM.statTotalSessions) compSubElem.textContent = DOM.statTotalSessions.textContent;
-  const todayMinElem = document.getElementById('pdfTodayMinutes');
-  if (todayMinElem && DOM.statTodayMinutes) todayMinElem.textContent = DOM.statTodayMinutes.textContent;
-  const todaySubElem = document.getElementById('pdfTodaySessions');
-  if (todaySubElem && DOM.statTodaySessions) todaySubElem.textContent = DOM.statTodaySessions.textContent;
-  const streakDaysElem = document.getElementById('pdfStreakDays');
-  if (streakDaysElem && DOM.statStreakDays) streakDaysElem.textContent = DOM.statStreakDays.textContent;
-
-  // Populate weekly activity chart
-  const pdfChart = document.getElementById('pdfActivityChart');
-  if (pdfChart && DOM.activityChart) {
-    pdfChart.innerHTML = DOM.activityChart.innerHTML;
+  // 2. Populate highlight metrics from active stats
+  const totalHrsElem = document.getElementById('shareTotalHours');
+  if (totalHrsElem && DOM.statTotalHours) {
+    totalHrsElem.innerHTML = DOM.statTotalHours.innerHTML;
+  }
+  const streakElem = document.getElementById('shareStreakDays');
+  if (streakElem && DOM.statStreakDays) {
+    streakElem.innerHTML = DOM.statStreakDays.innerHTML;
+  }
+  const todayMinElem = document.getElementById('shareTodayMinutes');
+  if (todayMinElem && DOM.statTodayMinutes) {
+    todayMinElem.innerHTML = DOM.statTodayMinutes.innerHTML;
+  }
+  const compCountElem = document.getElementById('shareCompletedCount');
+  if (compCountElem && DOM.statCompletedCount) {
+    compCountElem.textContent = DOM.statCompletedCount.textContent;
   }
 
-  // Populate recent sessions table
-  const pdfTableBody = document.getElementById('pdfHistoryTableBody');
-  const sessions = getLocalSessions();
-  if (pdfTableBody) {
-    if (sessions && sessions.length > 0) {
-      pdfTableBody.innerHTML = sessions.slice(0, 15).map(s => {
-        const modeLabel = s.mode === 'pomodoro' ? 'Focus 🎯' : (s.mode === 'short_break' ? 'Short Break ☕' : 'Long Break 🌴');
-        const duration = s.duration_minutes || (s.duration ? Math.round(s.duration / 60) : 25);
-        const taskName = escapeHtml(s.task_name || 'Focus Session');
-        const status = s.status || 'completed';
-        const dateStr = s.start_time ? new Date(s.start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-        return `
-          <tr>
-            <td><strong>${modeLabel}</strong></td>
-            <td>${taskName}</td>
-            <td>${duration}m</td>
-            <td><span class="status-badge ${status}">${status}</span></td>
-            <td>${dateStr}</td>
-          </tr>
-        `;
-      }).join('');
-    } else {
-      pdfTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #888; padding: 12px;">No study sessions logged yet.</td></tr>';
-    }
+  // 3. Populate weekly focus activity summary badge & chart
+  const weekTotalElem = document.getElementById('shareWeekTotal');
+  if (weekTotalElem && DOM.chartWeekTotal) {
+    weekTotalElem.textContent = DOM.chartWeekTotal.textContent;
   }
 
-  // Display template container momentarily for html2pdf rendering
-  reportContainer.style.display = 'block';
+  const chartContentElem = document.getElementById('shareChartContent');
+  if (chartContentElem && DOM.activityChart) {
+    chartContentElem.innerHTML = DOM.activityChart.innerHTML;
+  }
 
-  const opt = {
-    margin: [8, 8, 8, 8],
-    filename: `PomoHaven_Focus_Report.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#181112' },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
+  // 4. Temporarily show container for capture (position off-screen)
+  cardContainer.style.display = 'block';
+  cardContainer.style.position = 'fixed';
+  cardContainer.style.top = '0';
+  cardContainer.style.left = '-9999px';
+  cardContainer.style.zIndex = '-1000';
 
   try {
-    await html2pdf().set(opt).from(reportContainer).save();
-    showToast('✅ PDF Report downloaded: PomoHaven_Focus_Report.pdf', 'success');
+    const canvas = await html2canvas(cardContainer, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#150E10',
+      logging: false
+    });
+
+    const imageURL = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.href = imageURL;
+    link.download = 'PomoHaven_Focus_Report.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('📸 Saved PomoHaven_Focus_Report.png!', 'success');
   } catch (err) {
-    console.error('PDF export error:', err);
-    showToast('Failed to generate PDF report.', 'error');
+    console.error('Focus card export error:', err);
+    showToast('Failed to generate shareable focus card.', 'error');
   } finally {
-    reportContainer.style.display = 'none';
+    cardContainer.style.display = 'none';
+    cardContainer.style.position = '';
+    cardContainer.style.top = '';
+    cardContainer.style.left = '';
+    cardContainer.style.zIndex = '';
   }
 }
 
