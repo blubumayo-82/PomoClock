@@ -632,7 +632,9 @@ header,
 
 .icon-btn,
 .header-text-btn,
-.auth-btn {
+.auth-btn,
+.user-pill,
+.header-actions button {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -641,7 +643,7 @@ header,
   min-width: 36px !important;
   max-width: 36px !important;
   padding: 0 !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: 9999px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -692,12 +694,14 @@ header,
   .header-actions button,
   .header-actions .icon-btn,
   .header-actions .header-text-btn,
-  .header-actions .auth-btn {
+  .header-actions .auth-btn,
+  .header-actions .user-pill {
     width: 32px !important;
     height: 32px !important;
     min-width: 32px !important;
     max-width: 32px !important;
     padding: 2px !important;
+    border-radius: 9999px !important;
   }
 
   .header-actions .icon,
@@ -973,21 +977,22 @@ header,
   .task-bar-container {
     max-width: 100% !important;
     width: 100% !important;
-    padding: 8px 12px !important;
-    border-radius: 14px !important;
+    padding: 0 !important;
+    border-radius: 9999px !important;
   }
 
   .task-input-wrapper {
-    padding: 0.3rem 0.45rem 0.3rem 0.6rem;
+    padding: 0.3rem 0.45rem 0.3rem 0.6rem !important;
     gap: 0.25rem;
     width: 100%;
-    border-radius: 14px !important;
+    border-radius: 9999px !important;
   }
 
   .task-input {
     flex: 1;
     min-width: 0;
     font-size: 0.78rem;
+    border-radius: 9999px !important;
   }
 
   .task-input::placeholder {
@@ -1003,6 +1008,7 @@ header,
     padding: 0.18rem 0.4rem;
     font-size: 0.7rem;
     gap: 0.2rem;
+    border-radius: 9999px !important;
   }
 
   .queue-badge {
@@ -1013,6 +1019,7 @@ header,
   .task-quick-add-btn {
     padding: 0.18rem 0.45rem;
     font-size: 0.7rem;
+    border-radius: 9999px !important;
   }
 
   .task-input-divider {
@@ -1584,7 +1591,9 @@ button.mode-tab:disabled {
    Dynamic Finish Target & ETA Badge Styles (Repositioned above controls)
    -------------------------------------------------------------------------- */
 .eta-badge,
-.eta-pill-repositioned {
+.eta-pill-repositioned,
+.finish-target,
+.finish-target-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1593,8 +1602,8 @@ button.mode-tab:disabled {
   color: var(--text-secondary);
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-color);
-  padding: 0.35rem 1.15rem;
-  border-radius: var(--radius-full);
+  padding: 8px 18px !important;
+  border-radius: 9999px !important;
   margin: 1.2rem auto 0.8rem auto;
   letter-spacing: 0.01em;
   backdrop-filter: blur(10px);
@@ -1608,14 +1617,37 @@ button.mode-tab:disabled {
   box-sizing: border-box;
 }
 
-.eta-badge .eta-icon {
+.eta-badge .eta-icon,
+.finish-target .eta-icon {
   font-size: 0.85rem;
   line-height: 1;
 }
 
-.eta-badge .eta-target {
+.eta-badge .eta-target,
+.eta-badge .eta-text,
+.finish-target .target-time,
+.finish-target-badge .target-time {
   font-weight: 700;
   color: var(--accent-color);
+}
+
+@media (max-width: 640px) {
+  .finish-target-badge,
+  .finish-target,
+  .eta-badge,
+  .eta-pill-repositioned {
+    padding: 5px 12px !important;
+    font-size: 0.75rem !important;
+    max-width: 90% !important;
+    margin: 0.8rem auto 0.4rem auto !important;
+  }
+
+  .finish-target-badge .target-time,
+  .finish-target .target-time,
+  .eta-badge .eta-target,
+  .eta-badge .eta-text {
+    font-size: 0.8rem !important;
+  }
 }
 
 /* Timer Control Buttons */
@@ -1989,12 +2021,41 @@ button.mode-tab:disabled {
   font-size: 0.74rem;
   font-weight: 700;
   padding: 0.2rem 0.65rem;
-  border-radius: var(--radius-full);
+  border-radius: 9999px !important;
   background: var(--badge-bg);
   color: var(--accent-color);
   border: 1px solid var(--border-color);
   display: inline-flex;
   align-items: center;
+}
+
+.activity-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.share-stats-btn,
+#shareStatsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--badge-bg);
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+  border-radius: 9999px !important;
+  padding: 0.28rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.share-stats-btn:hover,
+#shareStatsBtn:hover {
+  background: var(--accent-color);
+  color: var(--btn-primary-text, #18221b);
+  box-shadow: 0 0 12px var(--accent-glow);
+  transform: translateY(-1px);
 }
 
 /* 7-Day Activity Chart */
@@ -2077,26 +2138,34 @@ button.mode-tab:disabled {
   filter: brightness(1.2);
 }
 
-.chart-tooltip {
+.chart-tooltip,
+.bar-tooltip,
+.bar-popover {
   position: absolute;
-  bottom: calc(100% + 4px);
-  background: rgba(0, 0, 0, 0.85);
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(0, 0, 0, 0.9);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  font-size: 0.7rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 10px !important;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition-fast), transform var(--transition-fast);
-  transform: translateY(4px);
-  z-index: 10;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
-.chart-col:hover .chart-tooltip {
+.chart-col:hover .chart-tooltip,
+.chart-col:hover .bar-tooltip,
+.chart-col:hover .bar-popover {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
 }
 
 .chart-day-label {
