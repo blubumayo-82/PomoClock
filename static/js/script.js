@@ -94,6 +94,10 @@ const DOM = {
   startPauseBtn: document.getElementById('startPauseBtn'),
   resetBtn: document.getElementById('resetBtn'),
   skipBtn: document.getElementById('skipBtn'),
+  zenModeBtn: document.getElementById('zenModeBtn'),
+  zenExpandIcon: document.getElementById('zenExpandIcon'),
+  zenCompressIcon: document.getElementById('zenCompressIcon'),
+  zenBtnText: document.getElementById('zenBtnText'),
   cycleIndicator: document.getElementById('cycleIndicator'),
   cycleLabel: document.getElementById('cycleLabel'),
   
@@ -187,6 +191,7 @@ const DOM = {
   // Science & Guide modal elements
   scienceModal: document.getElementById('scienceModal'),
   openScienceModalFooterBtn: document.getElementById('openScienceModalFooterBtn'),
+  startTourBtn: document.getElementById('startTourBtn'),
   closeScienceModalBtn: document.getElementById('closeScienceModalBtn'),
   closeScienceModalBtnBottom: document.getElementById('closeScienceModalBtnBottom'),
 
@@ -1321,6 +1326,9 @@ function setupEventListeners() {
   DOM.startPauseBtn.addEventListener('click', toggleStartPause);
   DOM.resetBtn.addEventListener('click', resetTimer);
   DOM.skipBtn.addEventListener('click', skipSession);
+  if (DOM.zenModeBtn) {
+    DOM.zenModeBtn.addEventListener('click', () => toggleZenMode());
+  }
 
   // Mode Selection Tabs
   DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
@@ -1384,13 +1392,21 @@ function setupEventListeners() {
   if (DOM.closeAuthModalBtn) {
     DOM.closeAuthModalBtn.addEventListener('click', () => closeModal(DOM.authModal));
   }
-  DOM.openThemeModalBtn.addEventListener('click', () => openModal(DOM.themeModal));
+  DOM.openThemeModalBtn.addEventListener('click', () => {
+    stopThemePulse();
+    openModal(DOM.themeModal);
+  });
   DOM.closeThemeModalBtn.addEventListener('click', () => closeModal(DOM.themeModal));
   
   DOM.openSettingsModalBtn.addEventListener('click', () => openModal(DOM.settingsModal));
   DOM.closeSettingsModalBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
   DOM.cancelSettingsBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
   DOM.saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
+
+  // Guided Tour Trigger
+  if (DOM.startTourBtn) {
+    DOM.startTourBtn.addEventListener('click', () => startOnboardingTour(true));
+  }
 
   // Science & Guide Modal Open / Close
   if (DOM.openScienceModalHeaderBtn) {
@@ -1487,16 +1503,30 @@ function setupEventListeners() {
     } else if (e.code === 'KeyS') {
       e.preventDefault();
       skipSession();
+    } else if (e.code === 'KeyZ') {
+      e.preventDefault();
+      toggleZenMode();
     } else if (e.code === 'KeyT') {
       e.preventDefault();
+      stopThemePulse();
       DOM.themeModal.classList.contains('open') ? closeModal(DOM.themeModal) : openModal(DOM.themeModal);
     } else if (e.code === 'KeyM') {
       e.preventDefault();
       DOM.soundToggleBtn.click();
     } else if (e.key === 'Escape') {
+      if (document.body.classList.contains('zen-mode-active')) {
+        toggleZenMode(false);
+      }
       [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal].forEach(m => {
         if (m && m.classList.contains('open')) closeModal(m);
       });
+    }
+  });
+
+  // Fullscreen change listener to sync Zen Mode state
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.body.classList.contains('zen-mode-active')) {
+      // User exited browser fullscreen, maintain clean state or toggle off
     }
   });
 }
@@ -1515,7 +1545,140 @@ function submitFeedback() {
 
 
 // ==========================================================================
-// 14. App Initialization
+// 14. Zen Mode (Full-Screen Distraction-Free Timer)
+// ==========================================================================
+
+function toggleZenMode(forcedState = null) {
+  const isZen = forcedState !== null ? forcedState : !document.body.classList.contains('zen-mode-active');
+  
+  if (isZen) {
+    document.body.classList.add('zen-mode-active');
+    if (DOM.zenExpandIcon) DOM.zenExpandIcon.classList.add('hidden');
+    if (DOM.zenCompressIcon) DOM.zenCompressIcon.classList.remove('hidden');
+    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Exit';
+    if (DOM.zenModeBtn) DOM.zenModeBtn.setAttribute('title', 'Exit Zen Mode (Esc or Z)');
+    showToast('Zen Mode active — Distraction free! Press Esc or Z to exit.', 'info');
+    
+    // Request HTML5 fullscreen if supported
+    try {
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (e) {}
+  } else {
+    document.body.classList.remove('zen-mode-active');
+    if (DOM.zenExpandIcon) DOM.zenExpandIcon.classList.remove('hidden');
+    if (DOM.zenCompressIcon) DOM.zenCompressIcon.classList.add('hidden');
+    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Zen';
+    if (DOM.zenModeBtn) DOM.zenModeBtn.setAttribute('title', 'Zen Mode (Distraction-Free) (Z)');
+    
+    // Exit HTML5 fullscreen if currently active
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {}
+  }
+}
+
+
+// ==========================================================================
+// 15. Onboarding Tour & Theme Highlight Engine (Driver.js)
+// ==========================================================================
+
+function checkFirstTimeUser() {
+  const isTourComplete = localStorage.getItem('pomoClockTourComplete');
+  const isThemeClicked = localStorage.getItem('pomoClockThemeClicked');
+
+  // Pulse theme button if user hasn't clicked it or completed tour
+  if (!isTourComplete && !isThemeClicked && DOM.openThemeModalBtn) {
+    DOM.openThemeModalBtn.classList.add('first-time-theme-pulse');
+  }
+
+  // Auto-launch guided tour on first visit
+  if (!isTourComplete) {
+    setTimeout(() => {
+      startOnboardingTour(false);
+    }, 600);
+  }
+}
+
+function stopThemePulse() {
+  if (DOM.openThemeModalBtn) {
+    DOM.openThemeModalBtn.classList.remove('first-time-theme-pulse');
+  }
+  localStorage.setItem('pomoClockThemeClicked', 'true');
+}
+
+function startOnboardingTour(isManual = false) {
+  if (typeof window.driver === 'undefined' || !window.driver.js || !window.driver.js.driver) {
+    console.warn('Driver.js is not loaded yet');
+    return;
+  }
+
+  const driver = window.driver.js.driver;
+  const driverObj = driver({
+    showProgress: true,
+    animate: true,
+    allowClose: true,
+    overlayColor: 'rgba(0, 0, 0, 0.78)',
+    stagePadding: 8,
+    stageRadius: 14,
+    popoverClass: 'pomoclock-driver-popover',
+    nextBtnText: 'Next →',
+    prevBtnText: '← Back',
+    doneBtnText: 'Got It! 🚀',
+    onDestroyStarted: () => {
+      localStorage.setItem('pomoClockTourComplete', 'true');
+      stopThemePulse();
+      driverObj.destroy();
+    },
+    steps: [
+      {
+        element: '.mode-tabs',
+        popover: {
+          title: '🎯 Focus vs. Break Modes',
+          description: 'Set your Pomodoro session (25m), then relax (5m). Cycles keep your energy high without burnout.',
+          side: 'bottom',
+          align: 'center'
+        }
+      },
+      {
+        element: '#currentTaskInput',
+        popover: {
+          title: '🎯 Set Your Target',
+          description: 'Write down the single task you are locking into right now. Single-tasking is the secret to deep focus.',
+          side: 'bottom',
+          align: 'center'
+        }
+      },
+      {
+        element: '#startPauseBtn',
+        popover: {
+          title: '⏱️ Start the Sprint',
+          description: 'Hit this button (or press <kbd>Space</kbd>) to begin your countdown to deep focus.',
+          side: 'top',
+          align: 'center'
+        }
+      },
+      {
+        element: '#openThemeModalBtn',
+        popover: {
+          title: '🎨 Your Aesthetic',
+          description: 'Customize PomoClock to match your mood here. Choose Classic Pomodoro, Sage, Cyberpunk, or create a custom palette!',
+          side: 'bottom',
+          align: 'end'
+        }
+      }
+    ]
+  });
+
+  driverObj.drive();
+}
+
+
+// ==========================================================================
+// 16. App Initialization
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1533,4 +1696,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check auth session & load statistics
   checkAuthStatus();
   fetchStatistics();
+
+  // Check for first-time user tour & pulse
+  checkFirstTimeUser();
 });

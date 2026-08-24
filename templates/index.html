@@ -38,6 +38,10 @@
   <!-- Main Stylesheet -->
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='pomoGrad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23E05344'/%3E%3Cstop offset='100%25' stop-color='%23C93B2C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='52' r='42' fill='url(%23pomoGrad)'/%3E%3Cpath d='M50 10 C48 18 42 22 36 24 C45 27 50 30 50 30 C50 30 55 27 64 24 C58 22 52 18 50 10 Z' fill='%23166534'/%3E%3Ccircle cx='50' cy='52' r='32' fill='%231A1212'/%3E%3Ccircle cx='50' cy='52' r='3' fill='%23E05344'/%3E%3Cline x1='50' y1='52' x2='50' y2='32' stroke='%23E05344' stroke-width='3.5' stroke-linecap='round'/%3E%3Cline x1='50' y1='52' x2='64' y2='52' stroke='%23E05344' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
+
+  <!-- Driver.js Onboarding Tour -->
+  <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css" />
 </head>
 
 <body data-theme="pomodoro">
@@ -233,6 +237,23 @@
             </svg>
             <span class="btn-text">Skip</span>
           </button>
+
+          <!-- Zen Mode Button -->
+          <button id="zenModeBtn" class="control-btn secondary-btn" title="Zen Mode (Distraction-Free) (Z)" aria-label="Toggle Zen Mode">
+            <svg id="zenExpandIcon" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+            <svg id="zenCompressIcon" class="btn-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 14 10 14 10 20"></polyline>
+              <polyline points="20 10 14 10 14 4"></polyline>
+              <line x1="14" y1="10" x2="21" y2="3"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+            <span id="zenBtnText" class="btn-text">Zen</span>
+          </button>
         </div>
 
         <!-- Keyboard Hint -->
@@ -240,6 +261,7 @@
           <span><kbd>Space</kbd> Start/Pause</span>
           <span><kbd>R</kbd> Reset</span>
           <span><kbd>S</kbd> Skip</span>
+          <span><kbd>Z</kbd> Zen</span>
           <span><kbd>T</kbd> Themes</span>
         </div>
 
@@ -347,6 +369,15 @@
       <div class="footer-content">
         <p class="footer-tagline">Built with love 💚 by Leeon • PomoClock</p>
         <div class="footer-links">
+          <button id="startTourBtn" class="footer-link-btn" title="Start Guided Tour">
+            <svg class="footer-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+            </svg>
+            <span>Tour</span>
+          </button>
+          <span class="footer-separator" aria-hidden="true">•</span>
           <button id="openScienceModalFooterBtn" class="footer-link-btn" title="How it Works & Science">
             <svg class="footer-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
               stroke-width="2">
