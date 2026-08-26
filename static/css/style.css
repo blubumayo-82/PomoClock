@@ -951,16 +951,18 @@ header,
 
 .unified-task-input-wrapper,
 .task-input-wrapper {
-  display: flex;
-  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
   background: rgba(0, 0, 0, 0.28);
   border: 1px solid var(--border-color);
   border-radius: 12px !important;
-  padding: 0.22rem 0.35rem 0.22rem 0.65rem;
-  width: 100%;
-  box-sizing: border-box;
-  gap: 0.35rem;
-  min-height: 38px;
+  padding: 0.25rem 0.4rem 0.25rem 0.75rem !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 40px;
   transition: all var(--transition-fast);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -975,17 +977,20 @@ header,
 
 .task-input-lead-icon,
 .task-icon {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   line-height: 1;
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
   opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
 }
 
 .unified-task-input,
 .task-input {
-  min-width: 0;
-  width: 100%;
-  flex: 1;
+  min-width: 60px;
+  width: auto;
+  flex: 1 1 auto !important;
+  flex-grow: 1 !important;
   background: transparent;
   border: none;
   color: var(--text-primary);
@@ -993,7 +998,7 @@ header,
   font-size: 0.82rem;
   font-weight: 500;
   outline: none;
-  padding: 0.1rem 0.2rem;
+  padding: 0.15rem 0.3rem;
 }
 
 .unified-task-input::placeholder,
@@ -1006,16 +1011,18 @@ header,
 /* Initial Tomato Target Stepper Selector (🍅 1-10) */
 .target-stepper-wrap,
 .stepper-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.15rem;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.2rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 0.12rem 0.28rem;
+  padding: 0.15rem 0.32rem;
   font-size: 0.75rem;
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
   user-select: none;
+  white-space: nowrap;
 }
 
 .target-stepper-icon,
@@ -1034,7 +1041,7 @@ header,
   cursor: pointer;
   font-weight: 700;
   font-size: 0.78rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
@@ -1063,17 +1070,20 @@ header,
   color: var(--btn-primary-text, #18221b);
   border: none;
   border-radius: 8px !important;
-  padding: 0.22rem 0.58rem;
+  padding: 0.25rem 0.65rem;
   font-family: var(--font-main);
   font-size: 0.76rem;
   font-weight: 700;
-  display: inline-flex;
-  align-items: center;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 0.2rem;
   cursor: pointer;
   transition: all var(--transition-fast);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
   line-height: 1.2;
+  white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
@@ -1098,10 +1108,10 @@ header,
 .unified-divider,
 .task-input-divider {
   width: 1px;
-  height: 18px;
+  height: 20px;
   background: var(--border-color);
-  margin: 0 0.1rem;
-  flex-shrink: 0;
+  margin: 0;
+  flex-shrink: 0 !important;
   opacity: 0.6;
 }
 
@@ -1111,21 +1121,22 @@ header,
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
   border-radius: 8px !important;
-  padding: 0.24rem 0.55rem;
+  padding: 0.25rem 0.55rem;
   font-family: var(--font-main);
   font-size: 0.74rem;
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 0.28rem;
   cursor: pointer;
   transition: all var(--transition-fast);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
   line-height: 1.2;
-  position: relative;
-  z-index: 2;
+  position: static !important;
   margin: 0;
+  white-space: nowrap;
 }
 
 .zen-toggle-btn:hover {
@@ -1143,7 +1154,7 @@ header,
 .zen-icon {
   width: 13px;
   height: 13px;
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
   display: inline-block;
   vertical-align: middle;
 }
@@ -3892,7 +3903,9 @@ button.mode-tab:disabled {
   display: none;
 }
 
-.exit-zen-btn {
+.zen-exit-btn,
+.exit-zen-btn,
+#exitZenBtn {
   display: none !important;
 }
 
@@ -3959,15 +3972,21 @@ body.zen-mode .task-queue-empty {
 }
 
 /* Dedicated Fixed Exit Zen Button (Top-Right Safe Area) */
-body.zen-mode-active .exit-zen-btn,
+body.zen-mode .zen-exit-btn,
 body.zen-mode .exit-zen-btn,
-.zen-mode-active .exit-zen-btn,
-.zen-mode .exit-zen-btn {
+body.zen-mode #exitZenBtn,
+body.zen-mode-active .zen-exit-btn,
+body.zen-mode-active .exit-zen-btn,
+body.zen-mode-active #exitZenBtn,
+.zen-mode .zen-exit-btn,
+.zen-mode .exit-zen-btn,
+.zen-mode-active .zen-exit-btn,
+.zen-mode-active .exit-zen-btn {
   display: inline-flex !important;
   position: fixed !important;
-  top: max(24px, env(safe-area-inset-top, 24px)) !important;
-  right: max(24px, env(safe-area-inset-right, 24px)) !important;
-  z-index: 99999 !important;
+  top: 20px !important;
+  right: 20px !important;
+  z-index: 9999 !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
@@ -3991,10 +4010,16 @@ body.zen-mode .exit-zen-btn,
   opacity: 1 !important;
 }
 
-body.zen-mode-active .exit-zen-btn:hover,
+body.zen-mode .zen-exit-btn:hover,
 body.zen-mode .exit-zen-btn:hover,
-.zen-mode-active .exit-zen-btn:hover,
-.zen-mode .exit-zen-btn:hover {
+body.zen-mode #exitZenBtn:hover,
+body.zen-mode-active .zen-exit-btn:hover,
+body.zen-mode-active .exit-zen-btn:hover,
+body.zen-mode-active #exitZenBtn:hover,
+.zen-mode .zen-exit-btn:hover,
+.zen-mode .exit-zen-btn:hover,
+.zen-mode-active .zen-exit-btn:hover,
+.zen-mode-active .exit-zen-btn:hover {
   background: var(--accent-color) !important;
   border-color: var(--accent-color) !important;
   color: var(--btn-primary-text, #18221b) !important;
@@ -4002,10 +4027,16 @@ body.zen-mode .exit-zen-btn:hover,
   box-shadow: 0 6px 24px var(--accent-glow) !important;
 }
 
-body.zen-mode-active .exit-zen-btn:active,
+body.zen-mode .zen-exit-btn:active,
 body.zen-mode .exit-zen-btn:active,
-.zen-mode-active .exit-zen-btn:active,
-.zen-mode .exit-zen-btn:active {
+body.zen-mode #exitZenBtn:active,
+body.zen-mode-active .zen-exit-btn:active,
+body.zen-mode-active .exit-zen-btn:active,
+body.zen-mode-active #exitZenBtn:active,
+.zen-mode .zen-exit-btn:active,
+.zen-mode .exit-zen-btn:active,
+.zen-mode-active .zen-exit-btn:active,
+.zen-mode-active .exit-zen-btn:active {
   transform: translateY(0) scale(0.98) !important;
 }
 
@@ -4168,9 +4199,13 @@ body.zen-mode-active .timer-controls {
     gap: 0.45rem !important;
   }
 
+  body.zen-mode-active .zen-exit-btn,
   body.zen-mode-active .exit-zen-btn,
+  body.zen-mode .zen-exit-btn,
   body.zen-mode .exit-zen-btn,
+  .zen-mode-active .zen-exit-btn,
   .zen-mode-active .exit-zen-btn,
+  .zen-mode .zen-exit-btn,
   .zen-mode .exit-zen-btn {
     top: max(16px, env(safe-area-inset-top, 16px)) !important;
     right: max(16px, env(safe-area-inset-right, 16px)) !important;

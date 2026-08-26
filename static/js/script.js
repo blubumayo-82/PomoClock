@@ -2047,7 +2047,7 @@ function toggleZenMode(forcedState = null) {
   if (isZen) {
     updateZenTaskDisplay();
     document.body.classList.add('zen-mode-active');
-    showToast('Zen Mode active — Distraction free! Press Esc or Z to exit.', 'info');
+    showToast('Full Mode active — Distraction free! Press Esc or Z to exit.', 'info');
     
     // Request HTML5 fullscreen if supported
     try {
