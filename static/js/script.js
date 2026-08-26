@@ -2165,11 +2165,20 @@ let taskTargetStepperCount = 2;
 
 function getTaskQueue() {
   try {
-    return JSON.parse(
+    const raw = JSON.parse(
       localStorage.getItem(LOCAL_STORAGE_KEY_TASK_QUEUE) ||
       localStorage.getItem('pomoclock_task_queue') ||
       '[]'
     );
+    return raw.map(t => ({
+      id: t.id || 'task_' + Math.random().toString(36).substr(2, 9),
+      title: t.title || t.text || 'Focus Task',
+      text: t.title || t.text || 'Focus Task',
+      targetPomos: Math.max(1, parseInt(t.targetPomos, 10) || 1),
+      completedPomos: Math.max(0, parseInt(t.completedPomos, 10) || 0),
+      completed: Boolean(t.completed),
+      createdAt: t.createdAt || new Date().toISOString()
+    }));
   } catch (e) {
     return [];
   }
@@ -2197,21 +2206,26 @@ function renderTaskQueue() {
   }
 
   DOM.taskQueueList.innerHTML = tasks.map(task => {
-    const isActive = activeTaskTitle && task.title.toLowerCase() === activeTaskTitle.toLowerCase();
+    const taskTitle = task.title || task.text || '';
+    const isActive = activeTaskTitle && taskTitle.toLowerCase() === activeTaskTitle.toLowerCase();
+    const isCompleted = task.completed || (task.completedPomos >= task.targetPomos);
+    const minTarget = Math.max(1, task.completedPomos || 0);
+    const canDecrement = (task.targetPomos || 1) > minTarget;
+
     return `
-      <div class="task-item ${isActive ? 'active-task' : ''} ${task.completed ? 'completed-task' : ''}" data-task-id="${task.id}">
-        <label class="task-checkbox-wrap" title="${task.completed ? 'Mark uncompleted' : 'Mark completed'}">
-          <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${task.completed ? 'checked' : ''}>
+      <div class="task-item ${isActive ? 'active-task' : ''} ${isCompleted ? 'completed-task' : ''}" data-task-id="${task.id}">
+        <label class="task-checkbox-wrap" title="${isCompleted ? 'Mark uncompleted' : 'Mark completed'}">
+          <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${isCompleted ? 'checked' : ''}>
           <span class="custom-checkbox"></span>
         </label>
-        <div class="task-details" data-task-id="${task.id}" title="Click to set as focus target">
-          <span class="task-name">${escapeHtml(task.title)}</span>
-          <div class="task-pomo-progress">
-            <span class="pomo-count">${task.completedPomos || 0}/${task.targetPomos || 1} 🍅</span>
-            <div class="task-mini-stepper">
-              <button type="button" class="pomo-adjust-btn dec-pomo" data-task-id="${task.id}" title="Decrease target pomodoros">−</button>
-              <button type="button" class="pomo-adjust-btn inc-pomo" data-task-id="${task.id}" title="Increase target pomodoros">+</button>
-            </div>
+        <div class="task-details" data-task-id="${task.id}" title="Click to set as active focus task">
+          <span class="task-name">${escapeHtml(taskTitle)}</span>
+          <div class="task-pomo-progress" title="Target: ${task.targetPomos || 1} Pomodoros (${task.completedPomos || 0} completed)">
+            <button type="button" class="pomo-adjust-btn dec-target" data-task-id="${task.id}" title="Decrease target pomodoros (−1)" ${!canDecrement ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>−</button>
+            <span class="task-pomo-badge ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}" title="Progress: ${task.completedPomos || 0}/${task.targetPomos || 1} completed">
+              🍅 <span class="pomo-count-text">${task.completedPomos || 0}/${task.targetPomos || 1}</span>
+            </span>
+            <button type="button" class="pomo-adjust-btn inc-target" data-task-id="${task.id}" title="Increase target pomodoros (+1)">+</button>
           </div>
         </div>
         <div class="task-actions">
@@ -2308,15 +2322,16 @@ function initTaskQueue() {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
 
-      // Checkbox click (mark complete)
+      // Checkbox click (manual toggle completed state)
       if (target.classList.contains('task-checkbox')) {
         task.completed = target.checked;
         if (task.completed) {
           playChimeSound('bell');
           showToast(`✅ "${task.title}" completed!`, 'success');
+        } else {
+          showToast(`↩️ "${task.title}" marked in progress`, 'info');
         }
         saveTaskQueue(tasks);
-        renderTaskQueue();
         return;
       }
 
@@ -2324,33 +2339,41 @@ function initTaskQueue() {
       if (target.classList.contains('task-delete-btn')) {
         const updated = tasks.filter(t => t.id !== taskId);
         saveTaskQueue(updated);
-        renderTaskQueue();
         showToast('Task removed from queue', 'info');
         return;
       }
 
-      // Target Pomodoro decrement
-      if (target.classList.contains('dec-pomo')) {
-        if (task.targetPomos > 1) {
+      // Target Pomodoro decrement (- button)
+      if (target.classList.contains('dec-target') || target.classList.contains('dec-pomo') || target.classList.contains('dec-completed')) {
+        const minTarget = Math.max(1, task.completedPomos || 0);
+        if (task.targetPomos > minTarget) {
           task.targetPomos--;
+          if (task.completedPomos >= task.targetPomos) {
+            task.completed = true;
+          }
           saveTaskQueue(tasks);
-          renderTaskQueue();
+          showToast(`🎯 Target updated: ${task.targetPomos} Pomos for "${task.title}"`, 'info');
+        } else if (task.completedPomos > 0) {
+          showToast(`Target cannot be lower than finished sessions (${task.completedPomos})`, 'warning');
         }
         return;
       }
 
-      // Target Pomodoro increment
-      if (target.classList.contains('inc-pomo')) {
-        if (task.targetPomos < 20) {
+      // Target Pomodoro increment (+ button)
+      if (target.classList.contains('inc-target') || target.classList.contains('inc-pomo') || target.classList.contains('inc-completed')) {
+        if (task.targetPomos < 50) {
           task.targetPomos++;
+          if (task.completedPomos < task.targetPomos) {
+            task.completed = false;
+          }
           saveTaskQueue(tasks);
-          renderTaskQueue();
+          showToast(`🎯 Target updated: ${task.targetPomos} Pomos for "${task.title}"`, 'info');
         }
         return;
       }
 
-      // Focus / Select task
-      if (target.classList.contains('task-select-btn') || target.classList.contains('task-name') || target.closest('.task-details')) {
+      // Focus / Select task (clicking select button, task name, badge, or details)
+      if (target.classList.contains('task-select-btn') || target.classList.contains('task-name') || target.classList.contains('task-pomo-badge') || target.classList.contains('pomo-count-text') || target.closest('.task-details')) {
         selectQueuedTask(task);
       }
     });
@@ -2368,10 +2391,12 @@ function submitNewTask() {
   }
 
   const tasks = getTaskQueue();
+  const targetCount = Math.max(1, parseInt(taskTargetStepperCount, 10) || 1);
   const newTask = {
     id: 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     title: title,
-    targetPomos: taskTargetStepperCount,
+    text: title,
+    targetPomos: targetCount,
     completedPomos: 0,
     completed: false,
     createdAt: new Date().toISOString()
@@ -2387,41 +2412,53 @@ function submitNewTask() {
 
   DOM.newTaskTitleInput.value = '';
   DOM.addTaskForm.classList.add('hidden');
-  renderTaskQueue();
-  showToast(`🎯 Added "${title}" (${taskTargetStepperCount} Pomos) to queue`, 'success');
+  showToast(`🎯 Added "${title}" (${targetCount} Pomos) to queue`, 'success');
 }
 
 function selectQueuedTask(task) {
   if (DOM.currentTaskInput) {
-    DOM.currentTaskInput.value = task.title;
-    state.currentTask = task.title;
+    const taskName = task.title || task.text || '';
+    DOM.currentTaskInput.value = taskName;
+    state.currentTask = taskName;
     updateZenTaskDisplay();
     renderTaskQueue();
-    showToast(`🎯 Active focus task: "${task.title}"`, 'info');
+    showToast(`🎯 Active focus task: "${taskName}"`, 'info');
   }
 }
 
 function incrementActiveTaskProgress() {
   const currentTaskName = (state.currentTask || (DOM.currentTaskInput ? DOM.currentTaskInput.value : '')).trim();
-  if (!currentTaskName) return;
-
   const tasks = getTaskQueue();
-  const matchedTask = tasks.find(t => t.title.trim().toLowerCase() === currentTaskName.toLowerCase());
+  if (tasks.length === 0) return;
+
+  // Match active task by name, or fallback to first uncompleted task
+  let matchedTask = null;
+  if (currentTaskName) {
+    matchedTask = tasks.find(t => (t.title || t.text || '').trim().toLowerCase() === currentTaskName.toLowerCase());
+  }
+  if (!matchedTask) {
+    matchedTask = tasks.find(t => !t.completed);
+  }
+
   if (matchedTask) {
     matchedTask.completedPomos = (matchedTask.completedPomos || 0) + 1;
+    
     if (matchedTask.completedPomos >= matchedTask.targetPomos && !matchedTask.completed) {
       matchedTask.completed = true;
-      showToast(`🏆 Goal reached for "${matchedTask.title}"!`, 'success');
+      triggerConfettiBurst();
+      showToast(`🏆 Goal reached (${matchedTask.targetPomos}/${matchedTask.targetPomos} 🍅) for "${matchedTask.title || matchedTask.text}"!`, 'success');
 
       // Automatically advance to the next incomplete task in the queue
       const nextTask = tasks.find(t => !t.completed && t.id !== matchedTask.id);
       if (nextTask) {
         selectQueuedTask(nextTask);
-        showToast(`🎯 Advanced to next queued task: "${nextTask.title}"`, 'info');
+        showToast(`🎯 Advanced to next queued task: "${nextTask.title || nextTask.text}"`, 'info');
       }
+    } else {
+      showToast(`🍅 Progress: ${matchedTask.completedPomos}/${matchedTask.targetPomos} Pomos for "${matchedTask.title || matchedTask.text}"`, 'info');
     }
+
     saveTaskQueue(tasks);
-    renderTaskQueue();
   }
 }
 

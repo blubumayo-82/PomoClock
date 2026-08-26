@@ -1398,53 +1398,79 @@ header,
   transition: all var(--transition-fast);
 }
 
+.task-item.completed-task {
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.12);
+}
+
 .task-item.completed-task .task-name {
   text-decoration: line-through;
   color: var(--text-muted);
-  opacity: 0.65;
+  opacity: 0.7;
 }
 
 .task-pomo-progress {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   flex-shrink: 0;
 }
 
-.pomo-count {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--accent-color);
-  font-family: var(--font-mono);
-}
-
-.task-mini-stepper {
+.task-pomo-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.2rem;
+  background: var(--badge-bg);
+  border: 1px solid var(--border-color);
+  color: var(--accent-color);
+  padding: 0.08rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--transition-fast);
+}
+
+.task-pomo-badge:hover {
+  border-color: var(--accent-color);
+  transform: scale(1.04);
+}
+
+.task-pomo-badge.completed {
+  background: rgba(56, 161, 105, 0.16);
+  border-color: rgba(56, 161, 105, 0.4);
+  color: var(--success-color, #48bb78);
 }
 
 .pomo-adjust-btn {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-color);
   color: var(--text-muted);
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   border-radius: 4px;
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  line-height: 1;
   transition: all var(--transition-fast);
 }
 
 .pomo-adjust-btn:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
+  background: var(--badge-bg);
+  color: var(--accent-color);
   border-color: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.pomo-adjust-btn:active {
+  transform: scale(0.95);
 }
 
 .task-actions {
@@ -3896,6 +3922,9 @@ body.zen-mode-active {
   overflow: hidden !important;
   background: var(--bg-primary) !important;
   height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
   width: 100vw !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -3908,9 +3937,16 @@ body.zen-mode-active .shortcuts-hint,
 body.zen-mode-active .active-task-bar,
 body.zen-mode-active .task-bar-container,
 body.zen-mode-active .task-input-wrapper,
+body.zen-mode-active .task-queue-actions,
+body.zen-mode-active .task-queue-pill-btn,
+body.zen-mode-active .task-quick-add-btn,
 body.zen-mode-active .task-queue-container,
+body.zen-mode-active #openAddTaskBtn,
+body.zen-mode-active #taskQueueContainer,
 body.zen-mode-active .add-task-form,
-body.zen-mode-active .task-queue-list {
+body.zen-mode-active .stepper-wrap,
+body.zen-mode-active .task-queue-list,
+body.zen-mode-active .task-queue-empty {
   display: none !important;
 }
 
@@ -3938,8 +3974,11 @@ body.zen-mode-active .zen-task-badge:not(.hidden):not(:empty) {
 
 body.zen-mode-active .app-wrapper {
   min-height: 100vh !important;
+  min-height: 100dvh !important;
   height: 100vh !important;
+  height: 100dvh !important;
   max-height: 100vh !important;
+  max-height: 100dvh !important;
   justify-content: center !important;
   align-items: center !important;
   padding: 1rem !important;
@@ -3947,6 +3986,7 @@ body.zen-mode-active .app-wrapper {
   margin: 0 auto !important;
   display: flex !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 body.zen-mode-active .main-layout {
@@ -3991,8 +4031,8 @@ body.zen-mode-active #zenModeBtn,
 body.zen-mode-active .zen-toggle-btn,
 body.zen-mode-active .zen-corner-btn {
   position: fixed !important;
-  top: max(1.25rem, env(safe-area-inset-top, 1.25rem)) !important;
-  right: max(1.25rem, env(safe-area-inset-right, 1.25rem)) !important;
+  top: max(16px, env(safe-area-inset-top, 16px)) !important;
+  right: max(16px, env(safe-area-inset-right, 16px)) !important;
   width: auto !important;
   height: 38px !important;
   min-width: 38px !important;
@@ -4008,7 +4048,7 @@ body.zen-mode-active .zen-corner-btn {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  z-index: 1100 !important;
+  z-index: 1200 !important;
   font-size: 0.8rem !important;
   font-weight: 700 !important;
   cursor: pointer !important;
@@ -4026,6 +4066,86 @@ body.zen-mode-active .zen-corner-btn:hover {
 
 body.zen-mode-active #zenModeBtn .zen-btn-label {
   display: inline !important;
+}
+
+/* Mobile Responsive Zen Mode (640px and below) */
+@media (max-width: 640px) {
+  body.zen-mode-active {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  body.zen-mode-active .app-wrapper {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    padding: 0.65rem 0.5rem !important;
+    justify-content: center !important;
+    align-items: center !important;
+  }
+
+  body.zen-mode-active .main-layout {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: auto !important;
+  }
+
+  body.zen-mode-active .timer-section {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    gap: 0.25rem !important;
+  }
+
+  body.zen-mode-active .zen-task-badge:not(.hidden):not(:empty) {
+    font-size: 0.82rem !important;
+    padding: 0.25rem 0.75rem !important;
+    margin-bottom: 0.45rem !important;
+    max-width: 88% !important;
+  }
+
+  body.zen-mode-active .mode-tabs {
+    margin-bottom: 0.25rem !important;
+    gap: 0.35rem !important;
+  }
+
+  body.zen-mode-active .progress-ring-wrapper {
+    width: min(260px, 66vw) !important;
+    height: min(260px, 66vw) !important;
+    margin: 0.1rem auto 0.3rem auto !important;
+    transform: none !important;
+  }
+
+  body.zen-mode-active .timer-display {
+    font-size: clamp(2.3rem, 9.5vw, 3.1rem) !important;
+  }
+
+  body.zen-mode-active .cycle-indicator {
+    margin-top: 0.35rem !important;
+  }
+
+  body.zen-mode-active .finish-target-badge,
+  body.zen-mode-active .eta-badge,
+  body.zen-mode-active .target-container {
+    margin: 3px auto 0.4rem auto !important;
+    padding: 2px 7px !important;
+  }
+
+  body.zen-mode-active .timer-controls {
+    margin-top: 0.5rem !important;
+    gap: 0.45rem !important;
+  }
+
+  body.zen-mode-active #zenModeBtn,
+  body.zen-mode-active .zen-corner-btn {
+    top: max(16px, env(safe-area-inset-top, 16px)) !important;
+    right: max(16px, env(safe-area-inset-right, 16px)) !important;
+    height: 36px !important;
+    padding: 0 12px !important;
+    font-size: 0.76rem !important;
+  }
 }
 
 /* ==========================================================================
