@@ -109,6 +109,16 @@ class UserPreference(db.Model):
     updated_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
 
 
+class Feedback(db.Model):
+    __tablename__ = 'feedbacks'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    user_email = db.Column(db.String(255), nullable=True)
+    feedback_type = db.Column(db.String(100), default='Feature Request')
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 def get_db():
     """
     Get or create a database connection for the current application context.
@@ -236,6 +246,19 @@ def init_db():
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_id, key),
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        # Create feedbacks table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS feedbacks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                user_email TEXT,
+                feedback_type TEXT DEFAULT 'Feature Request',
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
             );
         """)
 
@@ -1070,6 +1093,59 @@ def save_preferences():
         return jsonify({"success": True, "message": "Preferences saved successfully"}), 200
     except Exception as err:
         return jsonify({"success": False, "error": f"Failed to save preferences: {str(err)}"}), 500
+
+
+# ----------------------------------------------------------------------
+# Feedback & Feature Requests Endpoint
+# ----------------------------------------------------------------------
+
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """
+    Submits user feedback and feature requests to PostgreSQL / SQLite database.
+    Expects JSON: { feedback_type, message, email }
+    """
+    data = request.get_json() or {}
+    message = (data.get('message') or '').strip()
+    feedback_type = (data.get('feedback_type') or 'Feature Request').strip()
+    user_email = (data.get('email') or data.get('user_email') or '').strip()
+
+    if not message:
+        return jsonify({"success": False, "error": "Message cannot be empty."}), 400
+
+    try:
+        user_id = session.get('user_id') or get_current_user_id()
+        if user_id and not user_email:
+            user = User.query.get(user_id)
+            if user:
+                user_email = user.email
+
+        feedback = Feedback(
+            user_id=user_id,
+            user_email=user_email or None,
+            feedback_type=feedback_type,
+            message=message
+        )
+        db.session.add(feedback)
+        db.session.commit()
+
+        # SQLite direct insert fallback if active
+        try:
+            db_conn = get_db()
+            cursor = db_conn.cursor()
+            cursor.execute("""
+                INSERT INTO feedbacks (user_id, user_email, feedback_type, message)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, user_email or None, feedback_type, message))
+            db_conn.commit()
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "message": "Thank you for your feedback!"}), 200
+
+    except Exception as err:
+        db.session.rollback()
+        return jsonify({"success": False, "error": f"Failed to submit feedback: {str(err)}"}), 500
 
 
 # ----------------------------------------------------------------------

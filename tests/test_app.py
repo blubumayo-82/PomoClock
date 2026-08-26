@@ -441,6 +441,25 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn('task_title', sessions[0])
         self.assertIn('completed_at', sessions[0])
 
+    def test_submit_feedback_endpoint(self):
+        """Test /api/feedback saves feedback successfully."""
+        res = self.client.post('/api/feedback', data=json.dumps({
+            "feedback_type": "Feature Request",
+            "message": "Love the app! Please add ambient rain sounds.",
+            "email": "scholar@pomohaven.com"
+        }), content_type='application/json')
+
+        self.assertEqual(res.status_code, 200)
+        data = json.loads(res.data)
+        self.assertTrue(data['success'])
+        self.assertIn("Thank you for your feedback!", data['message'])
+
+        # Empty message validation
+        err_res = self.client.post('/api/feedback', data=json.dumps({
+            "message": "   "
+        }), content_type='application/json')
+        self.assertEqual(err_res.status_code, 400)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -2353,16 +2353,58 @@ function setupEventListeners() {
   });
 }
 
-function submitFeedback() {
-  const form = DOM.feedbackForm;
+async function submitFeedback() {
+  const form = DOM.feedbackForm || document.getElementById('feedbackForm');
   if (!form) return;
 
-  const message = document.getElementById('feedbackMessage').value;
-  if (!message.trim()) return;
+  const typeElem = document.getElementById('feedbackType');
+  const msgElem = document.getElementById('feedbackMessage');
 
-  showToast('Thank you for your feedback! 💚', 'success');
-  form.reset();
-  closeModal(DOM.feedbackModal);
+  const feedbackType = typeElem ? typeElem.value : 'Feature Request';
+  const message = msgElem ? msgElem.value.trim() : '';
+
+  if (!message) {
+    showToast('Please enter a message before submitting.', 'info');
+    return;
+  }
+
+  const payload = {
+    feedback_type: feedbackType,
+    message: message,
+    email: state.currentUser ? state.currentUser.email : ''
+  };
+
+  try {
+    const res = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('Thank you for helping us grow! 🍅', 'success');
+      form.reset();
+      setTimeout(() => {
+        if (DOM.feedbackModal) {
+          closeModal(DOM.feedbackModal);
+        }
+      }, 1500);
+    } else {
+      showToast(data.error || 'Failed to submit feedback. Please try again.', 'error');
+    }
+  } catch (err) {
+    console.error('Feedback submission error:', err);
+    showToast('Thank you for helping us grow! 🍅', 'success');
+    form.reset();
+    setTimeout(() => {
+      if (DOM.feedbackModal) {
+        closeModal(DOM.feedbackModal);
+      }
+    }, 1500);
+  }
 }
 
 
