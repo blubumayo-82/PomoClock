@@ -24,6 +24,8 @@ except ImportError:
     id_token = None
     google_requests = None
 
+from flask_sqlalchemy import SQLAlchemy
+
 # Initialize Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.getenv('SECRET_KEY', 'pomohaven-study-secret-key-2026')
@@ -31,9 +33,75 @@ app.secret_key = os.getenv('SECRET_KEY', 'pomohaven-study-secret-key-2026')
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 
-# Database path configuration
+# Database path & URI configuration with Heroku postgres:// -> postgresql:// fix
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, 'pomodoro.db')
+
+db_url = os.environ.get('DATABASE_URL', f'sqlite:///{DATABASE}')
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+
+# ----------------------------------------------------------------------
+# SQLAlchemy Models for PostgreSQL / SQLite Persistence
+# ----------------------------------------------------------------------
+
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=True)
+    name = db.Column(db.String(120), nullable=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)
+    avatar_url = db.Column(db.String(255), nullable=True)
+    auth_provider = db.Column(db.String(50), default='local')
+    google_id = db.Column(db.String(100), nullable=True)
+    created_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
+
+    sessions = db.relationship('StudySession', backref='user', lazy=True, cascade='all, delete-orphan')
+    streaks = db.relationship('DailyStreak', backref='user', lazy=True, cascade='all, delete-orphan')
+
+
+class StudySession(db.Model):
+    __tablename__ = 'sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    mode = db.Column(db.String(50), nullable=False)
+    duration_minutes = db.Column(db.Float, nullable=False)
+    start_time = db.Column(db.String(100), nullable=False)
+    end_time = db.Column(db.String(100), nullable=True)
+    status = db.Column(db.String(50), nullable=False, default='completed')
+    task_name = db.Column(db.String(200), default='Study Session')
+    created_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
+
+
+class DailyStreak(db.Model):
+    __tablename__ = 'daily_streaks'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    date = db.Column(db.String(20), nullable=False)
+    pomodoro_count = db.Column(db.Integer, default=0)
+    total_minutes = db.Column(db.Float, default=0.0)
+    created_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
+
+
+class Preference(db.Model):
+    __tablename__ = 'preferences'
+    key = db.Column(db.String(100), primary_key=True)
+    value = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
+
+
+class UserPreference(db.Model):
+    __tablename__ = 'user_preferences'
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    key = db.Column(db.String(100), primary_key=True)
+    value = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
 
 
 def get_db():
@@ -45,110 +113,136 @@ def get_db():
         g.db = sqlite3.connect(DATABASE)
         g.db.row_factory = sqlite3.Row
         # Enable WAL mode for high concurrency and write speed
-        g.db.execute("PRAGMA journal_mode=WAL;")
+        try:
+            g.db.execute("PRAGMA journal_mode=WAL;")
+        except Exception:
+            pass
     return g.db
 
 
 @app.teardown_appcontext
 def close_db(exception):
     """Closes the database connection at the end of the request context."""
-    db = g.pop('db', None)
-    if db is not None:
-        db.close()
+    db_conn = g.pop('db', None)
+    if db_conn is not None:
+        db_conn.close()
 
 
 def init_db():
     """
     Initializes database tables if they do not exist.
-    Creates 'users', 'sessions', 'preferences', and 'user_preferences' tables.
-    Also handles schema migrations for Google OAuth columns.
+    Creates tables via SQLAlchemy models and handles schema migrations.
     """
-    db = sqlite3.connect(DATABASE)
-    cursor = db.cursor()
+    with app.app_context():
+        db.create_all()
 
-    # Create users table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT,
-            name TEXT,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT,
-            avatar_url TEXT,
-            auth_provider TEXT DEFAULT 'local',
-            google_id TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
+    # SQLite fallback verification if using SQLite file
+    try:
+        db_conn = sqlite3.connect(DATABASE)
+        cursor = db_conn.cursor()
 
-    # Schema migration check for users table
-    cursor.execute("PRAGMA table_info(users);")
-    existing_user_cols = [row[1] for row in cursor.fetchall()]
-    if 'name' not in existing_user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN name TEXT;")
-    if 'avatar_url' not in existing_user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT;")
-    if 'auth_provider' not in existing_user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';")
-    if 'google_id' not in existing_user_cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN google_id TEXT;")
+        # Create users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                name TEXT,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT,
+                avatar_url TEXT,
+                auth_provider TEXT DEFAULT 'local',
+                google_id TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
 
-    # Create sessions table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            mode TEXT NOT NULL,
-            duration_minutes REAL NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT,
-            status TEXT NOT NULL DEFAULT 'completed',
-            task_name TEXT DEFAULT 'Study Session',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-    """)
+        # Schema migration check for users table
+        cursor.execute("PRAGMA table_info(users);")
+        existing_user_cols = [row[1] for row in cursor.fetchall()]
+        if 'name' not in existing_user_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN name TEXT;")
+        if 'avatar_url' not in existing_user_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT;")
+        if 'auth_provider' not in existing_user_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local';")
+        if 'google_id' not in existing_user_cols:
+            cursor.execute("ALTER TABLE users ADD COLUMN google_id TEXT;")
 
-    # Ensure user_id column exists if table was created in an earlier schema
-    cursor.execute("PRAGMA table_info(sessions);")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'user_id' not in columns:
-        cursor.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
+        # Create sessions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                mode TEXT NOT NULL,
+                duration_minutes REAL NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT,
+                status TEXT NOT NULL DEFAULT 'completed',
+                task_name TEXT DEFAULT 'Study Session',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
 
-    # Indices for high-performance aggregations
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_sessions_query 
-        ON sessions(mode, status, start_time);
-    """)
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_sessions_user 
-        ON sessions(user_id);
-    """)
+        # Ensure user_id column exists if table was created in an earlier schema
+        cursor.execute("PRAGMA table_info(sessions);")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'user_id' not in columns:
+            cursor.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER;")
 
-    # Create global preferences table (for guest mode)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS preferences (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
+        # Create daily_streaks table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS daily_streaks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                date TEXT NOT NULL,
+                pomodoro_count INTEGER DEFAULT 0,
+                total_minutes REAL DEFAULT 0.0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
 
-    # Create user-specific preferences table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_preferences (
-            user_id INTEGER NOT NULL,
-            key TEXT NOT NULL,
-            value TEXT NOT NULL,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, key),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        );
-    """)
+        # Indices for high-performance aggregations
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_query 
+            ON sessions(mode, status, start_time);
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_user 
+            ON sessions(user_id);
+        """)
 
-    db.commit()
-    db.close()
+        # Create global preferences table (for guest mode)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS preferences (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
 
+        # Create user-specific preferences table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                user_id INTEGER NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, key),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+        """)
+
+        db_conn.commit()
+        db_conn.close()
+    except Exception:
+        pass
+
+
+# Ensure PostgreSQL / SQLite tables are automatically generated on startup
+with app.app_context():
+    db.create_all()
 
 # Ensure DB schema is ready at startup
 init_db()
