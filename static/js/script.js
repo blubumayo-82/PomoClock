@@ -1512,64 +1512,83 @@ function updateModeBadges(pomoSeconds, shortBreakSeconds, longBreakSeconds) {
 }
 
 function loadStoredSettings() {
-  const savedTheme = localStorage.getItem('pomohaven_theme') || localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
-  const savedCustom = localStorage.getItem('pomohaven_custom_colors') || localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
-  if (savedTheme === 'custom' && savedCustom) {
-    applyTheme('custom', JSON.parse(savedCustom), false);
-  } else {
-    applyTheme(savedTheme, null, false);
+  try {
+    const savedTheme = localStorage.getItem('pomohaven_theme') || localStorage.getItem('pomoclock_theme') || localStorage.getItem('focusflow_theme') || 'pomodoro';
+    const savedCustom = localStorage.getItem('pomohaven_custom_colors') || localStorage.getItem('pomoclock_custom_colors') || localStorage.getItem('focusflow_custom_colors');
+    if (savedTheme === 'custom' && savedCustom) {
+      applyTheme('custom', JSON.parse(savedCustom), false);
+    } else {
+      applyTheme(savedTheme, null, false);
+    }
+
+    const savedPomo = parseInt(localStorage.getItem('pomohaven_dur_pomo') || localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
+    const savedShort = parseInt(localStorage.getItem('pomohaven_dur_short') || localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
+    const savedLong = parseInt(localStorage.getItem('pomohaven_dur_long') || localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
+    const savedInterval = parseInt(localStorage.getItem('pomohaven_cycle_interval') || localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
+    
+    const savedAutoNextRaw = localStorage.getItem('pomohaven_auto_start_next') ?? localStorage.getItem('pomohaven_auto_next_cycle');
+    const savedAutoBreaksRaw = localStorage.getItem('pomohaven_auto_breaks');
+    const savedAutoPomoRaw = localStorage.getItem('pomohaven_auto_pomo');
+    
+    let autoNextEnabled = true; // Default state: Enabled (true)
+    if (savedAutoNextRaw !== null) {
+      autoNextEnabled = savedAutoNextRaw === 'true';
+    } else if (savedAutoBreaksRaw !== null || savedAutoPomoRaw !== null) {
+      autoNextEnabled = (savedAutoBreaksRaw === 'true' || savedAutoPomoRaw === 'true');
+    }
+
+    const savedSound = localStorage.getItem('pomohaven_sound_type') || localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
+    const savedVolume = parseFloat(localStorage.getItem('pomohaven_sound_volume') || localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
+
+    if (!isNaN(savedPomo) && savedPomo > 0) state.durations.pomodoro = savedPomo * 60;
+    if (!isNaN(savedShort) && savedShort > 0) state.durations.short_break = savedShort * 60;
+    if (!isNaN(savedLong) && savedLong > 0) state.durations.long_break = savedLong * 60;
+    if (!isNaN(savedInterval) && savedInterval >= 2) state.longBreakInterval = savedInterval;
+    state.autoStartNextCycle = autoNextEnabled;
+    state.autoStartBreaks = autoNextEnabled;
+    state.autoStartPomodoro = autoNextEnabled;
+    state.soundType = savedSound;
+    if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
+
+    state.totalDuration = state.durations[state.currentMode];
+    state.timeLeft = state.totalDuration;
+
+    // Defensive DOM assignments with null guards & optional chaining
+    const pomoEl = DOM.settingPomodoro || document.getElementById('settingPomodoro');
+    if (pomoEl) pomoEl.value = Math.round(state.durations.pomodoro / 60);
+
+    const shortEl = DOM.settingShortBreak || document.getElementById('settingShortBreak');
+    if (shortEl) shortEl.value = Math.round(state.durations.short_break / 60);
+
+    const longEl = DOM.settingLongBreak || document.getElementById('settingLongBreak');
+    if (longEl) longEl.value = Math.round(state.durations.long_break / 60);
+
+    const intervalEl = DOM.settingLongBreakInterval || document.getElementById('settingLongBreakInterval');
+    if (intervalEl) intervalEl.value = state.longBreakInterval;
+    
+    const autoNextEl = DOM.settingAutoStartNextCycle || document.getElementById('settingAutoStartNextCycle') || document.getElementById('auto-transition-toggle');
+    if (autoNextEl) autoNextEl.checked = autoNextEnabled;
+
+    const autoBreaksEl = DOM.settingAutoStartBreaks || document.getElementById('settingAutoStartBreaks');
+    if (autoBreaksEl) autoBreaksEl.checked = autoNextEnabled;
+
+    const autoPomoEl = DOM.settingAutoStartPomodoro || document.getElementById('settingAutoStartPomodoro');
+    if (autoPomoEl) autoPomoEl.checked = autoNextEnabled;
+
+    const soundEl = DOM.settingSoundType || document.getElementById('settingSoundType');
+    if (soundEl) soundEl.value = state.soundType;
+
+    const volEl = DOM.settingVolume || document.getElementById('settingVolume');
+    if (volEl) volEl.value = Math.round(state.soundVolume * 100);
+
+    const volLabelEl = DOM.volumePercentLabel || document.getElementById('volumePercentLabel');
+    if (volLabelEl) volLabelEl.textContent = `${Math.round(state.soundVolume * 100)}%`;
+
+    // Dynamically update mode badges from loaded settings
+    updateModeBadges();
+  } catch (e) {
+    console.warn("Settings load warning:", e);
   }
-
-  const savedPomo = parseInt(localStorage.getItem('pomohaven_dur_pomo') || localStorage.getItem('pomoclock_dur_pomo') || localStorage.getItem('focusflow_dur_pomo'), 10);
-  const savedShort = parseInt(localStorage.getItem('pomohaven_dur_short') || localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
-  const savedLong = parseInt(localStorage.getItem('pomohaven_dur_long') || localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
-  const savedInterval = parseInt(localStorage.getItem('pomohaven_cycle_interval') || localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
-  
-  const savedAutoNextRaw = localStorage.getItem('pomohaven_auto_start_next') ?? localStorage.getItem('pomohaven_auto_next_cycle');
-  const savedAutoBreaksRaw = localStorage.getItem('pomohaven_auto_breaks');
-  const savedAutoPomoRaw = localStorage.getItem('pomohaven_auto_pomo');
-  
-  let autoNextEnabled = true; // Default state: Enabled (true)
-  if (savedAutoNextRaw !== null) {
-    autoNextEnabled = savedAutoNextRaw === 'true';
-  } else if (savedAutoBreaksRaw !== null || savedAutoPomoRaw !== null) {
-    autoNextEnabled = (savedAutoBreaksRaw === 'true' || savedAutoPomoRaw === 'true');
-  }
-
-  const savedSound = localStorage.getItem('pomohaven_sound_type') || localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
-  const savedVolume = parseFloat(localStorage.getItem('pomohaven_sound_volume') || localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
-
-  if (!isNaN(savedPomo) && savedPomo > 0) state.durations.pomodoro = savedPomo * 60;
-  if (!isNaN(savedShort) && savedShort > 0) state.durations.short_break = savedShort * 60;
-  if (!isNaN(savedLong) && savedLong > 0) state.durations.long_break = savedLong * 60;
-  if (!isNaN(savedInterval) && savedInterval >= 2) state.longBreakInterval = savedInterval;
-  state.autoStartNextCycle = autoNextEnabled;
-  state.autoStartBreaks = autoNextEnabled;
-  state.autoStartPomodoro = autoNextEnabled;
-  state.soundType = savedSound;
-  if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
-
-  state.totalDuration = state.durations[state.currentMode];
-  state.timeLeft = state.totalDuration;
-
-  if (DOM.settingPomodoro) DOM.settingPomodoro.value = Math.round(state.durations.pomodoro / 60);
-  if (DOM.settingShortBreak) DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
-  if (DOM.settingLongBreak) DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
-  if (DOM.settingLongBreakInterval) DOM.settingLongBreakInterval.value = state.longBreakInterval;
-  
-  const autoTransitionToggle = DOM.settingAutoStartNextCycle || document.getElementById('settingAutoStartNextCycle') || document.getElementById('auto-transition-toggle');
-  if (autoTransitionToggle) autoTransitionToggle.checked = state.autoStartNextCycle;
-  const autoBreaksToggle = DOM.settingAutoStartBreaks || document.getElementById('settingAutoStartBreaks');
-  if (autoBreaksToggle) autoBreaksToggle.checked = state.autoStartNextCycle;
-  const autoPomoToggle = DOM.settingAutoStartPomodoro || document.getElementById('settingAutoStartPomodoro');
-  if (autoPomoToggle) autoPomoToggle.checked = state.autoStartNextCycle;
-
-  if (DOM.settingSoundType) DOM.settingSoundType.value = state.soundType;
-  if (DOM.settingVolume) DOM.settingVolume.value = Math.round(state.soundVolume * 100);
-  if (DOM.volumePercentLabel) DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
-
-  // Dynamically update mode badges from loaded settings
-  updateModeBadges();
 }
 
 function saveSettingsFromModal() {
@@ -2719,8 +2738,8 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.progressCircle.style.strokeDasharray = CIRCUMFERENCE;
   }
 
-  loadStoredSettings();
   setupEventListeners();
+  loadStoredSettings();
   initTaskQueue();
   updateModeTabs();
   updateCycleIndicators();
