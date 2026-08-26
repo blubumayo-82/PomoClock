@@ -1185,12 +1185,13 @@ def save_preferences():
 def submit_feedback():
     """
     Submits user feedback and feature requests to PostgreSQL / SQLite database.
-    Expects JSON: { feedback_type, message, email }
+    Supports both JSON payloads and Form Data safely.
+    Expects payload/form: { feedback_type / type, message, email }
     """
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
     message = (data.get('message') or '').strip()
-    feedback_type = (data.get('feedback_type') or 'Feature Request').strip()
-    user_email = (data.get('email') or data.get('user_email') or '').strip()
+    feedback_type = (data.get('feedback_type') or data.get('type') or 'General Feedback').strip()
+    user_email = (data.get('email') or data.get('user_email') or '').strip() or None
 
     if not message:
         return jsonify({"success": False, "error": "Message cannot be empty."}), 400
@@ -1202,28 +1203,29 @@ def submit_feedback():
             if user:
                 user_email = user.email
 
-        feedback = Feedback(
+        new_feedback = Feedback(
             user_id=user_id,
-            user_email=user_email or None,
+            user_email=user_email,
             feedback_type=feedback_type,
-            message=message
+            message=message,
+            created_at=datetime.now(timezone.utc)
         )
-        db.session.add(feedback)
+        db.session.add(new_feedback)
         db.session.commit()
 
         # SQLite direct insert fallback if active
         try:
-            db_conn = get_db()
-            cursor = db_conn.cursor()
+            sqlite_conn = get_db()
+            cursor = sqlite_conn.cursor()
             cursor.execute("""
                 INSERT INTO feedbacks (user_id, user_email, feedback_type, message)
                 VALUES (?, ?, ?, ?)
-            """, (user_id, user_email or None, feedback_type, message))
-            db_conn.commit()
+            """, (user_id, user_email, feedback_type, message))
+            sqlite_conn.commit()
         except Exception:
             pass
 
-        return jsonify({"success": True, "message": "Thank you for your feedback!"}), 200
+        return jsonify({"success": True, "message": "Feedback received!"}), 200
 
     except Exception as err:
         db.session.rollback()

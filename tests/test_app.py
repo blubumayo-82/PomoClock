@@ -482,7 +482,17 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         data = json.loads(res.data)
         self.assertTrue(data['success'])
-        self.assertIn("Thank you for your feedback!", data['message'])
+        self.assertIn("Feedback received!", data['message'])
+
+        # Form Data submission test
+        form_res = self.client.post('/api/feedback', data={
+            "feedback_type": "Bug Report",
+            "message": "Timer pause button feels unresponsive on mobile.",
+            "email": "mobile@pomohaven.com"
+        })
+        self.assertEqual(form_res.status_code, 200)
+        form_data = json.loads(form_res.data)
+        self.assertTrue(form_data['success'])
 
         # Empty message validation
         err_res = self.client.post('/api/feedback', data=json.dumps({

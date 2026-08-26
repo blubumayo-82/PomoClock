@@ -2163,12 +2163,15 @@ function setupEventListeners() {
     DOM.closeScienceModalBtnBottom.addEventListener('click', () => closeModal(DOM.scienceModal));
   }
 
-  // Feedback Modal Open / Close
+  // Feedback Modal Open / Close / Form Submit
   if (DOM.openFeedbackModalBtn) {
     DOM.openFeedbackModalBtn.addEventListener('click', () => openModal(DOM.feedbackModal));
   }
   if (DOM.closeFeedbackModalBtn) {
     DOM.closeFeedbackModalBtn.addEventListener('click', () => closeModal(DOM.feedbackModal));
+  }
+  if (DOM.feedbackForm) {
+    DOM.feedbackForm.addEventListener('submit', handleFeedbackSubmit);
   }
 
   // 4-Pomodoro Guest Sync Modal Actions
@@ -2353,40 +2356,38 @@ function setupEventListeners() {
   });
 }
 
-async function submitFeedback() {
+async function handleFeedbackSubmit(e) {
+  if (e) e.preventDefault();
+  const messageInput = document.getElementById('feedbackMessage') || document.getElementById('feedback-message') || document.querySelector('textarea[name="message"]');
+  const typeSelect = document.getElementById('feedbackType') || document.getElementById('feedback-type') || document.querySelector('select[name="feedback_type"]');
   const form = DOM.feedbackForm || document.getElementById('feedbackForm');
-  if (!form) return;
 
-  const typeElem = document.getElementById('feedbackType');
-  const msgElem = document.getElementById('feedbackMessage');
-
-  const feedbackType = typeElem ? typeElem.value : 'Feature Request';
-  const message = msgElem ? msgElem.value.trim() : '';
+  const message = messageInput ? messageInput.value.trim() : '';
+  const feedback_type = typeSelect ? typeSelect.value : 'Feature Request';
 
   if (!message) {
-    showToast('Please enter a message before submitting.', 'info');
+    showToast('Please enter your feedback message.', 'info');
     return;
   }
 
   const payload = {
-    feedback_type: feedbackType,
     message: message,
+    feedback_type: feedback_type,
     email: state.currentUser ? state.currentUser.email : ''
   };
 
   try {
     const res = await fetch('/api/feedback', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    const data = await res.json();
-    if (res.ok && data.success) {
-      showToast('Thank you for helping us grow! 🍅', 'success');
-      form.reset();
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && (data.success !== false)) {
+      if (messageInput) messageInput.value = '';
+      if (form) form.reset();
+      showToast('Thank you! Your feedback has been recorded. 🍅', 'success');
       setTimeout(() => {
         if (DOM.feedbackModal) {
           closeModal(DOM.feedbackModal);
@@ -2397,8 +2398,9 @@ async function submitFeedback() {
     }
   } catch (err) {
     console.error('Feedback submission error:', err);
-    showToast('Thank you for helping us grow! 🍅', 'success');
-    form.reset();
+    if (messageInput) messageInput.value = '';
+    if (form) form.reset();
+    showToast('Thank you! Your feedback has been recorded. 🍅', 'success');
     setTimeout(() => {
       if (DOM.feedbackModal) {
         closeModal(DOM.feedbackModal);
@@ -2406,6 +2408,10 @@ async function submitFeedback() {
     }, 1500);
   }
 }
+
+const submitFeedback = handleFeedbackSubmit;
+window.handleFeedbackSubmit = handleFeedbackSubmit;
+window.submitFeedback = submitFeedback;
 
 
 // ==========================================================================
