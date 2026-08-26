@@ -2170,7 +2170,12 @@ function setupEventListeners() {
     DOM.openFeedbackModalBtn.addEventListener('click', () => openModal(DOM.feedbackModal));
   }
   if (DOM.closeFeedbackModalBtn) {
-    DOM.closeFeedbackModalBtn.addEventListener('click', () => closeModal(DOM.feedbackModal));
+    DOM.closeFeedbackModalBtn.addEventListener('click', () => {
+      if (DOM.feedbackForm) DOM.feedbackForm.reset();
+      const messageInput = document.getElementById('feedbackMessage') || document.getElementById('feedback-message') || document.querySelector('textarea[name="message"]');
+      if (messageInput) messageInput.value = '';
+      closeModal(DOM.feedbackModal);
+    });
   }
   if (DOM.cancelFeedbackModalBtn) {
     DOM.cancelFeedbackModalBtn.addEventListener('click', () => {
@@ -2366,11 +2371,16 @@ function setupEventListeners() {
   });
 }
 
+let isSubmittingFeedback = false;
+
 async function handleFeedbackSubmit(e) {
   if (e) e.preventDefault();
+  if (isSubmittingFeedback) return;
+
   const messageInput = document.getElementById('feedbackMessage') || document.getElementById('feedback-message') || document.querySelector('textarea[name="message"]');
   const typeSelect = document.getElementById('feedbackType') || document.getElementById('feedback-type') || document.querySelector('select[name="feedback_type"]');
   const form = DOM.feedbackForm || document.getElementById('feedbackForm');
+  const submitBtn = DOM.submitFeedbackModalBtn || document.getElementById('submitFeedbackModalBtn') || document.getElementById('feedback-submit-btn');
 
   const message = messageInput ? messageInput.value.trim() : '';
   const feedback_type = typeSelect ? typeSelect.value : 'Feature Request';
@@ -2378,6 +2388,13 @@ async function handleFeedbackSubmit(e) {
   if (!message) {
     showToast('Please enter your feedback message.', 'info');
     return;
+  }
+
+  isSubmittingFeedback = true;
+  const originalBtnText = submitBtn ? submitBtn.textContent : 'Submit Feedback';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
   }
 
   const payload = {
@@ -2398,11 +2415,9 @@ async function handleFeedbackSubmit(e) {
       if (messageInput) messageInput.value = '';
       if (form) form.reset();
       showToast('Thank you! Your feedback has been recorded. 🍅', 'success');
-      setTimeout(() => {
-        if (DOM.feedbackModal) {
-          closeModal(DOM.feedbackModal);
-        }
-      }, 1500);
+      if (DOM.feedbackModal) {
+        closeModal(DOM.feedbackModal);
+      }
     } else {
       showToast(data.error || 'Failed to submit feedback. Please try again.', 'error');
     }
@@ -2411,11 +2426,15 @@ async function handleFeedbackSubmit(e) {
     if (messageInput) messageInput.value = '';
     if (form) form.reset();
     showToast('Thank you! Your feedback has been recorded. 🍅', 'success');
-    setTimeout(() => {
-      if (DOM.feedbackModal) {
-        closeModal(DOM.feedbackModal);
-      }
-    }, 1500);
+    if (DOM.feedbackModal) {
+      closeModal(DOM.feedbackModal);
+    }
+  } finally {
+    isSubmittingFeedback = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+    }
   }
 }
 
