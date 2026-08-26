@@ -1552,26 +1552,31 @@ function loadStoredSettings() {
   state.totalDuration = state.durations[state.currentMode];
   state.timeLeft = state.totalDuration;
 
-  DOM.settingPomodoro.value = Math.round(state.durations.pomodoro / 60);
-  DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
-  DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
-  DOM.settingLongBreakInterval.value = state.longBreakInterval;
-  if (DOM.settingAutoStartNextCycle) DOM.settingAutoStartNextCycle.checked = state.autoStartNextCycle;
-  if (DOM.settingAutoStartBreaks) DOM.settingAutoStartBreaks.checked = state.autoStartNextCycle;
-  if (DOM.settingAutoStartPomodoro) DOM.settingAutoStartPomodoro.checked = state.autoStartNextCycle;
-  DOM.settingSoundType.value = state.soundType;
-  DOM.settingVolume.value = Math.round(state.soundVolume * 100);
-  DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
+  if (DOM.settingPomodoro) DOM.settingPomodoro.value = Math.round(state.durations.pomodoro / 60);
+  if (DOM.settingShortBreak) DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
+  if (DOM.settingLongBreak) DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
+  if (DOM.settingLongBreakInterval) DOM.settingLongBreakInterval.value = state.longBreakInterval;
+  
+  const autoTransitionToggle = DOM.settingAutoStartNextCycle || document.getElementById('settingAutoStartNextCycle') || document.getElementById('auto-transition-toggle');
+  if (autoTransitionToggle) autoTransitionToggle.checked = state.autoStartNextCycle;
+  const autoBreaksToggle = DOM.settingAutoStartBreaks || document.getElementById('settingAutoStartBreaks');
+  if (autoBreaksToggle) autoBreaksToggle.checked = state.autoStartNextCycle;
+  const autoPomoToggle = DOM.settingAutoStartPomodoro || document.getElementById('settingAutoStartPomodoro');
+  if (autoPomoToggle) autoPomoToggle.checked = state.autoStartNextCycle;
+
+  if (DOM.settingSoundType) DOM.settingSoundType.value = state.soundType;
+  if (DOM.settingVolume) DOM.settingVolume.value = Math.round(state.soundVolume * 100);
+  if (DOM.volumePercentLabel) DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
 
   // Dynamically update mode badges from loaded settings
   updateModeBadges();
 }
 
 function saveSettingsFromModal() {
-  const pomoMins = parseInt(DOM.settingPomodoro.value, 10);
-  const shortMins = parseInt(DOM.settingShortBreak.value, 10);
-  const longMins = parseInt(DOM.settingLongBreak.value, 10);
-  const interval = parseInt(DOM.settingLongBreakInterval.value, 10);
+  const pomoMins = DOM.settingPomodoro ? parseInt(DOM.settingPomodoro.value, 10) : 25;
+  const shortMins = DOM.settingShortBreak ? parseInt(DOM.settingShortBreak.value, 10) : 5;
+  const longMins = DOM.settingLongBreak ? parseInt(DOM.settingLongBreak.value, 10) : 15;
+  const interval = DOM.settingLongBreakInterval ? parseInt(DOM.settingLongBreakInterval.value, 10) : 4;
 
   if (pomoMins > 0) {
     state.durations.pomodoro = pomoMins * 60;
@@ -1590,15 +1595,17 @@ function saveSettingsFromModal() {
     localStorage.setItem('pomohaven_cycle_interval', interval);
   }
 
-  if (DOM.settingAutoStartNextCycle) {
-    state.autoStartNextCycle = DOM.settingAutoStartNextCycle.checked;
+  const autoNextToggle = DOM.settingAutoStartNextCycle || document.getElementById('settingAutoStartNextCycle') || document.getElementById('auto-transition-toggle');
+  if (autoNextToggle) {
+    state.autoStartNextCycle = Boolean(autoNextToggle.checked);
   } else if (DOM.settingAutoStartBreaks) {
-    state.autoStartNextCycle = DOM.settingAutoStartBreaks.checked;
+    state.autoStartNextCycle = Boolean(DOM.settingAutoStartBreaks.checked);
   }
   state.autoStartBreaks = state.autoStartNextCycle;
   state.autoStartPomodoro = state.autoStartNextCycle;
-  state.soundType = DOM.settingSoundType.value;
-  state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
+  
+  if (DOM.settingSoundType) state.soundType = DOM.settingSoundType.value;
+  if (DOM.settingVolume) state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
 
   localStorage.setItem('pomohaven_auto_start_next', state.autoStartNextCycle);
   localStorage.setItem('pomohaven_auto_breaks', state.autoStartNextCycle);
@@ -1615,7 +1622,7 @@ function saveSettingsFromModal() {
   // Update mode badges with newly saved durations
   updateModeBadges();
   updateCycleIndicators();
-  closeModal(DOM.settingsModal);
+  if (DOM.settingsModal) closeModal(DOM.settingsModal);
   showToast('Settings saved successfully', 'success');
 
   syncPreferences({
@@ -1680,17 +1687,17 @@ function adjustColorBrightness(hex, percent) {
 
 function setupEventListeners() {
   // Timer Controls
-  DOM.startPauseBtn.addEventListener('click', toggleStartPause);
-  DOM.resetBtn.addEventListener('click', resetTimer);
-  DOM.skipBtn.addEventListener('click', skipSession);
+  if (DOM.startPauseBtn) DOM.startPauseBtn.addEventListener('click', toggleStartPause);
+  if (DOM.resetBtn) DOM.resetBtn.addEventListener('click', resetTimer);
+  if (DOM.skipBtn) DOM.skipBtn.addEventListener('click', skipSession);
   if (DOM.zenModeBtn) {
     DOM.zenModeBtn.addEventListener('click', () => toggleZenMode());
   }
 
   // Mode Selection Tabs
-  DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
-  DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
-  DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
+  if (DOM.tabPomodoro) DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
+  if (DOM.tabShortBreak) DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
+  if (DOM.tabLongBreak) DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
 
   // Task Input (Auto-Active Task Input)
   if (DOM.currentTaskInput) {
@@ -1728,12 +1735,14 @@ function setupEventListeners() {
   }
 
   // Sound Toggle (Mute / Unmute)
-  DOM.soundToggleBtn.addEventListener('click', () => {
-    state.soundEnabled = !state.soundEnabled;
-    DOM.soundToggleBtn.style.opacity = state.soundEnabled ? '1' : '0.4';
-    DOM.soundWave.style.display = state.soundEnabled ? 'block' : 'none';
-    showToast(state.soundEnabled ? 'Sound enabled' : 'Sound muted', 'info');
-  });
+  if (DOM.soundToggleBtn) {
+    DOM.soundToggleBtn.addEventListener('click', () => {
+      state.soundEnabled = !state.soundEnabled;
+      DOM.soundToggleBtn.style.opacity = state.soundEnabled ? '1' : '0.4';
+      if (DOM.soundWave) DOM.soundWave.style.display = state.soundEnabled ? 'block' : 'none';
+      showToast(state.soundEnabled ? 'Sound enabled' : 'Sound muted', 'info');
+    });
+  }
 
   // Auth Button (Sign In / User Menu Trigger)
   if (DOM.openAuthModalBtn) {
@@ -1741,8 +1750,10 @@ function setupEventListeners() {
       e.stopPropagation();
       if (state.currentUser) {
         // Toggle user dropdown menu
-        const isShown = DOM.userMenuDropdown.style.display === 'flex';
-        DOM.userMenuDropdown.style.display = isShown ? 'none' : 'flex';
+        if (DOM.userMenuDropdown) {
+          const isShown = DOM.userMenuDropdown.style.display === 'flex';
+          DOM.userMenuDropdown.style.display = isShown ? 'none' : 'flex';
+        }
       } else {
         setAuthMode('login');
         openModal(DOM.authModal);
@@ -1752,7 +1763,7 @@ function setupEventListeners() {
 
   // Close dropdown on outside click
   window.addEventListener('click', (e) => {
-    if (DOM.userMenuDropdown && !DOM.authContainer.contains(e.target)) {
+    if (DOM.userMenuDropdown && DOM.authContainer && !DOM.authContainer.contains(e.target)) {
       DOM.userMenuDropdown.style.display = 'none';
     }
   });
@@ -1774,18 +1785,32 @@ function setupEventListeners() {
   if (DOM.closeAuthModalBtn) {
     DOM.closeAuthModalBtn.addEventListener('click', () => closeModal(DOM.authModal));
   }
-  DOM.openThemeModalBtn.addEventListener('click', () => {
-    stopThemePulse();
-    openModal(DOM.themeModal);
-  });
-  DOM.closeThemeModalBtn.addEventListener('click', () => closeModal(DOM.themeModal));
+  if (DOM.openThemeModalBtn) {
+    DOM.openThemeModalBtn.addEventListener('click', () => {
+      stopThemePulse();
+      openModal(DOM.themeModal);
+    });
+  }
+  if (DOM.closeThemeModalBtn) {
+    DOM.closeThemeModalBtn.addEventListener('click', () => closeModal(DOM.themeModal));
+  }
   
-  DOM.openSettingsModalBtn.addEventListener('click', () => openModal(DOM.settingsModal));
-  DOM.closeSettingsModalBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
-  DOM.cancelSettingsBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
-  DOM.saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
-  if (DOM.settingAutoStartNextCycle) {
-    DOM.settingAutoStartNextCycle.addEventListener('change', (e) => {
+  if (DOM.openSettingsModalBtn) {
+    DOM.openSettingsModalBtn.addEventListener('click', () => openModal(DOM.settingsModal));
+  }
+  if (DOM.closeSettingsModalBtn) {
+    DOM.closeSettingsModalBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
+  }
+  if (DOM.cancelSettingsBtn) {
+    DOM.cancelSettingsBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
+  }
+  if (DOM.saveSettingsBtn) {
+    DOM.saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
+  }
+  
+  const autoNextToggleElem = DOM.settingAutoStartNextCycle || document.getElementById('settingAutoStartNextCycle') || document.getElementById('auto-transition-toggle');
+  if (autoNextToggleElem) {
+    autoNextToggleElem.addEventListener('change', (e) => {
       state.autoStartNextCycle = e.target.checked;
       state.autoStartBreaks = state.autoStartNextCycle;
       state.autoStartPomodoro = state.autoStartNextCycle;
@@ -1855,50 +1880,65 @@ function setupEventListeners() {
   });
 
   // Theme Preset Buttons
-  DOM.themePresetsGrid.addEventListener('click', (e) => {
-    const btn = e.target.closest('.theme-card-btn');
-    if (btn) {
-      const preset = btn.getAttribute('data-preset');
-      applyTheme(preset, null, true);
-      showToast(`Switched theme to ${preset.charAt(0).toUpperCase() + preset.slice(1)}`, 'success');
-    }
-  });
+  if (DOM.themePresetsGrid) {
+    DOM.themePresetsGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.theme-card-btn');
+      if (btn) {
+        const preset = btn.getAttribute('data-preset');
+        applyTheme(preset, null, true);
+        showToast(`Switched theme to ${preset.charAt(0).toUpperCase() + preset.slice(1)}`, 'success');
+      }
+    });
+  }
 
   // Custom Color Pickers
   [DOM.customBgColor, DOM.customCardColor, DOM.customAccentColor, DOM.customTextColor].forEach(picker => {
-    picker.addEventListener('input', updateHexLabels);
+    if (picker) {
+      picker.addEventListener('input', updateHexLabels);
+    }
   });
 
-  DOM.applyCustomThemeBtn.addEventListener('click', () => {
-    const customColors = {
-      bg: DOM.customBgColor.value,
-      card: DOM.customCardColor.value,
-      accent: DOM.customAccentColor.value,
-      text: DOM.customTextColor.value
-    };
-    applyTheme('custom', customColors, true);
-    showToast('Custom theme applied!', 'success');
-  });
+  if (DOM.applyCustomThemeBtn) {
+    DOM.applyCustomThemeBtn.addEventListener('click', () => {
+      const customColors = {
+        bg: DOM.customBgColor ? DOM.customBgColor.value : '#181112',
+        card: DOM.customCardColor ? DOM.customCardColor.value : '#261b1d',
+        accent: DOM.customAccentColor ? DOM.customAccentColor.value : '#e05344',
+        text: DOM.customTextColor ? DOM.customTextColor.value : '#fff5f5'
+      };
+      applyTheme('custom', customColors, true);
+      showToast('Custom theme applied!', 'success');
+    });
+  }
 
-  DOM.resetDefaultThemeBtn.addEventListener('click', () => {
-    applyTheme('pomodoro', null, true);
-    showToast('Reset to Classic Pomodoro theme', 'info');
-  });
+  if (DOM.resetDefaultThemeBtn) {
+    DOM.resetDefaultThemeBtn.addEventListener('click', () => {
+      applyTheme('pomodoro', null, true);
+      showToast('Reset to Classic Pomodoro theme', 'info');
+    });
+  }
 
   // Sound Test & Notifications
-  DOM.settingVolume.addEventListener('input', (e) => {
-    DOM.volumePercentLabel.textContent = `${e.target.value}%`;
-    state.soundVolume = parseInt(e.target.value, 10) / 100;
-  });
+  if (DOM.settingVolume) {
+    DOM.settingVolume.addEventListener('input', (e) => {
+      if (DOM.volumePercentLabel) DOM.volumePercentLabel.textContent = `${e.target.value}%`;
+      state.soundVolume = parseInt(e.target.value, 10) / 100;
+    });
+  }
 
-  DOM.testSoundBtn.addEventListener('click', () => {
-    playChimeSound(DOM.settingSoundType.value);
-  });
+  if (DOM.testSoundBtn) {
+    DOM.testSoundBtn.addEventListener('click', () => {
+      const soundType = DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType;
+      playChimeSound(soundType);
+    });
+  }
 
-  DOM.requestNotificationBtn.addEventListener('click', requestNotificationPermission);
+  if (DOM.requestNotificationBtn) {
+    DOM.requestNotificationBtn.addEventListener('click', requestNotificationPermission);
+  }
 
   // Stats Actions & Export
-  DOM.clearHistoryBtn.addEventListener('click', handleClearHistory);
+  if (DOM.clearHistoryBtn) DOM.clearHistoryBtn.addEventListener('click', handleClearHistory);
   if (DOM.exportCsvBtn) {
     DOM.exportCsvBtn.addEventListener('click', exportSessionsToCsv);
   }
