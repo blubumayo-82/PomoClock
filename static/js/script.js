@@ -538,26 +538,57 @@ function updateModeTabsDisabledState(disabled) {
   const tabs = [DOM.tabPomodoro, DOM.tabShortBreak, DOM.tabLongBreak];
   tabs.forEach(tab => {
     if (!tab) return;
-    tab.disabled = disabled;
-    if (disabled) {
-      tab.classList.add('disabled-mode-switch');
-      tab.setAttribute('title', 'Pause or reset timer to switch modes');
-    } else {
-      tab.classList.remove('disabled-mode-switch');
-      tab.removeAttribute('title');
-    }
+    tab.disabled = false;
+    tab.classList.remove('disabled-mode-switch');
   });
 }
 
-function switchMode(newMode, autoStart = false) {
-  if (state.isRunning) {
-    pauseTimer();
+function switchMode(newMode, autoStart = false, bypassProtection = false) {
+  // If clicking the same mode and timer is completely idle at initial duration, do nothing
+  if (newMode === state.currentMode && !state.isRunning && state.timeLeft === state.totalDuration) {
+    return;
+  }
+
+  // Check if a session is currently running or paused midway
+  const isSessionInProgress = state.isRunning || state.timeLeft < state.totalDuration;
+
+  if (!bypassProtection && isSessionInProgress) {
+    const targetTab = DOM['tab' + newMode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')];
+    if (targetTab) {
+      targetTab.classList.remove('tab-warning-pulse');
+      void targetTab.offsetWidth; // Force DOM reflow to retrigger animation
+      targetTab.classList.add('tab-warning-pulse');
+      setTimeout(() => targetTab.classList.remove('tab-warning-pulse'), 400);
+    }
+
+    const confirmSwitch = window.confirm(
+      "A session is currently in progress. Switching modes will reset your current timer. Are you sure you want to switch?"
+    );
+
+    if (!confirmSwitch) {
+      return; // Cancelled: keep the current mode and active/paused timer intact
+    }
+  }
+
+  // If confirmed or idle, stop the active timer interval and reset elapsed state
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  }
+  state.isRunning = false;
+  state.sessionStartTime = null;
+
+  // Reset Start/Pause button UI to idle
+  if (DOM.playIcon && DOM.pauseIcon && DOM.startPauseText && DOM.startPauseBtn) {
+    DOM.playIcon.style.display = 'inline-block';
+    DOM.pauseIcon.style.display = 'none';
+    DOM.startPauseText.textContent = 'Start';
+    DOM.startPauseBtn.classList.remove('running');
   }
 
   state.currentMode = newMode;
-  state.totalDuration = state.durations[newMode];
+  state.totalDuration = state.durations[newMode] || 25 * 60;
   state.timeLeft = state.totalDuration;
-  state.sessionStartTime = null;
 
   updateModeTabs();
   updateModeTabsDisabledState(false);
@@ -723,14 +754,14 @@ function transitionToNextMode(isNaturalCompletion = true) {
     if (state.cycleCount >= state.longBreakInterval) {
       state.cycleCount = 1;
       updateCycleIndicators();
-      switchMode('long_break', shouldAutoStart);
+      switchMode('long_break', shouldAutoStart, true);
     } else {
       state.cycleCount++;
       updateCycleIndicators();
-      switchMode('short_break', shouldAutoStart);
+      switchMode('short_break', shouldAutoStart, true);
     }
   } else {
-    switchMode('pomodoro', shouldAutoStart);
+    switchMode('pomodoro', shouldAutoStart, true);
   }
 }
 

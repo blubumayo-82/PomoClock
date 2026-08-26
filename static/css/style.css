@@ -1573,14 +1573,23 @@ header,
   }
 }
 
-.mode-tab.disabled-mode-switch,
-.mode-pill.disabled-mode-switch,
-button.mode-btn:disabled,
-button.mode-tab:disabled {
-  opacity: 0.45 !important;
-  cursor: not-allowed !important;
-  pointer-events: none !important;
-  transition: opacity 0.2s ease !important;
+.mode-tab,
+.mode-btn,
+.mode-pill {
+  cursor: pointer !important;
+  user-select: none;
+}
+
+@keyframes tabWarningPulse {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.95); opacity: 0.75; }
+  60% { transform: scale(1.03); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.mode-tab.tab-warning-pulse,
+.mode-btn.tab-warning-pulse {
+  animation: tabWarningPulse 0.35s ease-in-out;
 }
 
 /* Circular SVG Progress Ring */
