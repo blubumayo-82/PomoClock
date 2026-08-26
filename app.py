@@ -28,7 +28,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 # Initialize Flask application
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.getenv('SECRET_KEY', 'pomohaven-study-secret-key-2026')
+app.secret_key = os.environ.get('SECRET_KEY', 'default-dev-fallback-key-pomohaven-2026')
+
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['SESSION_COOKIE_SECURE'] = True if (os.environ.get('DYNO') or os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or os.environ.get('FLASK_ENV') == 'production') else False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
@@ -370,6 +375,7 @@ def google_auth():
         except Exception:
             pass
 
+        session.permanent = True
         session['user_id'] = user.id
 
         display_name = user.name or user.username or user.email.split('@')[0]
@@ -451,6 +457,7 @@ def register():
         db.commit()
 
         user_id = cursor.lastrowid
+        session.permanent = True
         session['user_id'] = user_id
 
         return jsonify({
@@ -506,6 +513,7 @@ def login():
     if not check_password_hash(user['password_hash'], password):
         return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
 
+    session.permanent = True
     session['user_id'] = user['id']
     display_name = user['name'] or user['username'] or user['email'].split('@')[0]
 
