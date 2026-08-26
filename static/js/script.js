@@ -30,8 +30,9 @@ const state = {
   // Cycle tracking
   cycleCount: 1,
   longBreakInterval: 4,
-  autoStartBreaks: false,
-  autoStartPomodoro: false,
+  autoStartNextCycle: true,
+  autoStartBreaks: true,
+  autoStartPomodoro: true,
 
   // Audio settings
   soundEnabled: true,
@@ -97,6 +98,8 @@ const DOM = {
   zenModeBtn: document.getElementById('zenModeBtn'),
   zenExpandIcon: document.getElementById('zenExpandIcon'),
   zenCompressIcon: document.getElementById('zenCompressIcon'),
+  zenBtnText: document.getElementById('zenBtnText'),
+  zenTaskBadge: document.getElementById('zenTaskBadge'),
   // ETA & Cycle
   cycleIndicator: document.getElementById('cycleIndicator'),
   cycleLabel: document.getElementById('cycleLabel'),
@@ -196,6 +199,7 @@ const DOM = {
   settingShortBreak: document.getElementById('settingShortBreak'),
   settingLongBreak: document.getElementById('settingLongBreak'),
   settingLongBreakInterval: document.getElementById('settingLongBreakInterval'),
+  settingAutoStartNextCycle: document.getElementById('settingAutoStartNextCycle'),
   settingAutoStartBreaks: document.getElementById('settingAutoStartBreaks'),
   settingAutoStartPomodoro: document.getElementById('settingAutoStartPomodoro'),
   settingSoundType: document.getElementById('settingSoundType'),
@@ -716,18 +720,19 @@ async function handleTimerComplete() {
 }
 
 function transitionToNextMode(isNaturalCompletion = true) {
+  const shouldAutoStart = isNaturalCompletion && (state.autoStartNextCycle ?? true);
   if (state.currentMode === 'pomodoro') {
     if (state.cycleCount >= state.longBreakInterval) {
       state.cycleCount = 1;
       updateCycleIndicators();
-      switchMode('long_break', isNaturalCompletion && state.autoStartBreaks);
+      switchMode('long_break', shouldAutoStart);
     } else {
       state.cycleCount++;
       updateCycleIndicators();
-      switchMode('short_break', isNaturalCompletion && state.autoStartBreaks);
+      switchMode('short_break', shouldAutoStart);
     }
   } else {
-    switchMode('pomodoro', isNaturalCompletion && state.autoStartPomodoro);
+    switchMode('pomodoro', shouldAutoStart);
   }
 }
 
@@ -1519,8 +1524,18 @@ function loadStoredSettings() {
   const savedShort = parseInt(localStorage.getItem('pomohaven_dur_short') || localStorage.getItem('pomoclock_dur_short') || localStorage.getItem('focusflow_dur_short'), 10);
   const savedLong = parseInt(localStorage.getItem('pomohaven_dur_long') || localStorage.getItem('pomoclock_dur_long') || localStorage.getItem('focusflow_dur_long'), 10);
   const savedInterval = parseInt(localStorage.getItem('pomohaven_cycle_interval') || localStorage.getItem('pomoclock_cycle_interval') || localStorage.getItem('focusflow_cycle_interval'), 10);
-  const savedAutoBreaks = (localStorage.getItem('pomohaven_auto_breaks') || localStorage.getItem('pomoclock_auto_breaks') || localStorage.getItem('focusflow_auto_breaks')) === 'true';
-  const savedAutoPomo = (localStorage.getItem('pomohaven_auto_pomo') || localStorage.getItem('pomoclock_auto_pomo') || localStorage.getItem('focusflow_auto_pomo')) === 'true';
+  
+  const savedAutoNextRaw = localStorage.getItem('pomohaven_auto_start_next') ?? localStorage.getItem('pomohaven_auto_next_cycle');
+  const savedAutoBreaksRaw = localStorage.getItem('pomohaven_auto_breaks');
+  const savedAutoPomoRaw = localStorage.getItem('pomohaven_auto_pomo');
+  
+  let autoNextEnabled = true; // Default state: Enabled (true)
+  if (savedAutoNextRaw !== null) {
+    autoNextEnabled = savedAutoNextRaw === 'true';
+  } else if (savedAutoBreaksRaw !== null || savedAutoPomoRaw !== null) {
+    autoNextEnabled = (savedAutoBreaksRaw === 'true' || savedAutoPomoRaw === 'true');
+  }
+
   const savedSound = localStorage.getItem('pomohaven_sound_type') || localStorage.getItem('pomoclock_sound_type') || localStorage.getItem('focusflow_sound_type') || 'zen';
   const savedVolume = parseFloat(localStorage.getItem('pomohaven_sound_volume') || localStorage.getItem('pomoclock_sound_volume') || localStorage.getItem('focusflow_sound_volume'));
 
@@ -1528,8 +1543,9 @@ function loadStoredSettings() {
   if (!isNaN(savedShort) && savedShort > 0) state.durations.short_break = savedShort * 60;
   if (!isNaN(savedLong) && savedLong > 0) state.durations.long_break = savedLong * 60;
   if (!isNaN(savedInterval) && savedInterval >= 2) state.longBreakInterval = savedInterval;
-  state.autoStartBreaks = savedAutoBreaks;
-  state.autoStartPomodoro = savedAutoPomo;
+  state.autoStartNextCycle = autoNextEnabled;
+  state.autoStartBreaks = autoNextEnabled;
+  state.autoStartPomodoro = autoNextEnabled;
   state.soundType = savedSound;
   if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
 
@@ -1540,8 +1556,9 @@ function loadStoredSettings() {
   DOM.settingShortBreak.value = Math.round(state.durations.short_break / 60);
   DOM.settingLongBreak.value = Math.round(state.durations.long_break / 60);
   DOM.settingLongBreakInterval.value = state.longBreakInterval;
-  DOM.settingAutoStartBreaks.checked = state.autoStartBreaks;
-  DOM.settingAutoStartPomodoro.checked = state.autoStartPomodoro;
+  if (DOM.settingAutoStartNextCycle) DOM.settingAutoStartNextCycle.checked = state.autoStartNextCycle;
+  if (DOM.settingAutoStartBreaks) DOM.settingAutoStartBreaks.checked = state.autoStartNextCycle;
+  if (DOM.settingAutoStartPomodoro) DOM.settingAutoStartPomodoro.checked = state.autoStartNextCycle;
   DOM.settingSoundType.value = state.soundType;
   DOM.settingVolume.value = Math.round(state.soundVolume * 100);
   DOM.volumePercentLabel.textContent = `${Math.round(state.soundVolume * 100)}%`;
@@ -1573,12 +1590,18 @@ function saveSettingsFromModal() {
     localStorage.setItem('pomohaven_cycle_interval', interval);
   }
 
-  state.autoStartBreaks = DOM.settingAutoStartBreaks.checked;
-  state.autoStartPomodoro = DOM.settingAutoStartPomodoro.checked;
+  if (DOM.settingAutoStartNextCycle) {
+    state.autoStartNextCycle = DOM.settingAutoStartNextCycle.checked;
+  } else if (DOM.settingAutoStartBreaks) {
+    state.autoStartNextCycle = DOM.settingAutoStartBreaks.checked;
+  }
+  state.autoStartBreaks = state.autoStartNextCycle;
+  state.autoStartPomodoro = state.autoStartNextCycle;
   state.soundType = DOM.settingSoundType.value;
   state.soundVolume = parseInt(DOM.settingVolume.value, 10) / 100;
 
-  localStorage.setItem('pomohaven_auto_breaks', state.autoStartBreaks);
+  localStorage.setItem('pomohaven_auto_start_next', state.autoStartNextCycle);
+  localStorage.setItem('pomohaven_auto_breaks', state.autoStartNextCycle);
   localStorage.setItem('pomohaven_auto_pomo', state.autoStartPomodoro);
   localStorage.setItem('pomohaven_sound_type', state.soundType);
   localStorage.setItem('pomohaven_sound_volume', state.soundVolume);
@@ -1669,21 +1692,40 @@ function setupEventListeners() {
   DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
   DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
 
-  // Task Input
-  DOM.currentTaskInput.addEventListener('input', (e) => {
-    state.currentTask = e.target.value.trim();
-    if (typeof renderTaskQueue === 'function') {
-      renderTaskQueue();
-    }
-  });
-  DOM.clearTaskBtn.addEventListener('click', () => {
-    DOM.currentTaskInput.value = '';
-    state.currentTask = '';
-    DOM.currentTaskInput.focus();
-    if (typeof renderTaskQueue === 'function') {
-      renderTaskQueue();
-    }
-  });
+  // Task Input (Auto-Active Task Input)
+  if (DOM.currentTaskInput) {
+    DOM.currentTaskInput.addEventListener('input', (e) => {
+      state.currentTask = e.target.value.trim();
+      updateZenTaskDisplay();
+      if (typeof renderTaskQueue === 'function') {
+        renderTaskQueue();
+      }
+    });
+
+    DOM.currentTaskInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        state.currentTask = DOM.currentTaskInput.value.trim();
+        updateZenTaskDisplay();
+        DOM.currentTaskInput.blur();
+        if (state.currentTask) {
+          showToast(`🎯 Active focus task: "${state.currentTask}"`, 'info');
+        }
+      }
+    });
+  }
+
+  if (DOM.clearTaskBtn) {
+    DOM.clearTaskBtn.addEventListener('click', () => {
+      if (DOM.currentTaskInput) DOM.currentTaskInput.value = '';
+      state.currentTask = '';
+      updateZenTaskDisplay();
+      if (DOM.currentTaskInput) DOM.currentTaskInput.focus();
+      if (typeof renderTaskQueue === 'function') {
+        renderTaskQueue();
+      }
+    });
+  }
 
   // Sound Toggle (Mute / Unmute)
   DOM.soundToggleBtn.addEventListener('click', () => {
@@ -1742,6 +1784,16 @@ function setupEventListeners() {
   DOM.closeSettingsModalBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
   DOM.cancelSettingsBtn.addEventListener('click', () => closeModal(DOM.settingsModal));
   DOM.saveSettingsBtn.addEventListener('click', saveSettingsFromModal);
+  if (DOM.settingAutoStartNextCycle) {
+    DOM.settingAutoStartNextCycle.addEventListener('change', (e) => {
+      state.autoStartNextCycle = e.target.checked;
+      state.autoStartBreaks = state.autoStartNextCycle;
+      state.autoStartPomodoro = state.autoStartNextCycle;
+      localStorage.setItem('pomohaven_auto_start_next', state.autoStartNextCycle);
+      localStorage.setItem('pomohaven_auto_breaks', state.autoStartNextCycle);
+      localStorage.setItem('pomohaven_auto_pomo', state.autoStartNextCycle);
+    });
+  }
 
   // Guided Tour Trigger
   if (DOM.startTourBtn) {
@@ -1920,14 +1972,28 @@ function submitFeedback() {
 // 14. Zen Mode (Full-Screen Distraction-Free Timer)
 // ==========================================================================
 
+function updateZenTaskDisplay() {
+  if (!DOM.zenTaskBadge) return;
+  const currentTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
+  state.currentTask = currentTask;
+  if (currentTask) {
+    DOM.zenTaskBadge.textContent = `🎯 ${currentTask}`;
+    DOM.zenTaskBadge.classList.remove('hidden');
+  } else {
+    DOM.zenTaskBadge.textContent = '';
+    DOM.zenTaskBadge.classList.add('hidden');
+  }
+}
+
 function toggleZenMode(forcedState = null) {
   const isZen = forcedState !== null ? forcedState : !document.body.classList.contains('zen-mode-active');
   
   if (isZen) {
+    updateZenTaskDisplay();
     document.body.classList.add('zen-mode-active');
     if (DOM.zenExpandIcon) DOM.zenExpandIcon.classList.add('hidden');
     if (DOM.zenCompressIcon) DOM.zenCompressIcon.classList.remove('hidden');
-    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Exit';
+    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Exit Zen';
     if (DOM.zenModeBtn) DOM.zenModeBtn.setAttribute('title', 'Exit Zen Mode (Esc or Z)');
     showToast('Zen Mode active — Distraction free! Press Esc or Z to exit.', 'info');
     
@@ -2329,6 +2395,7 @@ function selectQueuedTask(task) {
   if (DOM.currentTaskInput) {
     DOM.currentTaskInput.value = task.title;
     state.currentTask = task.title;
+    updateZenTaskDisplay();
     renderTaskQueue();
     showToast(`🎯 Active focus task: "${task.title}"`, 'info');
   }

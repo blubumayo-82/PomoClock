@@ -197,13 +197,14 @@
             <line x1="3" y1="21" x2="10" y2="14"></line>
           </svg>
           <svg id="zenCompressIcon" class="zen-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="4 14 10 14 10 20"></polyline>
-            <polyline points="20 10 14 10 14 4"></polyline>
-            <line x1="14" y1="10" x2="21" y2="3"></line>
-            <line x1="3" y1="21" x2="10" y2="14"></line>
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
           <span id="zenBtnText" class="zen-btn-label">Zen</span>
         </button>
+
+        <!-- Zen Mode Active Task Badge (Clean minimalist label displayed in Zen Mode) -->
+        <div id="zenTaskBadge" class="zen-task-badge hidden" aria-live="polite"></div>
 
         <!-- Consolidated Active Focus Task Bar & Queue Dropdown -->
         <div class="active-task-bar task-bar-container" id="activeTaskBar">
@@ -890,22 +891,11 @@
 
           <div class="setting-row">
             <div>
-              <label for="settingAutoStartBreaks" class="setting-label">Auto-start Breaks</label>
-              <span class="setting-desc">Automatically start timer when a break begins</span>
+              <label for="settingAutoStartNextCycle" class="setting-label">Auto-Start Next Cycle</label>
+              <span class="setting-desc">Automatically start timer when transitioning to the next session or break</span>
             </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingAutoStartBreaks">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-row">
-            <div>
-              <label for="settingAutoStartPomodoro" class="setting-label">Auto-start Pomodoros</label>
-              <span class="setting-desc">Automatically start next study session when break ends</span>
-            </div>
-            <label class="toggle-switch">
-              <input type="checkbox" id="settingAutoStartPomodoro">
+            <label class="toggle-switch" for="settingAutoStartNextCycle">
+              <input type="checkbox" id="settingAutoStartNextCycle" checked>
               <span class="slider"></span>
             </label>
           </div>
