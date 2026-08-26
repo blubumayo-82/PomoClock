@@ -295,18 +295,15 @@ def google_auth():
     Expects JSON: { email, name, google_id, avatar_url, credential }
     Checks if user exists, creates or updates the user, and stores session['user_id'].
     """
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "Missing Google authentication payload"}), 400
-
+    data = request.get_json() or {}
     token = data.get('credential') or data.get('token') or data.get('id_token')
-    email = (data.get('email') or '').strip().lower()
-    name = (data.get('name') or '').strip()
-    google_id = data.get('google_id') or ''
-    avatar_url = data.get('avatar_url') or ''
+    email = data.get('email')
+    name = data.get('name')
+    google_id = data.get('google_id')
+    avatar_url = data.get('avatar_url')
 
-    # If credential token is passed and id_token library is loaded, verify token
-    if token and id_token:
+    # If credential token is passed, verify and extract profile info if not directly provided
+    if token and id_token and (not email or not google_id):
         try:
             req = google_requests.Request()
             if GOOGLE_CLIENT_ID:
@@ -314,78 +311,95 @@ def google_auth():
             else:
                 idinfo = id_token.verify_oauth2_token(token, req)
 
-            google_id = idinfo.get('sub') or google_id
-            token_email = (idinfo.get('email') or '').strip().lower()
-            if token_email:
-                email = token_email
-            name = idinfo.get('name') or idinfo.get('given_name') or name or email.split('@')[0]
-            avatar_url = idinfo.get('picture') or avatar_url
-        except Exception as err:
-            # If explicit email wasn't provided, verification failure is fatal
-            if not email:
-                return jsonify({"success": False, "error": f"Google authentication failed: {str(err)}"}), 401
+            google_id = google_id or idinfo.get('sub')
+            email = email or idinfo.get('email')
+            name = name or idinfo.get('name') or idinfo.get('given_name') or (email.split('@')[0] if email else '')
+            avatar_url = avatar_url or idinfo.get('picture')
+        except Exception:
+            pass
+
+    if email:
+        email = email.strip().lower()
 
     if not email:
-        return jsonify({"success": False, "error": "Google profile did not provide an email"}), 400
+        return jsonify({'error': 'Email is required', 'success': False}), 400
 
     if not name:
         name = email.split('@')[0]
 
     try:
-        db = get_db()
-        cursor = db.cursor()
-
-        # Look up existing user by google_id or email
-        cursor.execute("""
-            SELECT id, username, name, email, avatar_url, auth_provider, created_at
-            FROM users
-            WHERE (google_id IS NOT NULL AND google_id = ?) OR LOWER(email) = ?
-        """, (google_id, email))
-        user = cursor.fetchone()
-
-        if user:
-            user_id = user['id']
-            cursor.execute("""
-                UPDATE users
-                SET google_id = COALESCE(google_id, ?),
-                    name = COALESCE(?, name),
-                    avatar_url = COALESCE(?, avatar_url),
-                    auth_provider = CASE WHEN auth_provider IS NULL OR auth_provider = 'local' THEN 'google' ELSE auth_provider END
-                WHERE id = ?
-            """, (google_id, name, avatar_url, user_id))
-            db.commit()
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            user = User(
+                email=email,
+                name=name,
+                username=name,
+                google_id=google_id,
+                avatar_url=avatar_url,
+                password_hash='',
+                auth_provider='google'
+            )
+            db.session.add(user)
+            db.session.commit()
         else:
-            username = name or email.split('@')[0]
-            cursor.execute("""
-                INSERT INTO users (username, name, email, avatar_url, auth_provider, google_id, password_hash)
-                VALUES (?, ?, ?, ?, 'google', ?, NULL)
-            """, (username, name, email, avatar_url, google_id))
-            db.commit()
-            user_id = cursor.lastrowid
+            if google_id and not user.google_id:
+                user.google_id = google_id
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+            if name and not user.name:
+                user.name = name
+            db.session.commit()
 
-        session['user_id'] = user_id
+        # Synchronize SQLite users table if running direct queries
+        try:
+            db_conn = get_db()
+            cursor = db_conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO users (id, username, name, email, avatar_url, auth_provider, google_id)
+                    VALUES (?, ?, ?, ?, ?, 'google', ?)
+                """, (user.id, user.username or name, user.name or name, email, avatar_url or '', google_id))
+                db_conn.commit()
+            else:
+                cursor.execute("""
+                    UPDATE users SET google_id = COALESCE(google_id, ?), name = COALESCE(?, name), avatar_url = COALESCE(?, avatar_url)
+                    WHERE LOWER(email) = ?
+                """, (google_id, name, avatar_url, email))
+                db_conn.commit()
+        except Exception:
+            pass
 
-        # Fetch updated user record
-        cursor.execute("SELECT id, username, name, email, avatar_url, auth_provider, created_at FROM users WHERE id = ?", (user_id,))
-        updated_user = cursor.fetchone()
-        display_name = updated_user['name'] or updated_user['username'] or updated_user['email'].split('@')[0]
+        session['user_id'] = user.id
+
+        display_name = user.name or user.username or user.email.split('@')[0]
+        total_minutes = getattr(user, 'total_focus_minutes', 0) or 0
+        completed_sessions = getattr(user, 'completed_sessions', 0) or 0
+
+        user_payload = {
+            'id': user.id,
+            'email': user.email,
+            'name': display_name,
+            'username': display_name,
+            'avatar_url': user.avatar_url or '',
+            'auth_provider': user.auth_provider or 'google',
+            'created_at': str(user.created_at) if hasattr(user, 'created_at') else '',
+            'total_minutes': total_minutes,
+            'completed_sessions': completed_sessions
+        }
 
         return jsonify({
-            "success": True,
-            "message": "Google authentication successful",
-            "user": {
-                "id": updated_user['id'],
-                "username": display_name,
-                "name": display_name,
-                "email": updated_user['email'],
-                "avatar_url": updated_user['avatar_url'] or '',
-                "auth_provider": updated_user['auth_provider'] or 'google',
-                "created_at": updated_user['created_at']
-            }
+            'success': True,
+            'id': user.id,
+            'email': user.email,
+            'name': display_name,
+            'user': user_payload,
+            'total_minutes': total_minutes,
+            'completed_sessions': completed_sessions
         }), 200
 
     except Exception as err:
-        return jsonify({"success": False, "error": f"Database error during Google authentication: {str(err)}"}), 500
+        return jsonify({'error': f'Database error: {str(err)}', 'success': False}), 500
 
 
 @app.route('/api/auth/register', methods=['POST'])

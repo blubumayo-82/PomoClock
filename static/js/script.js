@@ -1233,11 +1233,11 @@ async function handleGoogleCredentialResponse(response) {
   try {
     const payload = parseJwt(response.credential) || {};
     const authData = {
-      credential: response.credential,
       email: payload.email || '',
       name: payload.name || payload.given_name || (payload.email ? payload.email.split('@')[0] : 'Scholar'),
       google_id: payload.sub || '',
-      avatar_url: payload.picture || ''
+      avatar_url: payload.picture || '',
+      credential: response.credential
     };
 
     const res = await fetch('/api/auth/google', {
@@ -1247,23 +1247,33 @@ async function handleGoogleCredentialResponse(response) {
     });
 
     const data = await res.json();
+    console.log('Logged into Postgres backend:', data);
 
-    if (!data.success) {
+    if (data.error && !data.id && !data.user) {
       DOM.authErrorAlert.textContent = data.error || 'Google authentication failed';
       DOM.authErrorAlert.style.display = 'block';
       return;
     }
 
-    state.currentUser = data.user;
+    const loggedUser = data.user || {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      username: data.name,
+      avatar_url: payload.picture || ''
+    };
+
+    state.currentUser = loggedUser;
     updateAuthUI();
     closeModal(DOM.authModal);
-    showToast(`Welcome, ${data.user.name || data.user.email}! Google Cloud Sync active ✨`, 'success');
+    showToast(`Welcome, ${loggedUser.name || loggedUser.email}! Google Cloud Sync active ✨`, 'success');
 
     // Auto-sync guest sessions, user preferences, and stats with database
     await syncLocalSessionsWithServer();
     await loadUserPreferences();
     await fetchStatistics();
   } catch (err) {
+    console.error('Google sign-in error:', err);
     DOM.authErrorAlert.textContent = 'Network error during Google sign-in';
     DOM.authErrorAlert.style.display = 'block';
   }

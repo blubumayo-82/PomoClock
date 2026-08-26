@@ -17,10 +17,12 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.db_fd, self.temp_db_path = tempfile.mkstemp()
         flask_app.DATABASE = self.temp_db_path
         flask_app.app.config['TESTING'] = True
+        flask_app.app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{self.temp_db_path}'
         self.client = flask_app.app.test_client()
 
         # Initialize schema
         with flask_app.app.app_context():
+            flask_app.db.create_all()
             flask_app.init_db()
 
     def tearDown(self):
@@ -380,7 +382,8 @@ class PomodoroAppTestCase(unittest.TestCase):
             "google_id": "google-sub-112233"
         }
         login_res = self.client.post('/api/auth/google', data=json.dumps(payload), content_type='application/json')
-        user_id = json.loads(login_res.data)['user']['id']
+        login_data = json.loads(login_res.data)
+        user_id = login_data.get('id') or (login_data.get('user') and login_data['user'].get('id'))
 
         # 2. Record completed pomodoro session
         session_res = self.client.post('/api/sessions', data=json.dumps({
