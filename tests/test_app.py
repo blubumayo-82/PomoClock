@@ -372,6 +372,29 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertEqual(data['user']['email'], 'sam.scholar@gmail.com')
         self.assertEqual(data['user']['name'], 'Sam Scholar')
         self.assertEqual(data['user']['avatar_url'], 'https://lh3.googleusercontent.com/avatar.png')
+        first_id = data['id']
+
+        # Update profile for same user
+        update_payload = {
+            "email": "sam.scholar@gmail.com",
+            "name": "Sam Updated",
+            "google_id": "google-sub-987654",
+            "avatar_url": "https://lh3.googleusercontent.com/avatar2.png"
+        }
+        res2 = self.client.post('/api/auth/google', data=json.dumps(update_payload), content_type='application/json')
+        data2 = json.loads(res2.data)
+        self.assertEqual(data2['id'], first_id)
+        self.assertEqual(data2['user']['name'], 'Sam Updated')
+
+        # Different user
+        other_payload = {
+            "email": "other.scholar@gmail.com",
+            "name": "Other Scholar",
+            "google_id": "google-sub-555555"
+        }
+        res3 = self.client.post('/api/auth/google', data=json.dumps(other_payload), content_type='application/json')
+        data3 = json.loads(res3.data)
+        self.assertNotEqual(data3['id'], first_id)
 
     def test_record_session_with_user_id(self):
         """Test session recording attaches user_id to session record."""

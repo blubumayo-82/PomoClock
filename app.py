@@ -64,7 +64,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=True)
     avatar_url = db.Column(db.String(255), nullable=True)
     auth_provider = db.Column(db.String(50), default='local')
-    google_id = db.Column(db.String(100), nullable=True)
+    google_id = db.Column(db.String(100), unique=True, nullable=True)
     created_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
 
     sessions = db.relationship('StudySession', backref='user', lazy=True, cascade='all, delete-orphan')
@@ -356,34 +356,43 @@ def google_auth():
         name = email.split('@')[0]
 
     try:
-        user = User.query.filter_by(email=email).first()
+        # Query specifically by google_id first, then fallback to email
+        if google_id:
+            user = User.query.filter((User.google_id == google_id) | (User.email == email)).first()
+        else:
+            user = User.query.filter_by(email=email).first()
+
         if not user:
             user = User(
+                google_id=google_id,
                 email=email,
                 name=name,
                 username=name,
-                google_id=google_id,
-                avatar_url=avatar_url,
+                avatar_url=avatar_url or '',
                 password_hash='',
                 auth_provider='google'
             )
             db.session.add(user)
-            db.session.commit()
+            db.session.flush()  # Generates new user.id
         else:
-            if google_id and not user.google_id:
+            if google_id:
                 user.google_id = google_id
-            if avatar_url and not user.avatar_url:
-                user.avatar_url = avatar_url
-            if name and not user.name:
+            if name:
                 user.name = name
-            db.session.commit()
+            if avatar_url:
+                user.avatar_url = avatar_url
+
+        db.session.commit()
+        session.permanent = True
+        session['user_id'] = user.id
 
         # Synchronize SQLite users table if running direct queries
         try:
             db_conn = get_db()
             cursor = db_conn.cursor()
-            cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
-            if not cursor.fetchone():
+            cursor.execute("SELECT id FROM users WHERE (google_id IS NOT NULL AND google_id = ?) OR LOWER(email) = ?", (google_id or '', email))
+            sqlite_user = cursor.fetchone()
+            if not sqlite_user:
                 cursor.execute("""
                     INSERT INTO users (id, username, name, email, avatar_url, auth_provider, google_id)
                     VALUES (?, ?, ?, ?, ?, 'google', ?)
@@ -391,15 +400,12 @@ def google_auth():
                 db_conn.commit()
             else:
                 cursor.execute("""
-                    UPDATE users SET google_id = COALESCE(google_id, ?), name = COALESCE(?, name), avatar_url = COALESCE(?, avatar_url)
-                    WHERE LOWER(email) = ?
-                """, (google_id, name, avatar_url, email))
+                    UPDATE users SET google_id = COALESCE(?, google_id), name = COALESCE(?, name), avatar_url = COALESCE(?, avatar_url)
+                    WHERE id = ?
+                """, (google_id, name, avatar_url, sqlite_user['id']))
                 db_conn.commit()
         except Exception:
             pass
-
-        session.permanent = True
-        session['user_id'] = user.id
 
         display_name = user.name or user.username or user.email.split('@')[0]
         total_minutes = getattr(user, 'total_focus_minutes', 0) or 0
