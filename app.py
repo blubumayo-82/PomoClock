@@ -356,10 +356,10 @@ def google_auth():
         name = email.split('@')[0]
 
     try:
-        # Query specifically by google_id first, then fallback to email
+        user = None
         if google_id:
-            user = User.query.filter((User.google_id == google_id) | (User.email == email)).first()
-        else:
+            user = User.query.filter_by(google_id=google_id).first()
+        if not user and email:
             user = User.query.filter_by(email=email).first()
 
         if not user:
@@ -373,7 +373,7 @@ def google_auth():
                 auth_provider='google'
             )
             db.session.add(user)
-            db.session.flush()  # Generates new user.id
+            db.session.commit()
         else:
             if google_id:
                 user.google_id = google_id
@@ -381,8 +381,7 @@ def google_auth():
                 user.name = name
             if avatar_url:
                 user.avatar_url = avatar_url
-
-        db.session.commit()
+            db.session.commit()
         session.permanent = True
         session['user_id'] = user.id
 
@@ -467,27 +466,50 @@ def register():
     if not password or len(password) < 6:
         return jsonify({"success": False, "error": "Password must be at least 6 characters long"}), 400
 
-    db = get_db()
-    cursor = db.cursor()
-
     # Check if email is already taken
-    cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
-    if cursor.fetchone():
+    existing_user = User.query.filter_by(email=email).first()
+    if not existing_user:
+        try:
+            sqlite_conn = get_db()
+            cursor = sqlite_conn.cursor()
+            cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
+            if cursor.fetchone():
+                existing_user = True
+        except Exception:
+            pass
+
+    if existing_user:
         return jsonify({"success": False, "error": "An account with this email already exists"}), 409
 
     # Hash password with scrypt/pbkdf2
     pwd_hash = generate_password_hash(password)
 
     try:
-        cursor.execute("""
-            INSERT INTO users (username, name, email, password_hash, auth_provider)
-            VALUES (?, ?, ?, ?, 'local')
-        """, (username, username, email, pwd_hash))
-        db.commit()
+        user = User(
+            username=username,
+            name=username,
+            email=email,
+            password_hash=pwd_hash,
+            auth_provider='local'
+        )
+        db.session.add(user)
+        db.session.commit()
 
-        user_id = cursor.lastrowid
+        user_id = user.id
         session.permanent = True
         session['user_id'] = user_id
+
+        # Direct SQLite synchronization
+        try:
+            sqlite_conn = get_db()
+            cursor = sqlite_conn.cursor()
+            cursor.execute("""
+                INSERT INTO users (id, username, name, email, password_hash, auth_provider)
+                VALUES (?, ?, ?, ?, ?, 'local')
+            """, (user.id, username, username, email, pwd_hash))
+            sqlite_conn.commit()
+        except Exception:
+            pass
 
         return jsonify({
             "success": True,
@@ -499,11 +521,12 @@ def register():
                 "email": email,
                 "avatar_url": '',
                 "auth_provider": 'local',
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "created_at": str(user.created_at) if hasattr(user, 'created_at') else datetime.now(timezone.utc).isoformat()
             }
         }), 201
 
     except Exception as err:
+        db.session.rollback()
         return jsonify({"success": False, "error": f"Failed to create account: {str(err)}"}), 500
 
 
@@ -522,41 +545,76 @@ def login():
     if not login_identifier or not password:
         return jsonify({"success": False, "error": "Email/Username and password are required"}), 400
 
-    db = get_db()
-    cursor = db.cursor()
+    # Query user via SQLAlchemy first
+    user = User.query.filter(
+        (db.func.lower(User.email) == login_identifier) |
+        (db.func.lower(User.username) == login_identifier) |
+        (db.func.lower(User.name) == login_identifier)
+    ).first()
+
+    if user:
+        if not user.password_hash:
+            if user.auth_provider == 'google':
+                return jsonify({"success": False, "error": "This account was created with Google Sign-In. Please sign in with Google."}), 400
+            return jsonify({"success": False, "error": "Account has no password set"}), 401
+
+        if not check_password_hash(user.password_hash, password):
+            return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
+
+        session.permanent = True
+        session['user_id'] = user.id
+        display_name = user.name or user.username or user.email.split('@')[0]
+
+        return jsonify({
+            "success": True,
+            "message": "Login successful",
+            "user": {
+                "id": user.id,
+                "username": display_name,
+                "name": display_name,
+                "email": user.email,
+                "avatar_url": user.avatar_url or '',
+                "auth_provider": user.auth_provider or 'local',
+                "created_at": str(user.created_at) if hasattr(user, 'created_at') else ''
+            }
+        }), 200
+
+    # SQLite fallback check
+    sqlite_conn = get_db()
+    cursor = sqlite_conn.cursor()
     cursor.execute("""
         SELECT id, username, name, email, password_hash, avatar_url, auth_provider, created_at 
         FROM users 
         WHERE LOWER(email) = ? OR LOWER(username) = ? OR LOWER(name) = ?
     """, (login_identifier, login_identifier, login_identifier))
-    user = cursor.fetchone()
+    sqlite_user = cursor.fetchone()
 
-    if not user:
+    if not sqlite_user:
         return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
 
-    if not user['password_hash']:
-        if user['auth_provider'] == 'google':
+    if not sqlite_user['password_hash']:
+        if sqlite_user['auth_provider'] == 'google':
             return jsonify({"success": False, "error": "This account was created with Google Sign-In. Please sign in with Google."}), 400
         return jsonify({"success": False, "error": "Account has no password set"}), 401
 
-    if not check_password_hash(user['password_hash'], password):
+    if not check_password_hash(sqlite_user['password_hash'], password):
         return jsonify({"success": False, "error": "Invalid email/username or password"}), 401
 
     session.permanent = True
-    session['user_id'] = user['id']
-    display_name = user['name'] or user['username'] or user['email'].split('@')[0]
+    session['user_id'] = sqlite_user['id']
+    display_name = sqlite_user['name'] or sqlite_user['username'] or sqlite_user['email'].split('@')[0]
 
     return jsonify({
         "success": True,
         "message": "Login successful",
         "user": {
-            "id": user['id'],
+            "id": sqlite_user['id'],
             "username": display_name,
             "name": display_name,
-            "email": user['email'],
-            "avatar_url": user['avatar_url'] or '',
-            "auth_provider": user['auth_provider'] or 'local',
-            "created_at": user['created_at']
+            "email": sqlite_user['email'],
+            "avatar_url": sqlite_user['avatar_url'] or '',
+            "auth_provider": sqlite_user['auth_provider'] or 'local',
+            "created_at": sqlite_user['created_at']
         }
     }), 200
 
@@ -569,37 +627,55 @@ def logout():
 
 
 @app.route('/api/auth/me', methods=['GET'])
+@app.route('/api/user/me', methods=['GET'])
+@app.route('/api/user/profile', methods=['GET'])
 def get_current_user():
-    """Returns authentication status and current user profile if logged in."""
-    user_id = get_current_user_id()
+    """Returns authentication status and current user profile strictly from session."""
+    user_id = session.get('user_id')
     if not user_id:
         return jsonify({"authenticated": False, "user": None}), 200
 
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("""
-        SELECT id, username, name, email, avatar_url, auth_provider, created_at 
-        FROM users 
-        WHERE id = ?
-    """, (user_id,))
-    user = cursor.fetchone()
-
+    user = db.session.get(User, user_id)
     if not user:
-        session.clear()
-        return jsonify({"authenticated": False, "user": None}), 200
+        # SQLite fallback check if using direct SQLite
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
+        cursor.execute("""
+            SELECT id, username, name, email, avatar_url, auth_provider, created_at 
+            FROM users 
+            WHERE id = ?
+        """, (user_id,))
+        sqlite_user = cursor.fetchone()
+        if not sqlite_user:
+            session.pop('user_id', None)
+            return jsonify({"authenticated": False, "user": None}), 200
 
-    display_name = user['name'] or user['username'] or user['email'].split('@')[0]
+        display_name = sqlite_user['name'] or sqlite_user['username'] or sqlite_user['email'].split('@')[0]
+        return jsonify({
+            "authenticated": True,
+            "user": {
+                "id": sqlite_user['id'],
+                "username": display_name,
+                "name": display_name,
+                "email": sqlite_user['email'],
+                "avatar_url": sqlite_user['avatar_url'] or '',
+                "auth_provider": sqlite_user['auth_provider'] or 'local',
+                "created_at": sqlite_user['created_at']
+            }
+        }), 200
+
+    display_name = user.name or user.username or user.email.split('@')[0]
 
     return jsonify({
         "authenticated": True,
         "user": {
-            "id": user['id'],
+            "id": user.id,
             "username": display_name,
             "name": display_name,
-            "email": user['email'],
-            "avatar_url": user['avatar_url'] or '',
-            "auth_provider": user['auth_provider'] or 'local',
-            "created_at": user['created_at']
+            "email": user.email,
+            "avatar_url": user.avatar_url or '',
+            "auth_provider": user.auth_provider or 'local',
+            "created_at": str(user.created_at) if hasattr(user, 'created_at') else ''
         }
     }), 200
 
@@ -1122,7 +1198,7 @@ def submit_feedback():
     try:
         user_id = session.get('user_id') or get_current_user_id()
         if user_id and not user_email:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if user:
                 user_email = user.email
 

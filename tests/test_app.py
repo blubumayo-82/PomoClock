@@ -17,19 +17,26 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.db_fd, self.temp_db_path = tempfile.mkstemp()
         flask_app.DATABASE = self.temp_db_path
         flask_app.app.config['TESTING'] = True
-        flask_app.app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{self.temp_db_path}'
         self.client = flask_app.app.test_client()
 
         # Initialize schema
         with flask_app.app.app_context():
+            flask_app.db.session.remove()
+            flask_app.db.drop_all()
             flask_app.db.create_all()
             flask_app.init_db()
 
     def tearDown(self):
         # Clean up temporary database
+        with flask_app.app.app_context():
+            flask_app.db.session.remove()
+            flask_app.db.drop_all()
         os.close(self.db_fd)
         if os.path.exists(self.temp_db_path):
-            os.unlink(self.temp_db_path)
+            try:
+                os.unlink(self.temp_db_path)
+            except Exception:
+                pass
 
     def test_health_check(self):
         """Test health check endpoint."""
@@ -482,6 +489,64 @@ class PomodoroAppTestCase(unittest.TestCase):
             "message": "   "
         }), content_type='application/json')
         self.assertEqual(err_res.status_code, 400)
+
+    def test_multi_user_data_isolation(self):
+        """Test multiple users on separate clients do not share or overwrite data."""
+        client_a = flask_app.app.test_client()
+        client_b = flask_app.app.test_client()
+
+        # 1. Login User A
+        res_a = client_a.post('/api/auth/google', data=json.dumps({
+            "email": "user.a@pomohaven.com",
+            "name": "User Alpha",
+            "google_id": "google-sub-alpha-111"
+        }), content_type='application/json')
+        self.assertEqual(res_a.status_code, 200)
+
+        # Record session for User A
+        client_a.post('/api/sessions', data=json.dumps({
+            "mode": "pomodoro",
+            "duration_minutes": 50.0,
+            "start_time": datetime.now(timezone.utc).isoformat(),
+            "end_time": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "task_name": "Alpha Focus"
+        }), content_type='application/json')
+
+        # 2. Login User B
+        res_b = client_b.post('/api/auth/google', data=json.dumps({
+            "email": "user.b@pomohaven.com",
+            "name": "User Beta",
+            "google_id": "google-sub-beta-222"
+        }), content_type='application/json')
+        self.assertEqual(res_b.status_code, 200)
+
+        # Check User B profile
+        res_me_b = client_b.get('/api/user/me')
+        data_me_b = json.loads(res_me_b.data)
+        self.assertTrue(data_me_b['authenticated'])
+        self.assertEqual(data_me_b['user']['email'], "user.b@pomohaven.com")
+
+        # Verify User B does not see User A's session
+        res_sessions_b = client_b.get('/api/sessions')
+        data_sessions_b = json.loads(res_sessions_b.data)
+        self.assertEqual(data_sessions_b['count'], 0)
+
+        # Record session for User B
+        client_b.post('/api/sessions', data=json.dumps({
+            "mode": "pomodoro",
+            "duration_minutes": 25.0,
+            "start_time": datetime.now(timezone.utc).isoformat(),
+            "end_time": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "task_name": "Beta Focus"
+        }), content_type='application/json')
+
+        # User A checks sessions -> only Alpha Focus (1 session)
+        res_sessions_a = client_a.get('/api/sessions')
+        data_sessions_a = json.loads(res_sessions_a.data)
+        self.assertEqual(data_sessions_a['count'], 1)
+        self.assertEqual(data_sessions_a['sessions'][0]['task_name'], "Alpha Focus")
 
 
 if __name__ == '__main__':
