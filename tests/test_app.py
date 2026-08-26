@@ -351,6 +351,53 @@ class PomodoroAppTestCase(unittest.TestCase):
             self.assertTrue(data_me['authenticated'])
             self.assertEqual(data_me['user']['email'], 'alex.student@gmail.com')
 
+    def test_google_auth_direct_json(self):
+        """Test Google authentication with direct JSON profile payload."""
+        payload = {
+            "email": "sam.scholar@gmail.com",
+            "name": "Sam Scholar",
+            "google_id": "google-sub-987654",
+            "avatar_url": "https://lh3.googleusercontent.com/avatar.png"
+        }
+        response = self.client.post(
+            '/api/auth/google',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data['user']['email'], 'sam.scholar@gmail.com')
+        self.assertEqual(data['user']['name'], 'Sam Scholar')
+        self.assertEqual(data['user']['avatar_url'], 'https://lh3.googleusercontent.com/avatar.png')
+
+    def test_record_session_with_user_id(self):
+        """Test session recording attaches user_id to session record."""
+        # 1. Login user
+        payload = {
+            "email": "timer.user@gmail.com",
+            "name": "Timer User",
+            "google_id": "google-sub-112233"
+        }
+        login_res = self.client.post('/api/auth/google', data=json.dumps(payload), content_type='application/json')
+        user_id = json.loads(login_res.data)['user']['id']
+
+        # 2. Record completed pomodoro session
+        session_res = self.client.post('/api/sessions', data=json.dumps({
+            "mode": "pomodoro",
+            "duration_minutes": 25.0,
+            "start_time": datetime.now(timezone.utc).isoformat(),
+            "end_time": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "task_name": "CS Study"
+        }), content_type='application/json')
+
+        self.assertEqual(session_res.status_code, 201)
+        session_data = json.loads(session_res.data)
+        self.assertTrue(session_data['success'])
+        self.assertEqual(session_data['session']['user_id'], user_id)
+        self.assertEqual(session_data['session']['task_name'], 'CS Study')
+
 
 if __name__ == '__main__':
     unittest.main()

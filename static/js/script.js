@@ -909,6 +909,11 @@ async function syncLocalSessionsWithServer() {
 // ==========================================================================
 
 async function recordSession(payload) {
+  // Attach user_id if authenticated
+  if (state.currentUser && state.currentUser.id && !payload.user_id) {
+    payload.user_id = state.currentUser.id;
+  }
+
   // 1. Store in localStorage immediately for 100% hybrid persistence
   saveLocalSession(payload);
 
@@ -1083,6 +1088,44 @@ async function syncPreferences(prefsObj) {
   }
 }
 
+async function loadUserPreferences() {
+  try {
+    const res = await fetch('/api/preferences');
+    const data = await res.json();
+    if (data.success && data.preferences) {
+      const prefs = data.preferences;
+      if (prefs.theme) {
+        setTheme(prefs.theme, false);
+      }
+      if (prefs.pomodoro_duration) {
+        state.durations.pomodoro = parseInt(prefs.pomodoro_duration, 10) * 60;
+      }
+      if (prefs.short_break_duration) {
+        state.durations.short_break = parseInt(prefs.short_break_duration, 10) * 60;
+      }
+      if (prefs.long_break_duration) {
+        state.durations.long_break = parseInt(prefs.long_break_duration, 10) * 60;
+      }
+      if (prefs.long_break_interval) {
+        state.longBreakInterval = parseInt(prefs.long_break_interval, 10);
+      }
+      if (prefs.sound_type) {
+        state.soundType = prefs.sound_type;
+      }
+      if (prefs.volume) {
+        state.volume = parseInt(prefs.volume, 10);
+      }
+      state.totalDuration = state.durations[state.currentMode];
+      if (!state.isRunning) {
+        state.timeLeft = state.totalDuration;
+        updateTimerDisplay();
+      }
+    }
+  } catch (err) {
+    console.warn('Could not load user preferences from server:', err);
+  }
+}
+
 
 // ==========================================================================
 // 8. User Authentication Module (Google OAuth 2.0 & Email/Password)
@@ -1163,6 +1206,22 @@ function initGoogleSignIn() {
   }
 }
 
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
 async function handleGoogleCredentialResponse(response) {
   if (!response || !response.credential) {
     showToast('Google Sign-In failed or was cancelled.', 'error');
@@ -1172,10 +1231,19 @@ async function handleGoogleCredentialResponse(response) {
   DOM.authErrorAlert.style.display = 'none';
 
   try {
+    const payload = parseJwt(response.credential) || {};
+    const authData = {
+      credential: response.credential,
+      email: payload.email || '',
+      name: payload.name || payload.given_name || (payload.email ? payload.email.split('@')[0] : 'Scholar'),
+      google_id: payload.sub || '',
+      avatar_url: payload.picture || ''
+    };
+
     const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: response.credential })
+      body: JSON.stringify(authData)
     });
 
     const data = await res.json();
@@ -1191,8 +1259,9 @@ async function handleGoogleCredentialResponse(response) {
     closeModal(DOM.authModal);
     showToast(`Welcome, ${data.user.name || data.user.email}! Google Cloud Sync active ✨`, 'success');
 
-    // Auto-sync guest sessions to account
+    // Auto-sync guest sessions, user preferences, and stats with database
     await syncLocalSessionsWithServer();
+    await loadUserPreferences();
     await fetchStatistics();
   } catch (err) {
     DOM.authErrorAlert.textContent = 'Network error during Google sign-in';

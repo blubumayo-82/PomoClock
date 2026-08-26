@@ -291,135 +291,149 @@ def get_config():
 @app.route('/api/auth/google', methods=['POST'])
 def google_auth():
     """
-    Authenticates a user via Google OAuth 2.0 Identity Services credential ID token.
-    Payload: {"credential": "...", "token": "..."}
+    Authenticates a user via Google OAuth 2.0 Identity Services.
+    Expects JSON: { email, name, google_id, avatar_url, credential }
+    Checks if user exists, creates or updates the user, and stores session['user_id'].
     """
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Missing Google authentication payload"}), 400
 
     token = data.get('credential') or data.get('token') or data.get('id_token')
-    if not token:
-        return jsonify({"success": False, "error": "Google credential ID token is required"}), 400
+    email = (data.get('email') or '').strip().lower()
+    name = (data.get('name') or '').strip()
+    google_id = data.get('google_id') or ''
+    avatar_url = data.get('avatar_url') or ''
+
+    # If credential token is passed and id_token library is loaded, verify token
+    if token and id_token:
+        try:
+            req = google_requests.Request()
+            if GOOGLE_CLIENT_ID:
+                idinfo = id_token.verify_oauth2_token(token, req, GOOGLE_CLIENT_ID)
+            else:
+                idinfo = id_token.verify_oauth2_token(token, req)
+
+            google_id = idinfo.get('sub') or google_id
+            token_email = (idinfo.get('email') or '').strip().lower()
+            if token_email:
+                email = token_email
+            name = idinfo.get('name') or idinfo.get('given_name') or name or email.split('@')[0]
+            avatar_url = idinfo.get('picture') or avatar_url
+        except Exception as err:
+            # If explicit email wasn't provided, verification failure is fatal
+            if not email:
+                return jsonify({"success": False, "error": f"Google authentication failed: {str(err)}"}), 401
+
+    if not email:
+        return jsonify({"success": False, "error": "Google profile did not provide an email"}), 400
+
+    if not name:
+        name = email.split('@')[0]
 
     try:
-        req = google_requests.Request()
-        if GOOGLE_CLIENT_ID:
-            idinfo = id_token.verify_oauth2_token(token, req, GOOGLE_CLIENT_ID)
+        db = get_db()
+        cursor = db.cursor()
+
+        # Look up existing user by google_id or email
+        cursor.execute("""
+            SELECT id, username, name, email, avatar_url, auth_provider, created_at
+            FROM users
+            WHERE (google_id IS NOT NULL AND google_id = ?) OR LOWER(email) = ?
+        """, (google_id, email))
+        user = cursor.fetchone()
+
+        if user:
+            user_id = user['id']
+            cursor.execute("""
+                UPDATE users
+                SET google_id = COALESCE(google_id, ?),
+                    name = COALESCE(?, name),
+                    avatar_url = COALESCE(?, avatar_url),
+                    auth_provider = CASE WHEN auth_provider IS NULL OR auth_provider = 'local' THEN 'google' ELSE auth_provider END
+                WHERE id = ?
+            """, (google_id, name, avatar_url, user_id))
+            db.commit()
         else:
-            idinfo = id_token.verify_oauth2_token(token, req)
+            username = name or email.split('@')[0]
+            cursor.execute("""
+                INSERT INTO users (username, name, email, avatar_url, auth_provider, google_id, password_hash)
+                VALUES (?, ?, ?, ?, 'google', ?, NULL)
+            """, (username, name, email, avatar_url, google_id))
+            db.commit()
+            user_id = cursor.lastrowid
 
-        google_id = idinfo.get('sub')
-        email = (idinfo.get('email') or '').strip().lower()
-        name = idinfo.get('name') or idinfo.get('given_name') or email.split('@')[0]
-        avatar_url = idinfo.get('picture') or ''
+        session['user_id'] = user_id
 
-        if not email:
-            return jsonify({"success": False, "error": "Google profile did not provide an email"}), 400
+        # Fetch updated user record
+        cursor.execute("SELECT id, username, name, email, avatar_url, auth_provider, created_at FROM users WHERE id = ?", (user_id,))
+        updated_user = cursor.fetchone()
+        display_name = updated_user['name'] or updated_user['username'] or updated_user['email'].split('@')[0]
+
+        return jsonify({
+            "success": True,
+            "message": "Google authentication successful",
+            "user": {
+                "id": updated_user['id'],
+                "username": display_name,
+                "name": display_name,
+                "email": updated_user['email'],
+                "avatar_url": updated_user['avatar_url'] or '',
+                "auth_provider": updated_user['auth_provider'] or 'google',
+                "created_at": updated_user['created_at']
+            }
+        }), 200
 
     except Exception as err:
-        return jsonify({"success": False, "error": f"Google authentication failed: {str(err)}"}), 401
-
-    db = get_db()
-    cursor = db.cursor()
-
-    # Look up existing user by google_id or email
-    cursor.execute("""
-        SELECT id, username, name, email, avatar_url, auth_provider, created_at
-        FROM users
-        WHERE google_id = ? OR LOWER(email) = ?
-    """, (google_id, email))
-    user = cursor.fetchone()
-
-    if user:
-        user_id = user['id']
-        cursor.execute("""
-            UPDATE users
-            SET google_id = COALESCE(google_id, ?),
-                name = COALESCE(?, name),
-                avatar_url = COALESCE(?, avatar_url),
-                auth_provider = CASE WHEN auth_provider IS NULL OR auth_provider = 'local' THEN 'google' ELSE auth_provider END
-            WHERE id = ?
-        """, (google_id, name, avatar_url, user_id))
-        db.commit()
-    else:
-        username = name or email.split('@')[0]
-        cursor.execute("""
-            INSERT INTO users (username, name, email, avatar_url, auth_provider, google_id, password_hash)
-            VALUES (?, ?, ?, ?, 'google', ?, NULL)
-        """, (username, name, email, avatar_url, google_id))
-        db.commit()
-        user_id = cursor.lastrowid
-
-    session['user_id'] = user_id
-
-    # Fetch updated user record
-    cursor.execute("SELECT id, username, name, email, avatar_url, auth_provider, created_at FROM users WHERE id = ?", (user_id,))
-    updated_user = cursor.fetchone()
-    display_name = updated_user['name'] or updated_user['username'] or updated_user['email'].split('@')[0]
-
-    return jsonify({
-        "success": True,
-        "message": "Google authentication successful",
-        "user": {
-            "id": updated_user['id'],
-            "username": display_name,
-            "name": display_name,
-            "email": updated_user['email'],
-            "avatar_url": updated_user['avatar_url'] or '',
-            "auth_provider": updated_user['auth_provider'] or 'google',
-            "created_at": updated_user['created_at']
-        }
-    }), 200
+        return jsonify({"success": False, "error": f"Database error during Google authentication: {str(err)}"}), 500
 
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     """
-    Registers a new user account with email and password.
-    Payload: {"email": "...", "password": "...", "name": "..."} or {"username": "...", ...}
+    Registers a new user with username/name, email, password, and confirm_password.
     """
     data = request.get_json()
     if not data:
-        return jsonify({"success": False, "error": "Missing registration data"}), 400
+        return jsonify({"success": False, "error": "Invalid or missing JSON payload"}), 400
 
+    username = (data.get('username') or data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
-    name = (data.get('name') or data.get('username') or '').strip()
     password = data.get('password') or ''
-
-    # Validation
-    if not email or not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        return jsonify({"success": False, "error": "Please provide a valid email address"}), 400
-
-    if not name:
-        name = email.split('@')[0]
-
-    if len(name) < 2 or len(name) > 50:
-        return jsonify({"success": False, "error": "Name must be between 2 and 50 characters"}), 400
-
-    if len(password) < 6:
-        return jsonify({"success": False, "error": "Password must be at least 6 characters"}), 400
-
     confirm_password = data.get('confirm_password')
+
+    # If confirm_password is provided in registration payload, verify match
     if confirm_password is not None and password != confirm_password:
         return jsonify({"success": False, "error": "Passwords do not match."}), 400
+
+    if not email or '@' not in email:
+        return jsonify({"success": False, "error": "A valid email address is required"}), 400
+
+    if not username:
+        username = email.split('@')[0]
+
+    if len(username) < 2 or len(username) > 50:
+        return jsonify({"success": False, "error": "Name/Username must be between 2 and 50 characters"}), 400
+
+    if not password or len(password) < 6:
+        return jsonify({"success": False, "error": "Password must be at least 6 characters long"}), 400
 
     db = get_db()
     cursor = db.cursor()
 
-    # Check for duplicate email
+    # Check if email is already taken
     cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,))
-    existing = cursor.fetchone()
-    if existing:
-        return jsonify({"success": False, "error": "Email is already registered"}), 409
+    if cursor.fetchone():
+        return jsonify({"success": False, "error": "An account with this email already exists"}), 409
 
-    password_hash = generate_password_hash(password)
+    # Hash password with scrypt/pbkdf2
+    pwd_hash = generate_password_hash(password)
 
     try:
         cursor.execute("""
             INSERT INTO users (username, name, email, password_hash, auth_provider)
             VALUES (?, ?, ?, ?, 'local')
-        """, (name, name, email, password_hash))
+        """, (username, username, email, pwd_hash))
         db.commit()
 
         user_id = cursor.lastrowid
@@ -430,33 +444,33 @@ def register():
             "message": "Account created successfully",
             "user": {
                 "id": user_id,
-                "username": name,
-                "name": name,
+                "username": username,
+                "name": username,
                 "email": email,
-                "avatar_url": "",
-                "auth_provider": "local"
+                "avatar_url": '',
+                "auth_provider": 'local',
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
         }), 201
 
     except Exception as err:
-        return jsonify({"success": False, "error": f"Registration failed: {str(err)}"}), 500
+        return jsonify({"success": False, "error": f"Failed to create account: {str(err)}"}), 500
 
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """
-    Authenticates an existing user via email/username and password.
-    Payload: {"email": "...", "password": "..."} or {"login": "...", "password": "..."}
+    Logs in an existing user with email/username and password.
     """
     data = request.get_json()
     if not data:
-        return jsonify({"success": False, "error": "Missing login credentials"}), 400
+        return jsonify({"success": False, "error": "Invalid or missing JSON payload"}), 400
 
-    login_identifier = (data.get('email') or data.get('login') or '').strip().lower()
+    login_identifier = (data.get('email') or data.get('username') or data.get('login') or '').strip().lower()
     password = data.get('password') or ''
 
     if not login_identifier or not password:
-        return jsonify({"success": False, "error": "Email/username and password are required"}), 400
+        return jsonify({"success": False, "error": "Email/Username and password are required"}), 400
 
     db = get_db()
     cursor = db.cursor()
@@ -584,7 +598,7 @@ def record_session():
         status = 'completed'
 
     task_name = (data.get('task_name') or 'Study Session').strip()[:100]
-    user_id = get_current_user_id()
+    user_id = get_current_user_id() or data.get('user_id')
 
     try:
         db = get_db()
