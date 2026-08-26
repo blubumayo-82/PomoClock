@@ -1347,7 +1347,7 @@ async function handleUserLogout() {
 // ==========================================================================
 
 const THEME_PRESETS = {
-  pomodoro: { bg: '#1A1212', card: '#2A181A', accent: '#E05344', text: '#FFF5F5', rgb: '224, 83, 68' },
+  pomodoro: { bg: '#D3A08D', card: '#EDE6E3', accent: '#FF4B3A', text: '#2C1810', rgb: '255, 75, 58' },
   matcha: { bg: '#18221b', card: '#223027', accent: '#4ade80', text: '#f0fdf4', rgb: '74, 222, 128' },
   coffee: { bg: '#1e1713', card: '#2d221c', accent: '#f59e0b', text: '#fef3c7', rgb: '245, 158, 11' },
   cyberpunk: { bg: '#090a10', card: '#141724', accent: '#00f0ff', text: '#f8fafc', rgb: '0, 240, 255' },
@@ -1358,6 +1358,30 @@ const THEME_PRESETS = {
   blush: { bg: '#FAF5F5', card: '#FFFFFF', accent: '#C07D88', text: '#3B2E31', rgb: '192, 125, 136' },
   cerulean: { bg: '#F0F4F8', card: '#FFFFFF', accent: '#5B82A6', text: '#253342', rgb: '91, 130, 166' }
 };
+
+function normalizeHex(val) {
+  if (!val || typeof val !== 'string') return null;
+  let clean = val.trim();
+  if (!clean.startsWith('#')) clean = '#' + clean;
+  if (/^#[0-9A-Fa-f]{6}$/.test(clean)) {
+    return clean.toUpperCase();
+  }
+  if (/^#[0-9A-Fa-f]{3}$/.test(clean)) {
+    const r = clean[1], g = clean[2], b = clean[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  return null;
+}
+
+function previewLiveCustomColors() {
+  const customColors = {
+    bg: DOM.customBgColor ? DOM.customBgColor.value : '#D3A08D',
+    card: DOM.customCardColor ? DOM.customCardColor.value : '#EDE6E3',
+    accent: DOM.customAccentColor ? DOM.customAccentColor.value : '#FF4B3A',
+    text: DOM.customTextColor ? DOM.customTextColor.value : '#2C1810'
+  };
+  applyTheme('custom', customColors, false);
+}
 
 function hexToRgbValues(hex) {
   let c = hex.replace('#', '');
@@ -1429,10 +1453,19 @@ function applyTheme(themeName, customColors = null, save = true) {
 }
 
 function updateHexLabels() {
-  DOM.customBgHex.textContent = DOM.customBgColor.value.toUpperCase();
-  DOM.customCardHex.textContent = DOM.customCardColor.value.toUpperCase();
-  DOM.customAccentHex.textContent = DOM.customAccentColor.value.toUpperCase();
-  DOM.customTextHex.textContent = DOM.customTextColor.value.toUpperCase();
+  const pairs = [
+    { input: DOM.customBgHex, picker: DOM.customBgColor, fallback: '#D3A08D' },
+    { input: DOM.customCardHex, picker: DOM.customCardColor, fallback: '#EDE6E3' },
+    { input: DOM.customAccentHex, picker: DOM.customAccentColor, fallback: '#FF4B3A' },
+    { input: DOM.customTextHex, picker: DOM.customTextColor, fallback: '#2C1810' }
+  ];
+  pairs.forEach(({ input, picker, fallback }) => {
+    if (input) {
+      const val = (picker ? picker.value : fallback).toUpperCase();
+      if ('value' in input) input.value = val;
+      input.textContent = val;
+    }
+  });
 }
 
 
@@ -1889,20 +1922,51 @@ function setupEventListeners() {
     });
   }
 
-  // Custom Color Pickers
-  [DOM.customBgColor, DOM.customCardColor, DOM.customAccentColor, DOM.customTextColor].forEach(picker => {
-    if (picker) {
-      picker.addEventListener('input', updateHexLabels);
+  // Custom Color Pickers with Two-Way Hex Sync & Live Preview
+  const colorSyncPairs = [
+    { picker: DOM.customBgColor, hexInput: DOM.customBgHex },
+    { picker: DOM.customCardColor, hexInput: DOM.customCardHex },
+    { picker: DOM.customAccentColor, hexInput: DOM.customAccentHex },
+    { picker: DOM.customTextColor, hexInput: DOM.customTextHex }
+  ];
+
+  colorSyncPairs.forEach(({ picker, hexInput }) => {
+    if (picker && hexInput) {
+      // 1. Swatch -> Hex Input + Live Sync
+      picker.addEventListener('input', () => {
+        hexInput.value = picker.value.toUpperCase();
+        previewLiveCustomColors();
+      });
+
+      // 2. Hex Input -> Swatch + Live Sync
+      hexInput.addEventListener('input', () => {
+        const norm = normalizeHex(hexInput.value);
+        if (norm) {
+          picker.value = norm;
+          previewLiveCustomColors();
+        }
+      });
+
+      // 3. Format/Validate on blur
+      hexInput.addEventListener('blur', () => {
+        const norm = normalizeHex(hexInput.value);
+        if (norm) {
+          hexInput.value = norm;
+          picker.value = norm;
+        } else {
+          hexInput.value = picker.value.toUpperCase();
+        }
+      });
     }
   });
 
   if (DOM.applyCustomThemeBtn) {
     DOM.applyCustomThemeBtn.addEventListener('click', () => {
       const customColors = {
-        bg: DOM.customBgColor ? DOM.customBgColor.value : '#181112',
-        card: DOM.customCardColor ? DOM.customCardColor.value : '#261b1d',
-        accent: DOM.customAccentColor ? DOM.customAccentColor.value : '#e05344',
-        text: DOM.customTextColor ? DOM.customTextColor.value : '#fff5f5'
+        bg: DOM.customBgColor ? DOM.customBgColor.value : '#D3A08D',
+        card: DOM.customCardColor ? DOM.customCardColor.value : '#EDE6E3',
+        accent: DOM.customAccentColor ? DOM.customAccentColor.value : '#FF4B3A',
+        text: DOM.customTextColor ? DOM.customTextColor.value : '#2C1810'
       };
       applyTheme('custom', customColors, true);
       showToast('Custom theme applied!', 'success');
