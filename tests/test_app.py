@@ -84,6 +84,33 @@ class PomodoroAppTestCase(unittest.TestCase):
         data_login = json.loads(res_login.data)
         self.assertTrue(data_login.get('success'))
 
+    def test_user_register_password_mismatch(self):
+        """Test registration with mismatched confirm_password returns 400."""
+        payload = {
+            "username": "mismatch_user",
+            "email": "mismatch@example.com",
+            "password": "strongPassword123",
+            "confirm_password": "differentPassword456"
+        }
+        res = self.client.post('/api/auth/register', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(res.status_code, 400)
+        data = json.loads(res.data)
+        self.assertFalse(data.get('success'))
+        self.assertIn("Passwords do not match", data.get('error', ''))
+
+    def test_user_register_with_matching_confirm_password(self):
+        """Test registration with matching confirm_password succeeds."""
+        payload = {
+            "username": "match_user",
+            "email": "match@example.com",
+            "password": "strongPassword123",
+            "confirm_password": "strongPassword123"
+        }
+        res = self.client.post('/api/auth/register', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(res.status_code, 201)
+        data = json.loads(res.data)
+        self.assertTrue(data.get('success'))
+
     def test_user_register_duplicate(self):
         """Test duplicate registration returns 409 Conflict."""
         payload = {

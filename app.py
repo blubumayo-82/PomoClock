@@ -389,6 +389,10 @@ def register():
     if len(password) < 6:
         return jsonify({"success": False, "error": "Password must be at least 6 characters"}), 400
 
+    confirm_password = data.get('confirm_password')
+    if confirm_password is not None and password != confirm_password:
+        return jsonify({"success": False, "error": "Passwords do not match."}), 400
+
     db = get_db()
     cursor = db.cursor()
 

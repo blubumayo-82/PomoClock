@@ -173,6 +173,10 @@ const DOM = {
   authEmailOrLogin: document.getElementById('authEmailOrLogin'),
   authEmailLabel: document.getElementById('authEmailLabel'),
   authPassword: document.getElementById('authPassword'),
+  confirmPasswordFieldGroup: document.getElementById('confirmPasswordFieldGroup'),
+  authConfirmPassword: document.getElementById('authConfirmPassword'),
+  togglePasswordBtn: document.getElementById('togglePasswordBtn'),
+  toggleConfirmPasswordBtn: document.getElementById('toggleConfirmPasswordBtn'),
   authSubmitBtn: document.getElementById('authSubmitBtn'),
 
   // Theme modal elements
@@ -1286,6 +1290,8 @@ function setAuthMode(mode) {
     DOM.tabLoginBtn.classList.remove('active');
     DOM.usernameFieldGroup.style.display = 'block';
     DOM.authUsername.required = true;
+    if (DOM.confirmPasswordFieldGroup) DOM.confirmPasswordFieldGroup.style.display = 'block';
+    if (DOM.authConfirmPassword) DOM.authConfirmPassword.required = true;
     DOM.authEmailLabel.textContent = 'Email Address';
     DOM.authEmailOrLogin.type = 'email';
     DOM.authEmailOrLogin.placeholder = 'alex@university.edu';
@@ -1296,6 +1302,11 @@ function setAuthMode(mode) {
     DOM.tabRegisterBtn.classList.remove('active');
     DOM.usernameFieldGroup.style.display = 'none';
     DOM.authUsername.required = false;
+    if (DOM.confirmPasswordFieldGroup) DOM.confirmPasswordFieldGroup.style.display = 'none';
+    if (DOM.authConfirmPassword) {
+      DOM.authConfirmPassword.required = false;
+      DOM.authConfirmPassword.value = '';
+    }
     DOM.authEmailLabel.textContent = 'Email Address';
     DOM.authEmailOrLogin.type = 'text';
     DOM.authEmailOrLogin.placeholder = 'alex@university.edu';
@@ -1310,6 +1321,17 @@ async function handleAuthFormSubmit() {
   const password = DOM.authPassword.value;
   const name = DOM.authUsername.value.trim();
 
+  // Validate matching passwords on frontend for registration
+  if (state.authMode === 'register') {
+    const confirmPassword = DOM.authConfirmPassword ? DOM.authConfirmPassword.value : '';
+    if (password !== confirmPassword) {
+      DOM.authErrorAlert.textContent = 'Passwords do not match.';
+      DOM.authErrorAlert.style.display = 'block';
+      if (DOM.authConfirmPassword) DOM.authConfirmPassword.focus();
+      return;
+    }
+  }
+
   DOM.authSubmitBtn.disabled = true;
   DOM.authSubmitBtn.textContent = 'Please wait...';
 
@@ -1318,8 +1340,9 @@ async function handleAuthFormSubmit() {
     let payload = { email: emailOrLogin, login: emailOrLogin, password };
 
     if (state.authMode === 'register') {
+      const confirmPassword = DOM.authConfirmPassword ? DOM.authConfirmPassword.value : '';
       endpoint = '/api/auth/register';
-      payload = { name, username: name, email: emailOrLogin, password };
+      payload = { name, username: name, email: emailOrLogin, password, confirm_password: confirmPassword };
     }
 
     const res = await fetch(endpoint, {
@@ -1837,6 +1860,28 @@ function setupEventListeners() {
   if (DOM.tabRegisterBtn) {
     DOM.tabRegisterBtn.addEventListener('click', () => setAuthMode('register'));
   }
+
+  // Password Visibility Toggles
+  function setupPasswordToggle(toggleBtn, inputElem) {
+    if (!toggleBtn || !inputElem) return;
+    toggleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isPass = inputElem.type === 'password';
+      inputElem.type = isPass ? 'text' : 'password';
+
+      const openEye = toggleBtn.querySelector('.eye-open');
+      const closedEye = toggleBtn.querySelector('.eye-closed');
+      if (openEye && closedEye) {
+        openEye.style.display = isPass ? 'none' : 'inline-block';
+        closedEye.style.display = isPass ? 'inline-block' : 'none';
+      }
+      inputElem.focus();
+    });
+  }
+
+  setupPasswordToggle(DOM.togglePasswordBtn, DOM.authPassword);
+  setupPasswordToggle(DOM.toggleConfirmPasswordBtn, DOM.authConfirmPassword);
 
   // Logout button
   if (DOM.userLogoutBtn) {
