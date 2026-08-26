@@ -401,6 +401,46 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertEqual(session_data['session']['user_id'], user_id)
         self.assertEqual(session_data['session']['task_name'], 'CS Study')
 
+    def test_weekly_stats_endpoint(self):
+        """Test /api/stats/weekly returns 7 days breakdown and total_weekly_hours."""
+        now = datetime.now()
+        self.client.post('/api/sessions', data=json.dumps({
+            "mode": "pomodoro",
+            "duration_minutes": 50.0,
+            "start_time": now.isoformat(),
+            "end_time": now.isoformat(),
+            "status": "completed"
+        }), content_type='application/json')
+
+        response = self.client.get('/api/stats/weekly')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get('success'))
+        self.assertEqual(len(data['days']), 7)
+        self.assertEqual(len(data['minutes']), 7)
+        self.assertGreaterEqual(data['total_weekly_hours'], 0.8)
+
+    def test_recent_sessions_endpoint(self):
+        """Test /api/sessions/recent returns 5 most recent sessions."""
+        now = datetime.now()
+        for i in range(6):
+            self.client.post('/api/sessions', data=json.dumps({
+                "mode": "pomodoro",
+                "duration_minutes": 25.0,
+                "start_time": (now + timedelta(minutes=i*30)).isoformat(),
+                "end_time": (now + timedelta(minutes=i*30 + 25)).isoformat(),
+                "status": "completed",
+                "task_name": f"Session {i+1}"
+            }), content_type='application/json')
+
+        response = self.client.get('/api/sessions/recent')
+        self.assertEqual(response.status_code, 200)
+        sessions = json.loads(response.data)
+        self.assertIsInstance(sessions, list)
+        self.assertEqual(len(sessions), 5)
+        self.assertIn('task_title', sessions[0])
+        self.assertIn('completed_at', sessions[0])
+
 
 if __name__ == '__main__':
     unittest.main()

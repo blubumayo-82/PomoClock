@@ -747,6 +747,8 @@ async function handleTimerComplete() {
 
   // 5. Refresh analytics
   await fetchStatistics();
+  await fetchWeeklyStats();
+  await fetchRecentSessions();
 
   // 6. Transition to the next cycle mode
   transitionToNextMode(true);
@@ -949,10 +951,121 @@ async function fetchStatistics() {
 
     if (result.success && result.stats) {
       renderStatistics(result.stats);
-      return;
     }
   } catch (err) {
     console.warn('Backend stats unavailable, using local calculation fallback:', err);
+  }
+
+  // Live weekly chart and recent sessions endpoints
+  await fetchWeeklyStats();
+  await fetchRecentSessions();
+}
+
+async function fetchWeeklyStats() {
+  if (!DOM.activityChart) return;
+  try {
+    const res = await fetch('/api/stats/weekly');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.days && data.minutes) {
+      const days = data.days;
+      const minutes = data.minutes;
+      const totalWeeklyHours = data.total_weekly_hours !== undefined 
+        ? data.total_weekly_hours 
+        : (minutes.reduce((a, b) => a + b, 0) / 60).toFixed(1);
+
+      if (DOM.chartWeekTotal) {
+        DOM.chartWeekTotal.textContent = `${totalWeeklyHours}h this week`;
+      }
+
+      const maxMinutes = Math.max(...minutes, 60);
+      const todayIndex = days.length - 1;
+
+      let html = '';
+      days.forEach((day, index) => {
+        const mins = minutes[index] || 0;
+        const isToday = index === todayIndex;
+        let heightPercent = 0;
+        let minHeightPx = '0px';
+        let barOpacity = 0.25;
+
+        if (mins > 0) {
+          const rawPercent = (mins / maxMinutes) * 100;
+          heightPercent = Math.min(100, Math.max(8, Math.round(rawPercent)));
+          minHeightPx = '8px';
+          barOpacity = 1;
+        }
+
+        const count = Math.round(mins / 25);
+        const badgeHtml = mins >= 25 ? `🍅 ${count}` : '&nbsp;';
+
+        html += `
+          <div class="chart-col ${isToday ? 'today' : ''}">
+            <div class="chart-top-badge ${mins >= 25 ? 'active' : ''}">${badgeHtml}</div>
+            <div class="chart-tooltip">${mins} mins</div>
+            <div class="chart-bar-wrap">
+              <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
+            </div>
+            <span class="chart-day-label">${day}</span>
+          </div>
+        `;
+      });
+
+      DOM.activityChart.innerHTML = html;
+    }
+  } catch (err) {
+    console.warn('Could not fetch weekly stats from /api/stats/weekly:', err);
+  }
+}
+
+async function fetchRecentSessions() {
+  if (!DOM.historyTableBody) return;
+  try {
+    const res = await fetch('/api/sessions/recent');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const sessions = Array.isArray(data) ? data : (data.sessions || []);
+
+    if (!sessions || sessions.length === 0) {
+      DOM.historyTableBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="empty-state">No sessions recorded yet. Complete a timer to view logs!</td>
+        </tr>
+      `;
+      return;
+    }
+
+    let html = '';
+    sessions.forEach(s => {
+      let modeLabel = 'Focus';
+      if (s.mode === 'short_break') modeLabel = 'Short Break';
+      if (s.mode === 'long_break') modeLabel = 'Long Break';
+
+      const taskName = s.task_title || s.task_name || 'Study Session';
+      const timeVal = s.completed_at || s.start_time;
+      let formattedTime = 'Just now';
+      try {
+        const d = new Date(timeVal);
+        formattedTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
+                        ' (' + (d.getMonth() + 1) + '/' + d.getDate() + ')';
+      } catch (e) {
+        formattedTime = timeVal || 'Just now';
+      }
+
+      html += `
+        <tr>
+          <td><strong>${modeLabel}</strong></td>
+          <td>${escapeHtml(taskName)}</td>
+          <td>${s.duration_minutes}m</td>
+          <td><span class="status-badge ${s.status || 'completed'}">${s.status || 'completed'}</span></td>
+          <td style="color: var(--text-muted); font-size: 0.8rem;">${formattedTime}</td>
+        </tr>
+      `;
+    });
+
+    DOM.historyTableBody.innerHTML = html;
+  } catch (err) {
+    console.warn('Could not fetch recent sessions from /api/sessions/recent:', err);
   }
 }
 

@@ -906,6 +906,104 @@ def get_statistics():
         return jsonify({"success": False, "error": f"Failed to compute statistics: {str(err)}"}), 500
 
 
+@app.route('/api/stats/weekly', methods=['GET'])
+def get_weekly_stats():
+    """
+    Returns 7-day focus activity breakdown for current user or guest:
+    {
+      "days": ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"],
+      "minutes": [0, 25, 50, 0, 75, 25, 1],
+      "total_weekly_hours": 2.9
+    }
+    """
+    try:
+        user_id = session.get('user_id') or get_current_user_id()
+        db = get_db()
+        cursor = db.cursor()
+
+        user_filter = "user_id = ?" if user_id else "user_id IS NULL"
+        user_params = (user_id,) if user_id else ()
+
+        now = datetime.now()
+        days = []
+        minutes = []
+        total_weekly_mins = 0.0
+
+        for i in range(6, -1, -1):
+            day_date = now - timedelta(days=i)
+            day_str = day_date.strftime('%Y-%m-%d')
+            day_name = day_date.strftime('%a')
+            day_params = user_params + (f"{day_str}%",)
+
+            cursor.execute(f"""
+                SELECT COALESCE(SUM(duration_minutes), 0) AS day_minutes
+                FROM sessions
+                WHERE {user_filter}
+                  AND mode = 'pomodoro' 
+                  AND status = 'completed' 
+                  AND start_time LIKE ?
+            """, day_params)
+            day_stat = cursor.fetchone()
+            day_mins = round(float(day_stat['day_minutes']), 1)
+            days.append(day_name)
+            minutes.append(day_mins)
+            total_weekly_mins += day_mins
+
+        total_weekly_hours = round(total_weekly_mins / 60.0, 1)
+
+        return jsonify({
+            "success": True,
+            "days": days,
+            "minutes": minutes,
+            "total_weekly_hours": total_weekly_hours
+        }), 200
+
+    except Exception as err:
+        return jsonify({"success": False, "error": f"Failed to calculate weekly stats: {str(err)}"}), 500
+
+
+@app.route('/api/sessions/recent', methods=['GET'])
+def get_recent_sessions():
+    """
+    Fetches the 5 most recent sessions for the current user.
+    Returns: [{ id, task_title, duration_minutes, mode, completed_at }]
+    """
+    try:
+        user_id = session.get('user_id') or get_current_user_id()
+        db = get_db()
+        cursor = db.cursor()
+
+        user_filter = "user_id = ?" if user_id else "user_id IS NULL"
+        user_params = (user_id,) if user_id else ()
+
+        cursor.execute(f"""
+            SELECT id, task_name, duration_minutes, mode, start_time, end_time, status, created_at
+            FROM sessions
+            WHERE {user_filter}
+            ORDER BY id DESC
+            LIMIT 5
+        """, user_params)
+        rows = cursor.fetchall()
+        recent = []
+        for r in rows:
+            completed_at = r['end_time'] or r['created_at'] or r['start_time']
+            recent.append({
+                "id": r['id'],
+                "task_title": r['task_name'] or 'Study Session',
+                "task_name": r['task_name'] or 'Study Session',
+                "duration_minutes": float(r['duration_minutes']),
+                "mode": r['mode'],
+                "status": r['status'],
+                "start_time": r['start_time'],
+                "completed_at": completed_at
+            })
+
+        return jsonify(recent), 200
+
+    except Exception as err:
+        return jsonify({"success": False, "error": f"Failed to retrieve recent sessions: {str(err)}"}), 500
+
+
 # ----------------------------------------------------------------------
 # User Preferences Endpoints
 # ----------------------------------------------------------------------
