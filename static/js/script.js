@@ -1089,6 +1089,7 @@ async function syncPreferences(prefsObj) {
 // ==========================================================================
 
 let googleSignInRetryCount = 0;
+window.googleGsiInitialized = false;
 
 function initGoogleSignIn() {
   const clientId = (
@@ -1104,42 +1105,50 @@ function initGoogleSignIn() {
   if (window.google && window.google.accounts && window.google.accounts.id) {
     try {
       if (clientId) {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleCredentialResponse,
-          auto_select: false,
-          cancel_on_tap_outside: true
-        });
-
-        googleBtnContainer.innerHTML = '';
-        window.google.accounts.id.renderButton(
-          googleBtnContainer,
-          {
-            theme: 'filled_black',
-            size: 'large',
-            text: 'continue_with',
-            shape: 'pill',
-            width: 320,
-            logo_alignment: 'left'
-          }
-        );
-      } else {
-        googleBtnContainer.innerHTML = `
-          <button type="button" class="modal-btn secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.6rem; border-radius: var(--radius-full); padding: 0.65rem 1rem;" id="googleDemoBtn">
-            <svg viewBox="0 0 24 24" width="18" height="18">
-              <path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 1.9 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.6 2.8C6.4 7.2 8.9 5 12 5z"/>
-              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
-              <path fill="#FBBC05" d="M5.5 14.1c-.2-.7-.4-1.4-.4-2.1s.2-1.4.4-2.1L1.9 7.1C.7 9.5 0 10.7 0 12s.7 2.5 1.9 4.9l3.6-2.8z"/>
-              <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.6-2.2-6.5-5.1L1.9 16C3.7 19.7 7.5 23 12 23z"/>
-            </svg>
-            <span style="font-size: 0.85rem; font-weight: 600;">Sign in with Google</span>
-          </button>
-        `;
-        const demoBtn = document.getElementById('googleDemoBtn');
-        if (demoBtn) {
-          demoBtn.addEventListener('click', () => {
-            showToast('Configure GOOGLE_CLIENT_ID in .env to activate live Google login', 'info');
+        if (!window.googleGsiInitialized) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
           });
+          window.googleGsiInitialized = true;
+        }
+
+        // Render or re-render button container if empty
+        if (!googleBtnContainer.hasChildNodes()) {
+          googleBtnContainer.innerHTML = '';
+          window.google.accounts.id.renderButton(
+            googleBtnContainer,
+            {
+              theme: 'filled_black',
+              size: 'large',
+              text: 'continue_with',
+              shape: 'pill',
+              width: 320,
+              logo_alignment: 'left'
+            }
+          );
+        }
+      } else {
+        if (!googleBtnContainer.hasChildNodes() || !document.getElementById('googleDemoBtn')) {
+          googleBtnContainer.innerHTML = `
+            <button type="button" class="modal-btn secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.6rem; border-radius: var(--radius-full); padding: 0.65rem 1rem;" id="googleDemoBtn">
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 1.9 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.6 2.8C6.4 7.2 8.9 5 12 5z"/>
+                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+                <path fill="#FBBC05" d="M5.5 14.1c-.2-.7-.4-1.4-.4-2.1s.2-1.4.4-2.1L1.9 7.1C.7 9.5 0 10.7 0 12s.7 2.5 1.9 4.9l3.6-2.8z"/>
+                <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.6-2.2-6.5-5.1L1.9 16C3.7 19.7 7.5 23 12 23z"/>
+              </svg>
+              <span style="font-size: 0.85rem; font-weight: 600;">Sign in with Google</span>
+            </button>
+          `;
+          const demoBtn = document.getElementById('googleDemoBtn');
+          if (demoBtn) {
+            demoBtn.addEventListener('click', () => {
+              showToast('Configure GOOGLE_CLIENT_ID in .env to activate live Google login', 'info');
+            });
+          }
         }
       }
     } catch (err) {
@@ -1737,8 +1746,11 @@ function saveSettingsFromModal() {
   });
 }
 
-function openModal(modal) {
+let lastFocusedElementBeforeModal = null;
+
+function openModal(modal, triggerElement = null) {
   if (!modal) return;
+  lastFocusedElementBeforeModal = triggerElement || document.activeElement;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
@@ -1750,9 +1762,22 @@ function openModal(modal) {
 
 function closeModal(modal) {
   if (!modal) return;
+
+  // If focus is currently inside the modal being hidden, blur it or return to trigger
+  if (document.activeElement && modal.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+
   modal.classList.remove('open');
   modal.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+
+  if (lastFocusedElementBeforeModal && typeof lastFocusedElementBeforeModal.focus === 'function') {
+    try {
+      lastFocusedElementBeforeModal.focus();
+    } catch (_) {}
+    lastFocusedElementBeforeModal = null;
+  }
 }
 
 

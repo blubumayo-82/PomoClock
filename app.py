@@ -253,6 +253,17 @@ def get_current_user_id():
     return session.get('user_id')
 
 
+@app.after_request
+def add_security_headers(response):
+    """
+    Configures response headers for Cross-Origin-Opener-Policy (COOP) and COEP.
+    Enables Google Identity Services OAuth popup and postMessage communication.
+    """
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+    response.headers['Cross-Origin-Embedder-Policy'] = 'unsafe-none'
+    return response
+
+
 # ----------------------------------------------------------------------
 # Page Routes & Config
 # ----------------------------------------------------------------------
