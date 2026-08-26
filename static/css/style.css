@@ -4522,7 +4522,7 @@ body.zen-mode-active .timer-controls {
 .share-metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   margin-bottom: 16px;
   box-sizing: border-box;
@@ -4534,16 +4534,28 @@ body.zen-mode-active .timer-controls {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 14px;
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-primary, #FFFFFF);
+  color: var(--text-primary, #2C1810);
   box-sizing: border-box;
   min-width: 0;
   white-space: nowrap;
+}
+
+[data-theme="cyberpunk"] .share-stat-pill,
+[data-theme="forest"] .share-stat-pill,
+[data-theme="ocean"] .share-stat-pill,
+[data-theme="lavender"] .share-stat-pill {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.25);
 }
 
 .share-pill-icon,
@@ -4558,7 +4570,7 @@ body.zen-mode-active .timer-controls {
   font-family: 'JetBrains Mono', monospace;
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--accent-color, #FF6B50);
+  color: var(--accent-color, #FF4B3A);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -4567,18 +4579,30 @@ body.zen-mode-active .timer-controls {
 .share-metric-val small {
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--accent-color, #FFA28B);
+  color: var(--accent-color, #FF4B3A);
   opacity: 0.85;
 }
 
 /* 3. Weekly Focus Activity Section & 7-Day Chart */
 .share-chart-section {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(var(--accent-rgb, 224, 83, 68), 0.18);
-  border-radius: 16px;
-  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 18px;
+  padding: 16px 20px;
   margin-bottom: 16px;
   box-sizing: border-box;
+}
+
+[data-theme="cyberpunk"] .share-chart-section,
+[data-theme="forest"] .share-chart-section,
+[data-theme="ocean"] .share-chart-section,
+[data-theme="lavender"] .share-chart-section {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.25);
 }
 
 .share-chart-header {
@@ -4591,18 +4615,25 @@ body.zen-mode-active .timer-controls {
 .share-chart-title {
   font-size: 0.88rem;
   font-weight: 700;
-  color: var(--text-primary, #FFFFFF);
+  color: var(--text-primary, #2C1810);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
+.share-chart-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted, #71717A);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
 .share-chart-badge {
   font-size: 0.74rem;
   font-weight: 700;
-  background: var(--badge-bg, rgba(var(--accent-rgb, 224, 83, 68), 0.15));
-  color: var(--accent-color, #FFA28B);
-  border: 1px solid rgba(var(--accent-rgb, 224, 83, 68), 0.3);
+  background: var(--badge-bg, rgba(var(--accent-rgb, 255, 75, 58), 0.15));
+  color: var(--accent-color, #FF4B3A);
+  border: 1px solid rgba(var(--accent-rgb, 255, 75, 58), 0.3);
   padding: 2px 10px;
   border-radius: 20px;
 }
@@ -4632,7 +4663,7 @@ body.zen-mode-active .timer-controls {
 .share-bar-badge {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--accent-color, #FFA28B);
+  color: var(--accent-color, #FF4B3A);
   height: 18px;
   line-height: 18px;
   display: flex;
@@ -4642,12 +4673,13 @@ body.zen-mode-active .timer-controls {
 }
 
 .share-bar-badge.active {
-  color: var(--accent-color, #FF6B50);
-  text-shadow: 0 0 8px var(--accent-glow, rgba(255, 107, 80, 0.5));
+  color: var(--accent-color, #FF4B3A);
+  text-shadow: 0 0 8px var(--accent-glow, rgba(255, 75, 58, 0.5));
 }
 
 .share-bar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   width: 34px;
   height: 105px;
   border-radius: 8px;
@@ -4657,24 +4689,32 @@ body.zen-mode-active .timer-controls {
   box-sizing: border-box;
 }
 
+[data-theme="cyberpunk"] .share-bar-track,
+[data-theme="forest"] .share-bar-track,
+[data-theme="ocean"] .share-bar-track,
+[data-theme="lavender"] .share-bar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
 .share-bar-fill {
-  background: var(--accent-color, #FF6B50);
+  background: var(--accent-color, #FF4B3A);
   border-radius: 8px;
   width: 100%;
-  box-shadow: 0 0 12px var(--accent-glow, rgba(255, 107, 80, 0.45));
+  box-shadow: 0 0 12px var(--accent-glow, rgba(255, 75, 58, 0.45));
   transition: height 0.3s ease;
 }
 
 .share-day-label {
   font-size: 0.76rem;
-  color: var(--text-muted, #94A3B8);
+  color: var(--text-muted, #71717A);
   font-weight: 600;
   margin-top: 2px;
   text-align: center;
 }
 
 .share-day-col.today .share-day-label {
-  color: var(--accent-color, #FF6B50);
+  color: var(--accent-color, #FF4B3A);
   font-weight: 700;
 }
 
@@ -4683,10 +4723,11 @@ body.zen-mode-active .timer-controls {
   display: flex;
   justify-content: center;
   align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 14px;
-  font-size: 0.74rem;
-  color: var(--text-muted, #94A3B8);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 12px;
+  font-size: 0.72rem;
+  color: var(--text-muted, #71717A);
+  opacity: 0.7;
 }
 
 .share-footer-left {
@@ -4696,9 +4737,10 @@ body.zen-mode-active .timer-controls {
 }
 
 .share-footer-icon {
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .share-footer-left strong {
-  color: var(--text-primary, #FFFFFF);
+  color: var(--text-primary, #2C1810);
+  font-weight: 700;
 }

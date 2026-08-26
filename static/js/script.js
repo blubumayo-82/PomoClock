@@ -2947,26 +2947,51 @@ async function exportShareableFocusCard() {
     scholarElem.textContent = activeUserName;
   }
 
-  // 3. Populate highlight metric pills from active stats (100% sync with live site)
+  // 3. Populate highlight metric pills from active stats with dynamic unit formatting
   const stats = state.currentStats || computeLocalStats();
   const totalHrsElem = document.getElementById('shareTotalHours');
   if (totalHrsElem) {
-    const hrsVal = stats.total_focus_hours !== undefined ? stats.total_focus_hours : (DOM.statTotalHours ? DOM.statTotalHours.textContent.replace('hrs', '').trim() : '0.0');
-    totalHrsElem.textContent = `${hrsVal} hrs`;
+    const totalMinutes = stats.total_focus_minutes !== undefined 
+      ? Math.round(parseFloat(stats.total_focus_minutes) || 0)
+      : (stats.total_focus_hours ? Math.round(parseFloat(stats.total_focus_hours) * 60) : 0);
+
+    let formattedTotal = '0m';
+    if (totalMinutes < 60) {
+      formattedTotal = `${totalMinutes}m`;
+    } else {
+      formattedTotal = `${(totalMinutes / 60).toFixed(1)} hrs`;
+    }
+    totalHrsElem.textContent = formattedTotal;
   }
+
   const streakElem = document.getElementById('shareStreakDays');
   if (streakElem) {
-    const streakVal = stats.current_streak_days !== undefined ? stats.current_streak_days : (DOM.statStreakDays ? DOM.statStreakDays.textContent.replace('days', '').trim() : '0');
-    streakElem.textContent = `${streakVal} days`;
+    const streakVal = stats.current_streak_days !== undefined 
+      ? parseInt(stats.current_streak_days, 10) || 0 
+      : (DOM.statStreakDays ? parseInt(DOM.statStreakDays.textContent, 10) || 0 : 0);
+    streakElem.textContent = streakVal === 1 ? '1 day' : `${streakVal} days`;
   }
+
   const todayMinElem = document.getElementById('shareTodayMinutes');
   if (todayMinElem) {
-    const minVal = stats.today_focus_minutes !== undefined ? stats.today_focus_minutes : (DOM.statTodayMinutes ? DOM.statTodayMinutes.textContent.replace('min', '').trim() : '0');
-    todayMinElem.textContent = `${minVal} min`;
+    const todayMinutes = stats.today_focus_minutes !== undefined 
+      ? Math.round(parseFloat(stats.today_focus_minutes) || 0) 
+      : (DOM.statTodayMinutes ? parseInt(DOM.statTodayMinutes.textContent, 10) || 0 : 0);
+
+    let formattedToday = '0m';
+    if (todayMinutes < 60) {
+      formattedToday = `${todayMinutes}m`;
+    } else {
+      formattedToday = `${(todayMinutes / 60).toFixed(1)} hrs`;
+    }
+    todayMinElem.textContent = formattedToday;
   }
+
   const compCountElem = document.getElementById('shareCompletedCount');
   if (compCountElem) {
-    const compVal = stats.completed_pomodoros !== undefined ? stats.completed_pomodoros : (DOM.statCompletedCount ? DOM.statCompletedCount.textContent.trim() : '0');
+    const compVal = stats.completed_pomodoros !== undefined 
+      ? stats.completed_pomodoros 
+      : (DOM.statCompletedCount ? DOM.statCompletedCount.textContent.trim() : '0');
     compCountElem.textContent = `${compVal} pomos`;
   }
 
@@ -2981,7 +3006,19 @@ async function exportShareableFocusCard() {
     const activity = (state.currentStats && state.currentStats.weekly_activity) || state.currentActivity || stats.weekly_activity || [];
     const todayStr = getLocalDateString();
     const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
+    const totalWeeklyMins = recordedMins.reduce((acc, m) => acc + m, 0);
     const maxMins = Math.max(...recordedMins, 25);
+
+    // Motivational subtitle for low weekly focus (< 15 mins)
+    const chartSubElem = document.getElementById('shareChartSubtitle');
+    if (chartSubElem) {
+      if (totalWeeklyMins < 15) {
+        chartSubElem.textContent = '🌱 Planting your focus seeds — keep going!';
+        chartSubElem.style.display = 'block';
+      } else {
+        chartSubElem.style.display = 'none';
+      }
+    }
 
     let chartHtml = '<div class="share-chart-row">';
     activity.forEach(item => {
