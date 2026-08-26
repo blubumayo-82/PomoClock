@@ -1,5 +1,23 @@
+# Virtual environments
+venv/
+.venv/
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
-venv/
+*.pyo
+*.pyd
+
+# Environment variables & secrets
 .env
-pomodoro.db
+
+# Databases & local storage
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Logs & OS artifacts
+*.log
+.DS_Store
+Thumbs.db
