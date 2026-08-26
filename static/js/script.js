@@ -223,6 +223,8 @@ const DOM = {
   feedbackModal: document.getElementById('feedbackModal'),
   openFeedbackModalBtn: document.getElementById('openFeedbackModalBtn'),
   closeFeedbackModalBtn: document.getElementById('closeFeedbackModalBtn'),
+  cancelFeedbackModalBtn: document.getElementById('cancelFeedbackModalBtn'),
+  submitFeedbackModalBtn: document.getElementById('submitFeedbackModalBtn'),
   feedbackForm: document.getElementById('feedbackForm'),
 
   // 4-Pomodoro Guest Sync modal elements
@@ -2163,12 +2165,20 @@ function setupEventListeners() {
     DOM.closeScienceModalBtnBottom.addEventListener('click', () => closeModal(DOM.scienceModal));
   }
 
-  // Feedback Modal Open / Close / Form Submit
+  // Feedback Modal Open / Close / Cancel / Form Submit
   if (DOM.openFeedbackModalBtn) {
     DOM.openFeedbackModalBtn.addEventListener('click', () => openModal(DOM.feedbackModal));
   }
   if (DOM.closeFeedbackModalBtn) {
     DOM.closeFeedbackModalBtn.addEventListener('click', () => closeModal(DOM.feedbackModal));
+  }
+  if (DOM.cancelFeedbackModalBtn) {
+    DOM.cancelFeedbackModalBtn.addEventListener('click', () => {
+      if (DOM.feedbackForm) DOM.feedbackForm.reset();
+      const messageInput = document.getElementById('feedbackMessage') || document.getElementById('feedback-message') || document.querySelector('textarea[name="message"]');
+      if (messageInput) messageInput.value = '';
+      closeModal(DOM.feedbackModal);
+    });
   }
   if (DOM.feedbackForm) {
     DOM.feedbackForm.addEventListener('submit', handleFeedbackSubmit);

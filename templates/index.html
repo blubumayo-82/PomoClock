@@ -36,7 +36,7 @@
     rel="stylesheet">
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=28.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=29.0">
   <!-- Tomato on a Cloud (🍅☁️) Favicon -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='pomoGrad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF6B6B'/%3E%3Cstop offset='100%25' stop-color='%23E05344'/%3E%3C/linearGradient%3E%3ClinearGradient id='cloudGrad' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FFFFFF'/%3E%3Cstop offset='100%25' stop-color='%23D1D5DB'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='42' r='28' fill='url(%23pomoGrad)'/%3E%3Cpath d='M50 14 C48 21 44 24 39 25 C45 28 49 30 49 30 C49 30 53 27 60 25 C55 24 52 21 50 14 Z' fill='%2322C55E'/%3E%3Cpath d='M50 14 C51 10 54 8 57 7' stroke='%2315803D' stroke-width='2.5' stroke-linecap='round' fill='none'/%3E%3Cpath d='M22 75 C16 75 12 70 12 64 C12 59 16 55 21 55 C22 47 28 42 36 42 C40 42 44 44 47 47 C50 43 56 40 62 40 C72 40 80 47 80 56 C85 56 89 60 89 65 C89 70 85 75 80 75 Z' fill='url(%23cloudGrad)' opacity='0.96'/%3E%3C/svg%3E">
 
@@ -856,11 +856,9 @@
               placeholder="What would make PomoHaven even better for your study sessions?" required></textarea>
           </div>
 
-          <div class="modal-footer" style="margin-top: 0; padding-top: 0;">
-            <button type="submit" class="modal-btn primary">Submit Feedback</button>
-            <a href="https://github.com/blubumayo-82/pomodoro-timer/issues/new" target="_blank" rel="noopener noreferrer"
-              class="modal-btn secondary" style="text-align: center; text-decoration: none; line-height: 2.2;">GitHub
-              Issues</a>
+          <div class="modal-footer feedback-modal-footer">
+            <button type="button" id="cancelFeedbackModalBtn" class="modal-btn secondary">Cancel</button>
+            <button type="submit" id="submitFeedbackModalBtn" class="modal-btn primary">Submit Feedback</button>
           </div>
         </form>
       </div>
@@ -1108,7 +1106,7 @@
   <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
 
   <!-- Main JavaScript File -->
-  <script src="{{ url_for('static', filename='js/script.js') }}?v=28.0"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}?v=29.0"></script>
 </body>
 
 </html>

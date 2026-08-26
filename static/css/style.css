@@ -3099,6 +3099,19 @@ header,
   margin-top: 1.5rem;
 }
 
+.feedback-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 0;
+}
+
+.feedback-modal-footer .modal-btn {
+  flex: 1;
+}
+
 
 /* --------------------------------------------------------------------------
    9. Toasts, Confetti & Footer
