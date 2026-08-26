@@ -970,12 +970,11 @@ async function fetchWeeklyStats() {
     if (data.days && data.minutes) {
       const days = data.days;
       const minutes = data.minutes;
-      const totalWeeklyHours = data.total_weekly_hours !== undefined 
-        ? data.total_weekly_hours 
-        : (minutes.reduce((a, b) => a + b, 0) / 60).toFixed(1);
+      const totalWeeklyMinutes = minutes.reduce((a, b) => a + (parseFloat(b) || 0), 0);
+      const weeklyHours = (totalWeeklyMinutes / 60).toFixed(1);
 
       if (DOM.chartWeekTotal) {
-        DOM.chartWeekTotal.textContent = `${totalWeeklyHours}h this week`;
+        DOM.chartWeekTotal.textContent = `${weeklyHours}h this week`;
       }
 
       const maxMinutes = Math.max(...minutes, 60);
@@ -1079,8 +1078,9 @@ function renderStatistics(stats) {
   DOM.statTodaySessions.textContent = `${stats.today_pomodoros} sessions today`;
   DOM.statStreakDays.innerHTML = `${stats.current_streak_days} <small>days</small>`;
 
-  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + (d.focus_minutes || 0), 0);
-  DOM.chartWeekTotal.textContent = `${(weekTotalMins / 60).toFixed(1)}h this week`;
+  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + (parseFloat(d.focus_minutes) || 0), 0);
+  const weeklyHours = (weekTotalMins / 60).toFixed(1);
+  DOM.chartWeekTotal.textContent = `${weeklyHours}h this week`;
 
   renderWeeklyChart(stats.weekly_activity || []);
   renderRecentSessions(stats.recent_sessions || []);
@@ -2955,11 +2955,11 @@ async function exportShareableFocusCard() {
       ? Math.round(parseFloat(stats.total_focus_minutes) || 0)
       : (stats.total_focus_hours ? Math.round(parseFloat(stats.total_focus_hours) * 60) : 0);
 
-    let formattedTotal = '0m';
+    let formattedTotal = '0m total';
     if (totalMinutes < 60) {
-      formattedTotal = `${totalMinutes}m`;
+      formattedTotal = `${totalMinutes}m total`;
     } else {
-      formattedTotal = `${(totalMinutes / 60).toFixed(1)} hrs`;
+      formattedTotal = `${(totalMinutes / 60).toFixed(1)} hrs total`;
     }
     totalHrsElem.textContent = formattedTotal;
   }
@@ -2978,11 +2978,11 @@ async function exportShareableFocusCard() {
       ? Math.round(parseFloat(stats.today_focus_minutes) || 0) 
       : (DOM.statTodayMinutes ? parseInt(DOM.statTodayMinutes.textContent, 10) || 0 : 0);
 
-    let formattedToday = '0m';
+    let formattedToday = '0m today';
     if (todayMinutes < 60) {
-      formattedToday = `${todayMinutes}m`;
+      formattedToday = `${todayMinutes}m today`;
     } else {
-      formattedToday = `${(todayMinutes / 60).toFixed(1)} hrs`;
+      formattedToday = `${(todayMinutes / 60).toFixed(1)} hrs today`;
     }
     todayMinElem.textContent = formattedToday;
   }
@@ -2996,9 +2996,13 @@ async function exportShareableFocusCard() {
   }
 
   // 4. Populate weekly focus activity summary badge & 7-day single-row column chart (100% sync with live site)
+  const activity = (state.currentStats && state.currentStats.weekly_activity) || state.currentActivity || stats.weekly_activity || [];
+  const totalWeeklyMins = activity.reduce((acc, d) => acc + (parseFloat(d.focus_minutes) || 0), 0);
+  const weeklyHours = (totalWeeklyMins / 60).toFixed(1);
+
   const weekTotalElem = document.getElementById('shareWeekTotal');
-  if (weekTotalElem && DOM.chartWeekTotal) {
-    weekTotalElem.textContent = DOM.chartWeekTotal.textContent;
+  if (weekTotalElem) {
+    weekTotalElem.textContent = `${weeklyHours}h this week`;
   }
 
   const chartContentElem = document.getElementById('shareChartContent');

@@ -4622,10 +4622,10 @@ body.zen-mode-active .timer-controls {
 }
 
 .share-chart-sub {
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   color: var(--text-muted, #71717A);
   font-weight: 500;
-  margin-top: 2px;
+  margin: 10px 0 14px 0;
 }
 
 .share-chart-badge {
@@ -4678,8 +4678,8 @@ body.zen-mode-active .timer-controls {
 }
 
 .share-bar-track {
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   width: 34px;
   height: 105px;
   border-radius: 8px;
@@ -4693,8 +4693,8 @@ body.zen-mode-active .timer-controls {
 [data-theme="forest"] .share-bar-track,
 [data-theme="ocean"] .share-bar-track,
 [data-theme="lavender"] .share-bar-track {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .share-bar-fill {
