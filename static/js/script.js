@@ -96,6 +96,7 @@ const DOM = {
   resetBtn: document.getElementById('resetBtn'),
   skipBtn: document.getElementById('skipBtn'),
   zenModeBtn: document.getElementById('zenModeBtn'),
+  exitZenBtn: document.getElementById('exitZenBtn'),
   zenExpandIcon: document.getElementById('zenExpandIcon'),
   zenCompressIcon: document.getElementById('zenCompressIcon'),
   zenBtnText: document.getElementById('zenBtnText'),
@@ -114,22 +115,19 @@ const DOM = {
   badgeShortBreak: document.getElementById('badgeShortBreak'),
   badgeLongBreak: document.getElementById('badgeLongBreak'),
   
-  // Task input & Multi-Task Queue
-  currentTaskInput: document.getElementById('currentTaskInput'),
-  clearTaskBtn: document.getElementById('clearTaskBtn'),
-  taskQueueContainer: document.getElementById('taskQueueContainer'),
-  toggleTaskQueueBtn: document.getElementById('toggleTaskQueueBtn'),
-  taskQueueBadge: document.getElementById('taskQueueBadge'),
-  queueArrow: document.getElementById('queueArrow'),
-  openAddTaskBtn: document.getElementById('openAddTaskBtn'),
-  addTaskForm: document.getElementById('addTaskForm'),
-  newTaskTitleInput: document.getElementById('newTaskTitleInput'),
-  stepperDecBtn: document.getElementById('stepperDecBtn'),
-  stepperIncBtn: document.getElementById('stepperIncBtn'),
-  newTargetPomoCount: document.getElementById('newTargetPomoCount'),
-  confirmAddTaskBtn: document.getElementById('confirmAddTaskBtn'),
-  cancelAddTaskBtn: document.getElementById('cancelAddTaskBtn'),
-  taskQueueList: document.getElementById('taskQueueList'),
+  // Unified Task Queue & Focus Engine
+  unifiedTaskQueue: document.getElementById('unifiedTaskQueue'),
+  unifiedTaskForm: document.getElementById('unifiedTaskForm'),
+  unifiedTaskInput: document.getElementById('unifiedTaskInput'),
+  inputTargetDecBtn: document.getElementById('inputTargetDecBtn'),
+  inputTargetIncBtn: document.getElementById('inputTargetIncBtn'),
+  inputTargetVal: document.getElementById('inputTargetVal'),
+  unifiedTaskAddBtn: document.getElementById('unifiedTaskAddBtn'),
+  unifiedQueueList: document.getElementById('unifiedQueueList'),
+  // Backwards compatibility mappings:
+  currentTaskInput: document.getElementById('unifiedTaskInput') || document.getElementById('currentTaskInput'),
+  taskQueueContainer: document.getElementById('unifiedTaskQueue') || document.getElementById('taskQueueContainer'),
+  taskQueueList: document.getElementById('unifiedQueueList') || document.getElementById('taskQueueList'),
 
   // Header controls & Auth
   authContainer: document.getElementById('authContainer'),
@@ -1710,7 +1708,10 @@ function setupEventListeners() {
   if (DOM.resetBtn) DOM.resetBtn.addEventListener('click', resetTimer);
   if (DOM.skipBtn) DOM.skipBtn.addEventListener('click', skipSession);
   if (DOM.zenModeBtn) {
-    DOM.zenModeBtn.addEventListener('click', () => toggleZenMode());
+    DOM.zenModeBtn.addEventListener('click', () => toggleZenMode(true));
+  }
+  if (DOM.exitZenBtn) {
+    DOM.exitZenBtn.addEventListener('click', () => toggleZenMode(false));
   }
 
   // Mode Selection Tabs
@@ -1718,37 +1719,15 @@ function setupEventListeners() {
   if (DOM.tabShortBreak) DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
   if (DOM.tabLongBreak) DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
 
-  // Task Input (Auto-Active Task Input)
-  if (DOM.currentTaskInput) {
-    DOM.currentTaskInput.addEventListener('input', (e) => {
-      state.currentTask = e.target.value.trim();
-      updateZenTaskDisplay();
-      if (typeof renderTaskQueue === 'function') {
-        renderTaskQueue();
-      }
-    });
-
-    DOM.currentTaskInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        state.currentTask = DOM.currentTaskInput.value.trim();
+  // Unified Task Queue Input (Auto-Active on typing if no active task)
+  const taskInputElem = DOM.unifiedTaskInput || DOM.currentTaskInput;
+  if (taskInputElem) {
+    taskInputElem.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      const tasks = getTaskQueue();
+      if (!tasks.some(t => !t.completed)) {
+        state.currentTask = val;
         updateZenTaskDisplay();
-        DOM.currentTaskInput.blur();
-        if (state.currentTask) {
-          showToast(`🎯 Active focus task: "${state.currentTask}"`, 'info');
-        }
-      }
-    });
-  }
-
-  if (DOM.clearTaskBtn) {
-    DOM.clearTaskBtn.addEventListener('click', () => {
-      if (DOM.currentTaskInput) DOM.currentTaskInput.value = '';
-      state.currentTask = '';
-      updateZenTaskDisplay();
-      if (DOM.currentTaskInput) DOM.currentTaskInput.focus();
-      if (typeof renderTaskQueue === 'function') {
-        renderTaskQueue();
       }
     });
   }
@@ -1973,6 +1952,9 @@ function setupEventListeners() {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
       if (e.key === 'Escape') {
         document.activeElement.blur();
+        if (document.body.classList.contains('zen-mode-active') || document.body.classList.contains('zen-mode')) {
+          toggleZenMode(false);
+        }
       }
       return;
     }
@@ -1997,7 +1979,7 @@ function setupEventListeners() {
       e.preventDefault();
       DOM.soundToggleBtn.click();
     } else if (e.key === 'Escape') {
-      if (document.body.classList.contains('zen-mode-active')) {
+      if (document.body.classList.contains('zen-mode-active') || document.body.classList.contains('zen-mode')) {
         toggleZenMode(false);
       }
       [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal].forEach(m => {
@@ -2008,8 +1990,8 @@ function setupEventListeners() {
 
   // Fullscreen change listener to sync Zen Mode state
   document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement && document.body.classList.contains('zen-mode-active')) {
-      // User exited browser fullscreen, maintain clean state or toggle off
+    if (!document.fullscreenElement && (document.body.classList.contains('zen-mode-active') || document.body.classList.contains('zen-mode'))) {
+      toggleZenMode(false);
     }
   });
 }
@@ -2033,13 +2015,28 @@ function submitFeedback() {
 
 function updateZenTaskDisplay() {
   if (!DOM.zenTaskBadge) return;
-  const currentTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
-  state.currentTask = currentTask;
-  if (currentTask) {
-    DOM.zenTaskBadge.textContent = `🎯 ${currentTask}`;
+  const tasks = getTaskQueue();
+  const currentTaskName = (state.currentTask || (DOM.unifiedTaskInput ? DOM.unifiedTaskInput.value : '') || '').trim();
+  
+  let activeTask = null;
+  if (currentTaskName) {
+    activeTask = tasks.find(t => (t.title || t.text || '').toLowerCase() === currentTaskName.toLowerCase());
+  }
+  if (!activeTask) {
+    activeTask = tasks.find(t => !t.completed);
+  }
+
+  if (activeTask) {
+    state.currentTask = activeTask.title || activeTask.text || '';
+    const completed = activeTask.completedPomos || 0;
+    const target = activeTask.targetPomos || 1;
+    DOM.zenTaskBadge.innerHTML = `🎯 <span class="zen-task-title">${escapeHtml(state.currentTask)}</span> <span class="zen-task-divider">•</span> <span class="zen-task-pomo">🍅 ${completed}/${target}</span>`;
+    DOM.zenTaskBadge.classList.remove('hidden');
+  } else if (currentTaskName) {
+    DOM.zenTaskBadge.innerHTML = `🎯 <span class="zen-task-title">${escapeHtml(currentTaskName)}</span>`;
     DOM.zenTaskBadge.classList.remove('hidden');
   } else {
-    DOM.zenTaskBadge.textContent = '';
+    DOM.zenTaskBadge.innerHTML = '';
     DOM.zenTaskBadge.classList.add('hidden');
   }
 }
@@ -2050,10 +2047,6 @@ function toggleZenMode(forcedState = null) {
   if (isZen) {
     updateZenTaskDisplay();
     document.body.classList.add('zen-mode-active');
-    if (DOM.zenExpandIcon) DOM.zenExpandIcon.classList.add('hidden');
-    if (DOM.zenCompressIcon) DOM.zenCompressIcon.classList.remove('hidden');
-    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Exit Zen';
-    if (DOM.zenModeBtn) DOM.zenModeBtn.setAttribute('title', 'Exit Zen Mode (Esc or Z)');
     showToast('Zen Mode active — Distraction free! Press Esc or Z to exit.', 'info');
     
     // Request HTML5 fullscreen if supported
@@ -2064,10 +2057,6 @@ function toggleZenMode(forcedState = null) {
     } catch (e) {}
   } else {
     document.body.classList.remove('zen-mode-active');
-    if (DOM.zenExpandIcon) DOM.zenExpandIcon.classList.remove('hidden');
-    if (DOM.zenCompressIcon) DOM.zenCompressIcon.classList.add('hidden');
-    if (DOM.zenBtnText) DOM.zenBtnText.textContent = 'Zen';
-    if (DOM.zenModeBtn) DOM.zenModeBtn.setAttribute('title', 'Zen Mode (Distraction-Free) (Z)');
     
     // Exit HTML5 fullscreen if currently active
     try {
@@ -2180,10 +2169,10 @@ function startOnboardingTour(isManual = false) {
         }
       },
       {
-        element: '#currentTaskInput',
+        element: '#unifiedTaskInput',
         popover: {
           title: '🎯 Set Your Target',
-          description: 'Write down the single task you are locking into right now. Single-tasking is the secret to deep focus.',
+          description: 'Type what you are working on, set your planned Pomodoro goal, and click Add to queue it up.',
           side: 'bottom',
           align: 'center'
         }
@@ -2216,11 +2205,11 @@ function startOnboardingTour(isManual = false) {
 
 
 // ==========================================================================
-// 16. Multi-Task Queue & Study Target Engine
+// 16. Unified Multi-Task Queue & Study Target Engine
 // ==========================================================================
 
 const LOCAL_STORAGE_KEY_TASK_QUEUE = 'pomohaven_task_queue';
-let taskTargetStepperCount = 2;
+let initialTargetStepperCount = 1;
 
 function getTaskQueue() {
   try {
@@ -2251,45 +2240,68 @@ function saveTaskQueue(tasks) {
 }
 
 function renderTaskQueue() {
-  if (!DOM.taskQueueList || !DOM.taskQueueBadge) return;
+  const container = DOM.unifiedQueueList || DOM.taskQueueList || document.getElementById('unifiedQueueList');
+  if (!container) return;
 
   const tasks = getTaskQueue();
-  const activeTaskTitle = (DOM.currentTaskInput ? DOM.currentTaskInput.value : '').trim();
-  const uncompletedCount = tasks.filter(t => !t.completed).length;
+  const currentTaskName = (state.currentTask || (DOM.unifiedTaskInput ? DOM.unifiedTaskInput.value : '') || '').trim().toLowerCase();
 
-  DOM.taskQueueBadge.textContent = uncompletedCount;
+  // If no task is marked active, and we have uncompleted tasks, set the first uncompleted task as active
+  let activeTask = null;
+  if (currentTaskName) {
+    activeTask = tasks.find(t => (t.title || t.text || '').toLowerCase() === currentTaskName && !t.completed);
+  }
+  if (!activeTask) {
+    activeTask = tasks.find(t => !t.completed);
+    if (activeTask) {
+      state.currentTask = activeTask.title || activeTask.text || '';
+    }
+  }
+
+  updateZenTaskDisplay();
 
   if (tasks.length === 0) {
-    DOM.taskQueueList.innerHTML = '<div class="task-queue-empty">No tasks in queue. Add your first study target above!</div>';
+    container.innerHTML = `
+      <div class="unified-queue-empty">
+        <span class="empty-icon">📋</span>
+        <span>No tasks in queue. Add your first goal above to start focusing!</span>
+      </div>
+    `;
     return;
   }
 
-  DOM.taskQueueList.innerHTML = tasks.map(task => {
+  container.innerHTML = tasks.map(task => {
     const taskTitle = task.title || task.text || '';
-    const isActive = activeTaskTitle && taskTitle.toLowerCase() === activeTaskTitle.toLowerCase();
+    const isActive = activeTask && activeTask.id === task.id && !task.completed;
     const isCompleted = task.completed || (task.completedPomos >= task.targetPomos);
     const minTarget = Math.max(1, task.completedPomos || 0);
     const canDecrement = (task.targetPomos || 1) > minTarget;
 
     return `
-      <div class="task-item ${isActive ? 'active-task' : ''} ${isCompleted ? 'completed-task' : ''}" data-task-id="${task.id}">
-        <label class="task-checkbox-wrap" title="${isCompleted ? 'Mark uncompleted' : 'Mark completed'}">
-          <input type="checkbox" class="task-checkbox" data-task-id="${task.id}" ${isCompleted ? 'checked' : ''}>
-          <span class="custom-checkbox"></span>
+      <div class="unified-task-card ${isActive ? 'active-focus' : ''} ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}">
+        <label class="task-check-wrap" title="${isCompleted ? 'Mark uncompleted' : 'Mark completed'}">
+          <input type="checkbox" class="unified-task-checkbox" data-task-id="${task.id}" ${isCompleted ? 'checked' : ''}>
+          <span class="custom-check"></span>
         </label>
-        <div class="task-details" data-task-id="${task.id}" title="Click to set as active focus task">
-          <span class="task-name">${escapeHtml(taskTitle)}</span>
-          <div class="task-pomo-progress" title="Target: ${task.targetPomos || 1} Pomodoros (${task.completedPomos || 0} completed)">
-            <button type="button" class="pomo-adjust-btn dec-target" data-task-id="${task.id}" title="Decrease target pomodoros (−1)" ${!canDecrement ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>−</button>
-            <span class="task-pomo-badge ${isCompleted ? 'completed' : ''}" data-task-id="${task.id}" title="Progress: ${task.completedPomos || 0}/${task.targetPomos || 1} completed">
-              🍅 <span class="pomo-count-text">${task.completedPomos || 0}/${task.targetPomos || 1}</span>
+        <div class="unified-task-info" data-task-id="${task.id}" title="Click to focus on this task">
+          <span class="unified-task-title">${escapeHtml(taskTitle)}</span>
+          <div class="unified-pomo-stepper" title="Progress: ${task.completedPomos || 0}/${task.targetPomos || 1} Pomodoros">
+            <button type="button" class="pomo-step-btn dec-pomo-btn" data-task-id="${task.id}" title="Decrease target limit (−1)" ${!canDecrement ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>−</button>
+            <span class="unified-pomo-badge ${isCompleted ? 'done' : ''}">
+              🍅 <span class="pomo-numbers">${task.completedPomos || 0}/${task.targetPomos || 1}</span>
             </span>
-            <button type="button" class="pomo-adjust-btn inc-target" data-task-id="${task.id}" title="Increase target pomodoros (+1)">+</button>
+            <button type="button" class="pomo-step-btn inc-pomo-btn" data-task-id="${task.id}" title="Increase target limit (+1)">+</button>
           </div>
         </div>
-        <div class="task-actions">
-          <button type="button" class="task-select-btn" data-task-id="${task.id}" title="Set as active focus task">${isActive ? 'Active' : '🎯 Focus'}</button>
-          <button type="button" class="task-delete-btn" data-task-id="${task.id}" title="Delete task">&times;</button>
+        <div class="unified-task-meta">
+          ${isActive ? `
+            <span class="active-focus-pill" title="Currently active session focus">
+              <span class="pulse-dot"></span> 🎯 Focus
+            </span>
+          ` : `
+            <button type="button" class="set-focus-btn" data-task-id="${task.id}" title="Make this the active focus task">🎯 Focus</button>
+          `}
+          <button type="button" class="unified-delete-btn" data-task-id="${task.id}" title="Delete task" aria-label="Delete task">&times;</button>
         </div>
       </div>
     `;
@@ -2297,113 +2309,101 @@ function renderTaskQueue() {
 }
 
 function initTaskQueue() {
-  if (!DOM.taskQueueContainer) return;
+  const form = DOM.unifiedTaskForm || document.getElementById('unifiedTaskForm');
+  const input = DOM.unifiedTaskInput || document.getElementById('unifiedTaskInput');
+  const decBtn = DOM.inputTargetDecBtn || document.getElementById('inputTargetDecBtn');
+  const incBtn = DOM.inputTargetIncBtn || document.getElementById('inputTargetIncBtn');
+  const valDisplay = DOM.inputTargetVal || document.getElementById('inputTargetVal');
+  const list = DOM.unifiedQueueList || DOM.taskQueueList || document.getElementById('unifiedQueueList');
 
-  // Toggle drawer / dropdown
-  if (DOM.toggleTaskQueueBtn) {
-    DOM.toggleTaskQueueBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isHidden = DOM.taskQueueContainer.classList.contains('hidden');
-      if (isHidden) {
-        DOM.taskQueueContainer.classList.remove('hidden');
-        DOM.queueArrow.classList.add('open');
-        DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
-      } else {
-        DOM.taskQueueContainer.classList.add('hidden');
-        DOM.queueArrow.classList.remove('open');
-        DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'false');
+  // Initial stepper controls for top input bar
+  if (decBtn && incBtn && valDisplay) {
+    decBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (initialTargetStepperCount > 1) {
+        initialTargetStepperCount--;
+        valDisplay.textContent = initialTargetStepperCount;
+      }
+    });
+    incBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (initialTargetStepperCount < 10) {
+        initialTargetStepperCount++;
+        valDisplay.textContent = initialTargetStepperCount;
       }
     });
   }
 
-  // Open add task form
-  if (DOM.openAddTaskBtn) {
-    DOM.openAddTaskBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      DOM.taskQueueContainer.classList.remove('hidden');
-      DOM.addTaskForm.classList.remove('hidden');
-      DOM.queueArrow.classList.add('open');
-      DOM.toggleTaskQueueBtn.setAttribute('aria-expanded', 'true');
-      if (DOM.newTaskTitleInput) {
-        DOM.newTaskTitleInput.focus();
-      }
+  // Form submission (click + Add or press Enter)
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitNewTask();
     });
   }
 
-  // Cancel add task
-  if (DOM.cancelAddTaskBtn) {
-    DOM.cancelAddTaskBtn.addEventListener('click', () => {
-      DOM.addTaskForm.classList.add('hidden');
-      if (DOM.newTaskTitleInput) DOM.newTaskTitleInput.value = '';
-    });
-  }
-
-  // Stepper controls for new task target
-  if (DOM.stepperDecBtn && DOM.stepperIncBtn && DOM.newTargetPomoCount) {
-    DOM.stepperDecBtn.addEventListener('click', () => {
-      if (taskTargetStepperCount > 1) {
-        taskTargetStepperCount--;
-        DOM.newTargetPomoCount.textContent = taskTargetStepperCount;
-      }
-    });
-    DOM.stepperIncBtn.addEventListener('click', () => {
-      if (taskTargetStepperCount < 20) {
-        taskTargetStepperCount++;
-        DOM.newTargetPomoCount.textContent = taskTargetStepperCount;
-      }
-    });
-  }
-
-  // Confirm add task
-  if (DOM.confirmAddTaskBtn) {
-    DOM.confirmAddTaskBtn.addEventListener('click', submitNewTask);
-  }
-
-  if (DOM.newTaskTitleInput) {
-    DOM.newTaskTitleInput.addEventListener('keydown', (e) => {
+  if (input) {
+    input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         submitNewTask();
-      } else if (e.key === 'Escape') {
-        DOM.addTaskForm.classList.add('hidden');
       }
     });
   }
 
   // Task list event delegation
-  if (DOM.taskQueueList) {
-    DOM.taskQueueList.addEventListener('click', (e) => {
+  if (list) {
+    list.addEventListener('click', (e) => {
       const target = e.target;
-      const taskId = target.getAttribute('data-task-id') || target.closest('[data-task-id]')?.getAttribute('data-task-id');
+      const card = target.closest('.unified-task-card, .task-item');
+      if (!card) return;
+      const taskId = card.getAttribute('data-task-id');
       if (!taskId) return;
 
       const tasks = getTaskQueue();
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
 
-      // Checkbox click (manual toggle completed state)
-      if (target.classList.contains('task-checkbox')) {
+      // 1. Checkbox toggle (mark complete/incomplete)
+      if (target.classList.contains('unified-task-checkbox') || target.classList.contains('task-checkbox')) {
         task.completed = target.checked;
         if (task.completed) {
           playChimeSound('bell');
           showToast(`✅ "${task.title}" completed!`, 'success');
+          // If the completed task was currently focused, advance to the next uncompleted task
+          const wasActive = state.currentTask && state.currentTask.toLowerCase() === (task.title || task.text || '').toLowerCase();
+          if (wasActive) {
+            const nextTask = tasks.find(t => !t.completed && t.id !== task.id);
+            state.currentTask = nextTask ? (nextTask.title || nextTask.text || '') : '';
+            if (nextTask) {
+              showToast(`🎯 Advanced focus to: "${nextTask.title || nextTask.text}"`, 'info');
+            }
+          }
         } else {
           showToast(`↩️ "${task.title}" marked in progress`, 'info');
+          if (!state.currentTask) {
+            state.currentTask = task.title || task.text || '';
+          }
         }
         saveTaskQueue(tasks);
         return;
       }
 
-      // Delete button
-      if (target.classList.contains('task-delete-btn')) {
+      // 2. Delete button (✕)
+      if (target.classList.contains('unified-delete-btn') || target.classList.contains('task-delete-btn')) {
+        const wasActive = state.currentTask && state.currentTask.toLowerCase() === (task.title || task.text || '').toLowerCase();
         const updated = tasks.filter(t => t.id !== taskId);
+        if (wasActive) {
+          const nextTask = updated.find(t => !t.completed);
+          state.currentTask = nextTask ? (nextTask.title || nextTask.text || '') : '';
+        }
         saveTaskQueue(updated);
         showToast('Task removed from queue', 'info');
         return;
       }
 
-      // Target Pomodoro decrement (- button)
-      if (target.classList.contains('dec-target') || target.classList.contains('dec-pomo') || target.classList.contains('dec-completed')) {
+      // 3. Target Pomodoro decrement (−)
+      if (target.classList.contains('dec-pomo-btn') || target.classList.contains('dec-target')) {
         const minTarget = Math.max(1, task.completedPomos || 0);
         if (task.targetPomos > minTarget) {
           task.targetPomos--;
@@ -2418,8 +2418,8 @@ function initTaskQueue() {
         return;
       }
 
-      // Target Pomodoro increment (+ button)
-      if (target.classList.contains('inc-target') || target.classList.contains('inc-pomo') || target.classList.contains('inc-completed')) {
+      // 4. Target Pomodoro increment (+)
+      if (target.classList.contains('inc-pomo-btn') || target.classList.contains('inc-target')) {
         if (task.targetPomos < 50) {
           task.targetPomos++;
           if (task.completedPomos < task.targetPomos) {
@@ -2431,9 +2431,11 @@ function initTaskQueue() {
         return;
       }
 
-      // Focus / Select task (clicking select button, task name, badge, or details)
-      if (target.classList.contains('task-select-btn') || target.classList.contains('task-name') || target.classList.contains('task-pomo-badge') || target.classList.contains('pomo-count-text') || target.closest('.task-details')) {
-        selectQueuedTask(task);
+      // 5. Select / Focus task
+      if (target.classList.contains('set-focus-btn') || target.classList.contains('task-select-btn') || target.classList.contains('unified-task-title') || target.closest('.unified-task-info')) {
+        if (!task.completed) {
+          selectQueuedTask(task);
+        }
       }
     });
   }
@@ -2442,15 +2444,16 @@ function initTaskQueue() {
 }
 
 function submitNewTask() {
-  if (!DOM.newTaskTitleInput) return;
-  const title = DOM.newTaskTitleInput.value.trim();
+  const input = DOM.unifiedTaskInput || DOM.currentTaskInput || document.getElementById('unifiedTaskInput');
+  if (!input) return;
+  const title = input.value.trim();
   if (!title) {
-    showToast('Please enter a task title', 'warning');
+    showToast('Please enter what you are working on 🎯', 'warning');
     return;
   }
 
   const tasks = getTaskQueue();
-  const targetCount = Math.max(1, parseInt(taskTargetStepperCount, 10) || 1);
+  const targetCount = Math.max(1, parseInt(initialTargetStepperCount, 10) || 1);
   const newTask = {
     id: 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     title: title,
@@ -2462,38 +2465,40 @@ function submitNewTask() {
   };
 
   tasks.push(newTask);
-  saveTaskQueue(tasks);
 
-  // If active task input is empty, automatically select
-  if (!DOM.currentTaskInput.value.trim()) {
-    selectQueuedTask(newTask);
+  // If no task is currently active or uncompleted, immediately set this new task as active
+  const hasActiveIncomplete = tasks.some(t => !t.completed && (state.currentTask && t.title.toLowerCase() === state.currentTask.toLowerCase()));
+  if (!hasActiveIncomplete || !state.currentTask) {
+    state.currentTask = newTask.title;
   }
 
-  DOM.newTaskTitleInput.value = '';
-  DOM.addTaskForm.classList.add('hidden');
-  showToast(`🎯 Added "${title}" (${targetCount} Pomos) to queue`, 'success');
+  saveTaskQueue(tasks);
+
+  input.value = '';
+  initialTargetStepperCount = 1;
+  const valDisplay = DOM.inputTargetVal || document.getElementById('inputTargetVal');
+  if (valDisplay) valDisplay.textContent = '1';
+
+  showToast(`🎯 Added "${title}" (${targetCount} 🍅) to queue`, 'success');
 }
 
 function selectQueuedTask(task) {
-  if (DOM.currentTaskInput) {
-    const taskName = task.title || task.text || '';
-    DOM.currentTaskInput.value = taskName;
-    state.currentTask = taskName;
-    updateZenTaskDisplay();
-    renderTaskQueue();
-    showToast(`🎯 Active focus task: "${taskName}"`, 'info');
-  }
+  const taskName = task.title || task.text || '';
+  state.currentTask = taskName;
+  updateZenTaskDisplay();
+  renderTaskQueue();
+  showToast(`🎯 Active focus task: "${taskName}"`, 'info');
 }
 
 function incrementActiveTaskProgress() {
-  const currentTaskName = (state.currentTask || (DOM.currentTaskInput ? DOM.currentTaskInput.value : '')).trim();
+  const currentTaskName = (state.currentTask || (DOM.unifiedTaskInput ? DOM.unifiedTaskInput.value : '')).trim();
   const tasks = getTaskQueue();
   if (tasks.length === 0) return;
 
   // Match active task by name, or fallback to first uncompleted task
   let matchedTask = null;
   if (currentTaskName) {
-    matchedTask = tasks.find(t => (t.title || t.text || '').trim().toLowerCase() === currentTaskName.toLowerCase());
+    matchedTask = tasks.find(t => (t.title || t.text || '').trim().toLowerCase() === currentTaskName.toLowerCase() && !t.completed);
   }
   if (!matchedTask) {
     matchedTask = tasks.find(t => !t.completed);
@@ -2510,8 +2515,10 @@ function incrementActiveTaskProgress() {
       // Automatically advance to the next incomplete task in the queue
       const nextTask = tasks.find(t => !t.completed && t.id !== matchedTask.id);
       if (nextTask) {
-        selectQueuedTask(nextTask);
-        showToast(`🎯 Advanced to next queued task: "${nextTask.title || nextTask.text}"`, 'info');
+        state.currentTask = nextTask.title || nextTask.text || '';
+        showToast(`🎯 Advanced to next queued task: "${state.currentTask}"`, 'info');
+      } else {
+        state.currentTask = '';
       }
     } else {
       showToast(`🍅 Progress: ${matchedTask.completedPomos}/${matchedTask.targetPomos} Pomos for "${matchedTask.title || matchedTask.text}"`, 'info');

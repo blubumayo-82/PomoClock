@@ -186,67 +186,56 @@
     <!-- Main Content Layout -->
     <main class="main-layout">
 
-      <!-- Timer Focus Section -->
-      <section class="timer-section card">
-        <!-- Floating Corner Zen Mode Button -->
-        <button id="zenModeBtn" class="zen-toggle-btn zen-corner-btn" title="Zen Mode (Distraction-Free) (Z)" aria-label="Toggle Zen Mode">
-          <svg id="zenExpandIcon" class="zen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <polyline points="9 21 3 21 3 15"></polyline>
-            <line x1="21" y1="3" x2="14" y2="10"></line>
-            <line x1="3" y1="21" x2="10" y2="14"></line>
-          </svg>
-          <svg id="zenCompressIcon" class="zen-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-          <span id="zenBtnText" class="zen-btn-label">Zen</span>
-        </button>
+      <!-- Dedicated Fixed Exit Zen Button (Displayed in Zen Mode) -->
+      <button type="button" id="exitZenBtn" class="exit-zen-btn" title="Exit Zen Mode (Esc or Z)" aria-label="Exit Zen Mode">
+        <span class="exit-zen-icon" aria-hidden="true">✕</span>
+        <span class="exit-zen-label">Exit Zen</span>
+      </button>
 
-        <!-- Zen Mode Active Task Badge (Clean minimalist label displayed in Zen Mode) -->
+      <!-- Timer Focus Section -->
+      <section class="timer-section card" id="timerSection">
+
+        <!-- Zen Mode Active Task Badge (Displays active task & tomato progress in Zen Mode) -->
         <div id="zenTaskBadge" class="zen-task-badge hidden" aria-live="polite"></div>
 
-        <!-- Consolidated Active Focus Task Bar & Queue Dropdown -->
-        <div class="active-task-bar task-bar-container" id="activeTaskBar">
-          <div class="task-input-wrapper">
-            <span class="task-icon" title="Active Focus Goal">🎯</span>
-            <input type="text" id="currentTaskInput" class="task-input"
-              placeholder="Focusing on..." maxlength="80" aria-label="Active focus task">
-            <button id="clearTaskBtn" class="task-clear-btn" title="Clear task" aria-label="Clear task">&times;</button>
-            <div class="task-input-divider"></div>
-            <div class="task-queue-actions">
-              <button type="button" id="toggleTaskQueueBtn" class="task-queue-pill-btn" aria-expanded="false" title="View study queue / upcoming tasks">
-                <span class="queue-icon">📋</span>
-                <span class="queue-badge" id="taskQueueBadge">0</span>
-                <span id="queueArrow" class="queue-arrow">▾</span>
+        <!-- Unified Task Queue Component -->
+        <div class="unified-task-queue" id="unifiedTaskQueue">
+          <!-- Top Row: Unified Input Bar -->
+          <form id="unifiedTaskForm" class="unified-task-form" onsubmit="return false;">
+            <div class="unified-task-input-wrapper">
+              <span class="task-input-lead-icon" aria-hidden="true">🎯</span>
+              <input type="text" id="unifiedTaskInput" class="unified-task-input"
+                placeholder="What are you working on?" maxlength="80" autocomplete="off" aria-label="What are you working on?">
+              
+              <div class="target-stepper-wrap" title="Initial tomato goal for this task">
+                <span class="target-stepper-icon" aria-hidden="true">🍅</span>
+                <button type="button" id="inputTargetDecBtn" class="stepper-btn" aria-label="Decrease initial target">−</button>
+                <span id="inputTargetVal" class="stepper-val">1</span>
+                <button type="button" id="inputTargetIncBtn" class="stepper-btn" aria-label="Increase initial target">+</button>
+              </div>
+
+              <button type="submit" id="unifiedTaskAddBtn" class="unified-add-btn" title="Add task to queue (+ Enter)">
+                <span class="add-btn-icon">+</span>
+                <span class="add-btn-text">Add</span>
               </button>
-              <button type="button" id="openAddTaskBtn" class="task-quick-add-btn" title="Add new task to queue">+ Queue</button>
-            </div>
-          </div>
 
-          <!-- Collapsible Dropdown Queue Panel -->
-          <div class="task-queue-container hidden" id="taskQueueContainer">
-            <!-- Add Task Input Form -->
-            <div id="addTaskForm" class="add-task-form hidden">
-              <div class="add-task-row">
-                <input type="text" id="newTaskTitleInput" class="new-task-input" placeholder="Task title (e.g. Data Structures Lab)..." maxlength="70">
-                <div class="stepper-wrap" title="Target Pomodoros for this task">
-                  <span class="stepper-pomo-icon">🍅</span>
-                  <button type="button" id="stepperDecBtn" class="stepper-btn" aria-label="Decrease target">−</button>
-                  <span id="newTargetPomoCount" class="stepper-val">2</span>
-                  <button type="button" id="stepperIncBtn" class="stepper-btn" aria-label="Increase target">+</button>
-                </div>
-              </div>
-              <div class="add-task-actions">
-                <button type="button" id="confirmAddTaskBtn" class="add-confirm-btn">Add to Queue</button>
-                <button type="button" id="cancelAddTaskBtn" class="add-cancel-btn">Cancel</button>
-              </div>
-            </div>
+              <div class="unified-divider" aria-hidden="true"></div>
 
-            <!-- Task Items List -->
-            <div id="taskQueueList" class="task-queue-list">
-              <div class="task-queue-empty">No tasks in queue. Click "+ Queue" to plan upcoming tasks!</div>
+              <button type="button" id="zenModeBtn" class="zen-toggle-btn" title="Zen Mode (Distraction-Free) (Z)" aria-label="Enter Zen Mode">
+                <svg id="zenExpandIcon" class="zen-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="9 21 3 21 3 15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+                <span class="zen-btn-label">Zen</span>
+              </button>
             </div>
+          </form>
+
+          <!-- Below Input: Unified Task Queue List -->
+          <div id="unifiedQueueList" class="unified-queue-list">
+            <!-- Rendered dynamically -->
           </div>
         </div>
 
