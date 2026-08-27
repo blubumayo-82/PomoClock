@@ -10,6 +10,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, jsonify, g, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 try:
     from dotenv import load_dotenv
@@ -31,9 +33,34 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = os.environ.get('SECRET_KEY', 'default-dev-fallback-key-pomohaven-2026')
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['SESSION_COOKIE_SECURE'] = True if (os.environ.get('DYNO') or os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or os.environ.get('FLASK_ENV') == 'production') else False
+is_production_env = (
+    os.environ.get('DYNO') is not None
+    or os.environ.get('FLASK_ENV') == 'production'
+    or os.environ.get('ENVIRONMENT') == 'production'
+    or os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1')
+)
+app.config['SESSION_COOKIE_SECURE'] = True if is_production_env else (os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1'))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Initialize Rate Limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Custom JSON response for rate limit violations."""
+    return jsonify({
+        "success": False,
+        "error": "Rate limit exceeded. Please try again later.",
+        "message": "Too many requests. Please slow down."
+    }), 429
+
 
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
@@ -343,6 +370,7 @@ def get_config():
 # ----------------------------------------------------------------------
 
 @app.route('/api/auth/google', methods=['POST'])
+@limiter.limit("30 per minute; 120 per hour")
 def google_auth():
     """
     Authenticates a user via Google OAuth 2.0 Identity Services.
@@ -463,6 +491,7 @@ def google_auth():
 
 
 @app.route('/api/auth/register', methods=['POST'])
+@limiter.limit("20 per minute; 100 per hour")
 def register():
     """
     Registers a new user with username/name, email, password, and confirm_password.
@@ -557,6 +586,7 @@ def register():
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("20 per minute; 100 per hour")
 def login():
     """
     Logs in an existing user with email/username and password.
@@ -1208,19 +1238,46 @@ def save_preferences():
 # ----------------------------------------------------------------------
 
 @app.route('/api/feedback', methods=['POST'])
+@limiter.limit("10 per minute; 60 per hour")
 def submit_feedback():
     """
     Submits user feedback and feature requests to PostgreSQL / SQLite database.
-    Supports both JSON payloads and Form Data safely.
+    Supports both JSON payloads and Form Data safely with data type validation and length truncation.
     Expects payload/form: { feedback_type / type, message, email }
     """
-    data = request.get_json(silent=True) or request.form.to_dict() or {}
-    message = (data.get('message') or '').strip()
-    feedback_type = (data.get('feedback_type') or data.get('type') or 'General Feedback').strip()
-    user_email = (data.get('email') or data.get('user_email') or '').strip() or None
+    raw_data = request.get_json(silent=True)
+    if raw_data is None:
+        data = request.form.to_dict() if request.form else {}
+    elif isinstance(raw_data, dict):
+        data = raw_data
+    else:
+        return jsonify({"success": False, "error": "Invalid request payload format. Expected JSON object or form data."}), 400
 
+    raw_message = data.get('message')
+    if raw_message is None or not isinstance(raw_message, str):
+        return jsonify({"success": False, "error": "Message must be a text string."}), 400
+
+    message = raw_message.strip()
     if not message:
         return jsonify({"success": False, "error": "Message cannot be empty."}), 400
+
+    # Truncate message payload (max 1000 chars)
+    if len(message) > 1000:
+        message = message[:1000]
+
+    raw_type = data.get('feedback_type') or data.get('type')
+    if raw_type is not None and not isinstance(raw_type, str):
+        return jsonify({"success": False, "error": "Feedback type must be a text string."}), 400
+    feedback_type = (raw_type or 'General Feedback').strip()
+    if len(feedback_type) > 100:
+        feedback_type = feedback_type[:100]
+
+    raw_email = data.get('email') or data.get('user_email')
+    if raw_email is not None and not isinstance(raw_email, str):
+        return jsonify({"success": False, "error": "Email must be a text string."}), 400
+    user_email = (raw_email or '').strip() or None
+    if user_email and len(user_email) > 255:
+        user_email = user_email[:255]
 
     try:
         user_id = session.get('user_id') or get_current_user_id()
@@ -1264,4 +1321,12 @@ def submit_feedback():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    is_production = (
+        os.environ.get('FLASK_ENV') == 'production'
+        or os.environ.get('ENVIRONMENT') == 'production'
+        or bool(os.environ.get('DYNO'))
+        or os.environ.get('FLASK_DEBUG', '').lower() in ('false', '0', 'no')
+    )
+    # Strictly enforce debug=False in production
+    debug_mode = False if is_production else (os.environ.get('FLASK_DEBUG', 'false').lower() in ('true', '1'))
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)

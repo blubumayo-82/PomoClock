@@ -494,7 +494,7 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn('completed_at', sessions[0])
 
     def test_submit_feedback_endpoint(self):
-        """Test /api/feedback saves feedback successfully."""
+        """Test /api/feedback saves feedback successfully, validates types, and truncates to 1000 chars."""
         res = self.client.post('/api/feedback', data=json.dumps({
             "feedback_type": "Feature Request",
             "message": "Love the app! Please add ambient rain sounds.",
@@ -521,6 +521,31 @@ class PomodoroAppTestCase(unittest.TestCase):
             "message": "   "
         }), content_type='application/json')
         self.assertEqual(err_res.status_code, 400)
+
+        # Non-string message type validation
+        err_type_res = self.client.post('/api/feedback', data=json.dumps({
+            "message": 12345
+        }), content_type='application/json')
+        self.assertEqual(err_type_res.status_code, 400)
+
+        # Message truncation > 1000 chars test
+        long_message = "A" * 1500
+        trunc_res = self.client.post('/api/feedback', data=json.dumps({
+            "message": long_message
+        }), content_type='application/json')
+        self.assertEqual(trunc_res.status_code, 200)
+
+        # Verify truncated message in database
+        with flask_app.app.app_context():
+            latest_fb = flask_app.Feedback.query.order_by(flask_app.Feedback.id.desc()).first()
+            self.assertIsNotNone(latest_fb)
+            self.assertEqual(len(latest_fb.message), 1000)
+
+    def test_security_cookie_configuration(self):
+        """Test session cookie security attributes."""
+        self.assertTrue(flask_app.app.config.get('SESSION_COOKIE_HTTPONLY'))
+        self.assertEqual(flask_app.app.config.get('SESSION_COOKIE_SAMESITE'), 'Lax')
+
 
     def test_multi_user_data_isolation(self):
         """Test multiple users on separate clients do not share or overwrite data."""
