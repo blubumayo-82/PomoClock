@@ -47,14 +47,15 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertTrue(data.get('guest_mode'))
 
     def test_index_page(self):
-        """Test index page returns HTML with 200 OK and PomoHaven branding and SEO metadata."""
+        """Test index page returns HTML with 200 OK, PomoHaven branding, SEO metadata, and GA4."""
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'PomoHaven \xe2\x80\x94 Cozy Pomodoro Timer & Study Focus Tracker', response.data)
         self.assertIn(b'YOUR COZY FOCUS HAVEN', response.data)
         self.assertIn(b'https://pomohaven.com/', response.data)
-        self.assertIn(b'style.css?v=31.0', response.data)
-        self.assertIn(b'script.js?v=31.0', response.data)
+        self.assertIn(b'G-5X56TCFQ65', response.data)
+        self.assertIn(b'style.css?v=32.0', response.data)
+        self.assertIn(b'script.js?v=32.0', response.data)
 
     def test_robots_txt(self):
         """Test robots.txt returns valid crawling directives and sitemap reference."""
