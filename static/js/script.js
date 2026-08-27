@@ -233,6 +233,12 @@ const DOM = {
   guestSyncSignupBtn: document.getElementById('guestSyncSignupBtn'),
   guestSyncDismissBtn: document.getElementById('guestSyncDismissBtn'),
 
+  // Privacy & Terms modal elements
+  privacyModal: document.getElementById('privacyModal') || document.getElementById('privacy-modal'),
+  openPrivacyModalBtn: document.getElementById('openPrivacyModalBtn'),
+  closePrivacyModalBtn: document.getElementById('closePrivacyModalBtn'),
+  closePrivacyModalBtnBottom: document.getElementById('closePrivacyModalBtnBottom'),
+
   // Feedback & Canvas
   confettiCanvas: document.getElementById('confettiCanvas'),
   toastContainer: document.getElementById('toastContainer')
@@ -2212,8 +2218,19 @@ function setupEventListeners() {
     });
   }
 
+  // Privacy & Terms Modal Open / Close
+  if (DOM.openPrivacyModalBtn) {
+    DOM.openPrivacyModalBtn.addEventListener('click', () => openModal(DOM.privacyModal));
+  }
+  if (DOM.closePrivacyModalBtn) {
+    DOM.closePrivacyModalBtn.addEventListener('click', () => closeModal(DOM.privacyModal));
+  }
+  if (DOM.closePrivacyModalBtnBottom) {
+    DOM.closePrivacyModalBtnBottom.addEventListener('click', () => closeModal(DOM.privacyModal));
+  }
+
   // Backdrop click to close any modal
-  [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal].forEach(modal => {
+  [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal, DOM.privacyModal].forEach(modal => {
     if (modal) {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal(modal);
@@ -2357,7 +2374,7 @@ function setupEventListeners() {
       if (document.body.classList.contains('zen-mode-active') || document.body.classList.contains('zen-mode')) {
         toggleZenMode(false);
       }
-      [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal].forEach(m => {
+      [DOM.authModal, DOM.themeModal, DOM.settingsModal, DOM.scienceModal, DOM.feedbackModal, DOM.guestSyncModal, DOM.privacyModal].forEach(m => {
         if (m && m.classList.contains('open')) closeModal(m);
       });
     }
