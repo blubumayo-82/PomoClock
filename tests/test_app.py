@@ -47,11 +47,32 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertTrue(data.get('guest_mode'))
 
     def test_index_page(self):
-        """Test index page returns HTML with 200 OK and PomoHaven branding."""
+        """Test index page returns HTML with 200 OK and PomoHaven branding and SEO metadata."""
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'PomoHaven', response.data)
+        self.assertIn(b'PomoHaven \xe2\x80\x94 Cozy Pomodoro Timer & Study Focus Tracker', response.data)
         self.assertIn(b'YOUR COZY FOCUS HAVEN', response.data)
+        self.assertIn(b'https://pomohaven.com/', response.data)
+        self.assertIn(b'style.css?v=31.0', response.data)
+        self.assertIn(b'script.js?v=31.0', response.data)
+
+    def test_robots_txt(self):
+        """Test robots.txt returns valid crawling directives and sitemap reference."""
+        response = self.client.get('/robots.txt')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('text/plain', response.content_type)
+        self.assertIn(b'User-agent: *', response.data)
+        self.assertIn(b'Allow: /', response.data)
+        self.assertIn(b'Sitemap: https://pomohaven.com/sitemap.xml', response.data)
+
+    def test_sitemap_xml(self):
+        """Test sitemap.xml returns valid XML sitemap."""
+        response = self.client.get('/sitemap.xml')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('application/xml', response.content_type)
+        self.assertIn(b'<loc>https://pomohaven.com/</loc>', response.data)
+        self.assertIn(b'<changefreq>daily</changefreq>', response.data)
+        self.assertIn(b'<priority>1.0</priority>', response.data)
 
     def test_user_register_and_login(self):
         """Test registering a new user account and subsequent login."""

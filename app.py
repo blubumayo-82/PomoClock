@@ -8,7 +8,7 @@ import os
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, request, jsonify, g, session
+from flask import Flask, render_template, request, jsonify, g, session, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 try:
@@ -301,6 +301,32 @@ def index():
     """Renders the main Pomodoro Study Timer single-page application."""
     google_id = os.environ.get('GOOGLE_CLIENT_ID', GOOGLE_CLIENT_ID)
     return render_template('index.html', google_client_id=google_id)
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    """Serves robots.txt search engine crawling directives dynamically."""
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Sitemap: https://pomohaven.com/sitemap.xml"
+    ]
+    return Response("\n".join(lines), mimetype="text/plain")
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Serves XML sitemap for search engine indexing."""
+    sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://pomohaven.com/</loc>
+    <lastmod>2026-08-27</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+    return Response(sitemap, mimetype="application/xml")
 
 
 @app.route('/api/config', methods=['GET'])
