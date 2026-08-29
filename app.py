@@ -1097,17 +1097,138 @@ def clear_sessions():
 @app.route('/api/user-stats', methods=['GET'])
 def get_statistics():
     """
-    Calculates study statistics for current user/guest:
+    Calculates study statistics for current user/guest using PostgreSQL (SQLAlchemy)
+    with SQLite fallback.
       - Total study hours and total minutes
       - Completed Pomodoro / Work count
       - Total sessions count (all modes)
       - Today's study minutes and pomodoro count
       - 7-day daily activity breakdown for charts
-      - Recent session logs
+      - Recent session logs (up to 10)
       - Daily streak calculation
     """
     try:
         user_id = session.get('user_id') or get_current_user_id()
+        now = datetime.now()
+        today_str = now.strftime('%Y-%m-%d')
+        focus_modes = ['work', 'pomodoro', 'focus']
+
+        # 1. Primary Query via SQLAlchemy (PostgreSQL / SQLite)
+        try:
+            query = StudySession.query
+            if user_id:
+                query = query.filter(StudySession.user_id == user_id)
+            else:
+                query = query.filter(StudySession.user_id.is_(None))
+
+            # Query all focus sessions with flexible mode and status
+            focus_sessions = query.filter(
+                StudySession.mode.in_(focus_modes),
+                (StudySession.status.in_(['completed', '', None])) | (db.func.lower(StudySession.status) == 'completed')
+            ).all()
+
+            total_focus_minutes = round(sum(float(s.duration_minutes or 0) for s in focus_sessions), 1)
+            completed_pomodoros = len(focus_sessions)
+            total_focus_hours = round(total_focus_minutes / 60.0, 2)
+
+            all_sessions = query.all()
+            total_sessions = len(all_sessions)
+
+            # Today's Focus Metrics
+            today_sessions = [
+                s for s in focus_sessions
+                if (s.start_time and s.start_time.startswith(today_str)) or
+                   (s.created_at and str(s.created_at).startswith(today_str))
+            ]
+            today_focus_minutes = round(sum(float(s.duration_minutes or 0) for s in today_sessions), 1)
+            today_pomodoros = len(today_sessions)
+
+            # 7-Day Weekly Activity Breakdown
+            weekly_activity = []
+            for i in range(6, -1, -1):
+                day_date = now - timedelta(days=i)
+                day_str = day_date.strftime('%Y-%m-%d')
+                day_name = day_date.strftime('%a')
+
+                day_sessions = [
+                    s for s in focus_sessions
+                    if (s.start_time and s.start_time.startswith(day_str)) or
+                       (s.created_at and str(s.created_at).startswith(day_str))
+                ]
+                day_mins = round(sum(float(s.duration_minutes or 0) for s in day_sessions), 1)
+                weekly_activity.append({
+                    "date": day_str,
+                    "day_name": day_name,
+                    "focus_minutes": day_mins,
+                    "completed_count": len(day_sessions)
+                })
+
+            # Recent 10 Sessions ordered by id.desc() / created_at.desc()
+            recent_objs = query.order_by(StudySession.id.desc()).limit(10).all()
+            recent_sessions = []
+            for r in recent_objs:
+                completed_at = r.end_time or (str(r.created_at) if hasattr(r, 'created_at') else None) or r.start_time
+                recent_sessions.append({
+                    "id": r.id,
+                    "task_title": r.task_name or 'Study Session',
+                    "task_name": r.task_name or 'Study Session',
+                    "duration_minutes": float(r.duration_minutes or 0),
+                    "mode": r.mode,
+                    "status": r.status or 'completed',
+                    "start_time": r.start_time,
+                    "created_at": str(r.created_at) if hasattr(r, 'created_at') else None,
+                    "completed_at": completed_at
+                })
+
+            # Streak Calculation
+            streak_days = 0
+            if today_sessions:
+                streak_days = 1
+            check_offset = 1
+            while True:
+                past_day = now - timedelta(days=check_offset)
+                past_str = past_day.strftime('%Y-%m-%d')
+                has_past = any(
+                    (s.start_time and s.start_time.startswith(past_str)) or
+                    (s.created_at and str(s.created_at).startswith(past_str))
+                    for s in focus_sessions
+                )
+                if has_past:
+                    streak_days += 1
+                    check_offset += 1
+                else:
+                    break
+                if check_offset > 365:
+                    break
+
+            return jsonify({
+                "success": True,
+                "stats": {
+                    "total_focus_minutes": total_focus_minutes,
+                    "total_focus_hours": total_focus_hours,
+                    "completed_pomodoros": completed_pomodoros,
+                    "total_sessions": total_sessions,
+                    "today_focus_minutes": today_focus_minutes,
+                    "today_pomodoros": today_pomodoros,
+                    "current_streak_days": streak_days,
+                    "weekly_activity": weekly_activity,
+                    "recent_sessions": recent_sessions
+                },
+                "total_focus_hours": total_focus_hours,
+                "total_focus_minutes": total_focus_minutes,
+                "completed_pomodoros": completed_pomodoros,
+                "total_sessions": total_sessions,
+                "today_focus_minutes": today_focus_minutes,
+                "today_pomodoros": today_pomodoros,
+                "current_streak_days": streak_days,
+                "weekly_activity": weekly_activity,
+                "recent_sessions": recent_sessions
+            }), 200
+
+        except Exception as sa_err:
+            app.logger.warning(f"SQLAlchemy query error, executing SQLite fallback: {sa_err}")
+
+        # 2. SQLite direct connection fallback
         sqlite_conn = get_db()
         cursor = sqlite_conn.cursor()
 
@@ -1119,7 +1240,9 @@ def get_statistics():
             SELECT COALESCE(SUM(duration_minutes), 0) AS total_minutes,
                    COUNT(*) AS completed_pomodoros
             FROM sessions
-            WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed'
+            WHERE {user_filter} 
+              AND mode IN ('pomodoro', 'work', 'focus') 
+              AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
         """, user_params)
         total_row = cursor.fetchone()
         total_focus_minutes = round(float(total_row['total_minutes']), 1)
@@ -1131,16 +1254,15 @@ def get_statistics():
         total_sessions = int(cursor.fetchone()['total_count'])
 
         # 3. Today's Focus Metrics
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        today_params = user_params + (f"{today_str}%",)
+        today_params = user_params + (f"{today_str}%", f"{today_str}%")
         cursor.execute(f"""
             SELECT COALESCE(SUM(duration_minutes), 0) AS today_minutes,
                    COUNT(*) AS today_pomodoros
             FROM sessions
             WHERE {user_filter}
               AND mode IN ('pomodoro', 'work', 'focus') 
-              AND status = 'completed' 
-              AND start_time LIKE ?
+              AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
+              AND (start_time LIKE ? OR created_at LIKE ?)
         """, today_params)
         today_row = cursor.fetchone()
         today_focus_minutes = round(float(today_row['today_minutes']), 1)
@@ -1148,12 +1270,11 @@ def get_statistics():
 
         # 4. Weekly Activity (Past 7 days breakdown)
         weekly_activity = []
-        now = datetime.now()
         for i in range(6, -1, -1):
             day_date = now - timedelta(days=i)
             day_str = day_date.strftime('%Y-%m-%d')
             day_name = day_date.strftime('%a')
-            day_params = user_params + (f"{day_str}%",)
+            day_params = user_params + (f"{day_str}%", f"{day_str}%")
 
             cursor.execute(f"""
                 SELECT COALESCE(SUM(duration_minutes), 0) AS day_minutes,
@@ -1161,8 +1282,8 @@ def get_statistics():
                 FROM sessions
                 WHERE {user_filter}
                   AND mode IN ('pomodoro', 'work', 'focus')
-                  AND status = 'completed'
-                  AND start_time LIKE ?
+                  AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
+                  AND (start_time LIKE ? OR created_at LIKE ?)
             """, day_params)
             day_stat = cursor.fetchone()
             weekly_activity.append({
@@ -1174,22 +1295,37 @@ def get_statistics():
 
         # 5. Recent 10 Sessions
         cursor.execute(f"""
-            SELECT id, mode, duration_minutes, start_time, end_time, status, task_name
+            SELECT id, mode, duration_minutes, start_time, end_time, status, task_name, created_at
             FROM sessions
             WHERE {user_filter}
             ORDER BY id DESC
             LIMIT 10
         """, user_params)
         recent_rows = cursor.fetchall()
-        recent_sessions = [dict(r) for r in recent_rows]
+        recent_sessions = []
+        for r in recent_rows:
+            time_val = r['end_time'] or r['created_at'] or r['start_time']
+            recent_sessions.append({
+                "id": r['id'],
+                "task_title": r['task_name'] or 'Study Session',
+                "task_name": r['task_name'] or 'Study Session',
+                "duration_minutes": float(r['duration_minutes']),
+                "mode": r['mode'],
+                "status": r['status'] or 'completed',
+                "start_time": r['start_time'],
+                "created_at": r['created_at'],
+                "completed_at": time_val
+            })
 
         # 6. Streak Calculation
         streak_days = 0
         test_day = now
-        check_params = user_params + (f"{test_day.strftime('%Y-%m-%d')}%",)
+        check_params = user_params + (f"{test_day.strftime('%Y-%m-%d')}%", f"{test_day.strftime('%Y-%m-%d')}%")
         cursor.execute(f"""
             SELECT COUNT(*) AS c FROM sessions 
-            WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed' AND start_time LIKE ?
+            WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') 
+              AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
+              AND (start_time LIKE ? OR created_at LIKE ?)
         """, check_params)
         today_has_activity = cursor.fetchone()['c'] > 0
 
@@ -1200,10 +1336,12 @@ def get_statistics():
         while True:
             past_day = now - timedelta(days=check_offset)
             past_str = past_day.strftime('%Y-%m-%d')
-            past_params = user_params + (f"{past_str}%",)
+            past_params = user_params + (f"{past_str}%", f"{past_str}%")
             cursor.execute(f"""
                 SELECT COUNT(*) AS c FROM sessions 
-                WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed' AND start_time LIKE ?
+                WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') 
+                  AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
+                  AND (start_time LIKE ? OR created_at LIKE ?)
             """, past_params)
             if cursor.fetchone()['c'] > 0:
                 streak_days += 1
@@ -1225,7 +1363,16 @@ def get_statistics():
                 "current_streak_days": streak_days,
                 "weekly_activity": weekly_activity,
                 "recent_sessions": recent_sessions
-            }
+            },
+            "total_focus_hours": total_focus_hours,
+            "total_focus_minutes": total_focus_minutes,
+            "completed_pomodoros": completed_pomodoros,
+            "total_sessions": total_sessions,
+            "today_focus_minutes": today_focus_minutes,
+            "today_pomodoros": today_pomodoros,
+            "current_streak_days": streak_days,
+            "weekly_activity": weekly_activity,
+            "recent_sessions": recent_sessions
         }), 200
 
     except Exception as err:
@@ -1244,13 +1391,60 @@ def get_weekly_stats():
     """
     try:
         user_id = session.get('user_id') or get_current_user_id()
+        now = datetime.now()
+        focus_modes = ['work', 'pomodoro', 'focus']
+
+        # Try SQLAlchemy first
+        try:
+            query = StudySession.query
+            if user_id:
+                query = query.filter(StudySession.user_id == user_id)
+            else:
+                query = query.filter(StudySession.user_id.is_(None))
+
+            focus_sessions = query.filter(
+                StudySession.mode.in_(focus_modes),
+                (StudySession.status.in_(['completed', '', None])) | (db.func.lower(StudySession.status) == 'completed')
+            ).all()
+
+            days = []
+            minutes = []
+            total_weekly_mins = 0.0
+
+            for i in range(6, -1, -1):
+                day_date = now - timedelta(days=i)
+                day_str = day_date.strftime('%Y-%m-%d')
+                day_name = day_date.strftime('%a')
+
+                day_sessions = [
+                    s for s in focus_sessions
+                    if (s.start_time and s.start_time.startswith(day_str)) or
+                       (s.created_at and str(s.created_at).startswith(day_str))
+                ]
+                day_mins = round(sum(float(s.duration_minutes or 0) for s in day_sessions), 1)
+                days.append(day_name)
+                minutes.append(day_mins)
+                total_weekly_mins += day_mins
+
+            total_weekly_hours = round(total_weekly_mins / 60.0, 1)
+
+            return jsonify({
+                "success": True,
+                "days": days,
+                "minutes": minutes,
+                "total_weekly_hours": total_weekly_hours
+            }), 200
+
+        except Exception as sa_err:
+            app.logger.warning(f"SQLAlchemy weekly stats error: {sa_err}")
+
+        # SQLite fallback
         sqlite_conn = get_db()
         cursor = sqlite_conn.cursor()
 
         user_filter = "user_id = ?" if user_id else "user_id IS NULL"
         user_params = (user_id,) if user_id else ()
 
-        now = datetime.now()
         days = []
         minutes = []
         total_weekly_mins = 0.0
@@ -1259,15 +1453,15 @@ def get_weekly_stats():
             day_date = now - timedelta(days=i)
             day_str = day_date.strftime('%Y-%m-%d')
             day_name = day_date.strftime('%a')
-            day_params = user_params + (f"{day_str}%",)
+            day_params = user_params + (f"{day_str}%", f"{day_str}%")
 
             cursor.execute(f"""
                 SELECT COALESCE(SUM(duration_minutes), 0) AS day_minutes
                 FROM sessions
                 WHERE {user_filter}
                   AND mode IN ('pomodoro', 'work', 'focus') 
-                  AND status = 'completed' 
-                  AND start_time LIKE ?
+                  AND (status IN ('completed', '') OR status IS NULL OR LOWER(status) = 'completed')
+                  AND (start_time LIKE ? OR created_at LIKE ?)
             """, day_params)
             day_stat = cursor.fetchone()
             day_mins = round(float(day_stat['day_minutes']), 1)
@@ -1291,11 +1485,43 @@ def get_weekly_stats():
 @app.route('/api/sessions/recent', methods=['GET'])
 def get_recent_sessions():
     """
-    Fetches the 5 most recent sessions for the current user.
-    Returns: [{ id, task_title, duration_minutes, mode, completed_at }]
+    Fetches the most recent sessions for the current user.
+    Returns: [{ id, task_title, duration_minutes, mode, status, completed_at }]
     """
     try:
         user_id = session.get('user_id') or get_current_user_id()
+        limit = request.args.get('limit', default=5, type=int)
+
+        # Try SQLAlchemy first
+        try:
+            query = StudySession.query
+            if user_id:
+                query = query.filter(StudySession.user_id == user_id)
+            else:
+                query = query.filter(StudySession.user_id.is_(None))
+
+            recent_objs = query.order_by(StudySession.id.desc()).limit(limit).all()
+            recent = []
+            for r in recent_objs:
+                completed_at = r.end_time or (str(r.created_at) if hasattr(r, 'created_at') else None) or r.start_time
+                recent.append({
+                    "id": r.id,
+                    "task_title": r.task_name or 'Study Session',
+                    "task_name": r.task_name or 'Study Session',
+                    "duration_minutes": float(r.duration_minutes or 0),
+                    "mode": r.mode,
+                    "status": r.status or 'completed',
+                    "start_time": r.start_time,
+                    "created_at": str(r.created_at) if hasattr(r, 'created_at') else None,
+                    "completed_at": completed_at
+                })
+
+            return jsonify(recent), 200
+
+        except Exception as sa_err:
+            app.logger.warning(f"SQLAlchemy recent sessions error: {sa_err}")
+
+        # SQLite fallback
         sqlite_conn = get_db()
         cursor = sqlite_conn.cursor()
 
@@ -1307,8 +1533,8 @@ def get_recent_sessions():
             FROM sessions
             WHERE {user_filter}
             ORDER BY id DESC
-            LIMIT 5
-        """, user_params)
+            LIMIT ?
+        """, user_params + (limit,))
         rows = cursor.fetchall()
         recent = []
         for r in rows:
@@ -1319,8 +1545,9 @@ def get_recent_sessions():
                 "task_name": r['task_name'] or 'Study Session',
                 "duration_minutes": float(r['duration_minutes']),
                 "mode": r['mode'],
-                "status": r['status'],
+                "status": r['status'] or 'completed',
                 "start_time": r['start_time'],
+                "created_at": r['created_at'],
                 "completed_at": completed_at
             })
 

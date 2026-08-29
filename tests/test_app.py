@@ -54,8 +54,8 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn(b'YOUR COZY FOCUS HAVEN', response.data)
         self.assertIn(b'https://pomohaven.com/', response.data)
         self.assertIn(b'G-5X56TCFQ65', response.data)
-        self.assertIn(b'style.css?v=5.0', response.data)
-        self.assertIn(b'script.js?v=5.0', response.data)
+        self.assertIn(b'style.css?v=6.0', response.data)
+        self.assertIn(b'script.js?v=6.0', response.data)
         self.assertIn(b'Privacy & Terms', response.data)
         self.assertIn(b'privacyModal', response.data)
         self.assertIn(b'Data Collection & Authentication', response.data)
@@ -347,6 +347,9 @@ class PomodoroAppTestCase(unittest.TestCase):
         data_user_stats = json.loads(res_user_stats.data)
         self.assertEqual(data_user_stats['stats']['total_focus_minutes'], 30.0)
         self.assertEqual(data_user_stats['stats']['completed_pomodoros'], 1)
+        self.assertEqual(len(data_user_stats['stats']['weekly_activity']), 7)
+        self.assertGreaterEqual(len(data_user_stats['stats']['recent_sessions']), 1)
+        self.assertEqual(data_user_stats['stats']['recent_sessions'][0]['task_name'], 'Deep Work on Project')
 
         # 4. Verify daily_streaks table contains the updated streak record
         with flask_app.app.app_context():
