@@ -1285,6 +1285,17 @@ async function handleTimerComplete() {
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
 
+  // Safely resolve active or selected task name
+  let activeTask = '';
+  if (DOM.currentTaskInput && DOM.currentTaskInput.value) {
+    activeTask = DOM.currentTaskInput.value.trim();
+  } else if (typeof state !== 'undefined' && state.currentTask) {
+    activeTask = state.currentTask.trim();
+  }
+  if (typeof state !== 'undefined') {
+    state.currentTask = activeTask;
+  }
+
   // 1. Play audio alarm on all completed sessions (Pomodoro, Short Break, Long Break)
   if (state.soundEnabled && state.soundVolume > 0) {
     try {
