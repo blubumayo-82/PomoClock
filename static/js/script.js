@@ -1420,15 +1420,18 @@ async function fetchWeeklyStats() {
         }
 
         // Fair Metric Rule: 1 Tomato = Every 25 minutes of cumulative focus time
+        const rawMinutes = (minutes[index] !== undefined && minutes[index] !== null) ? minutes[index] : 0;
+        const mins = parseFloat(rawMinutes) || 0;
         const tomatoes = Math.floor(mins / 25);
         const badgeVisible = tomatoes >= 1;
         const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
         const badgeTitle = badgeVisible ? `${tomatoes} Tomato${tomatoes > 1 ? 'es' : ''} (${tomatoes * 25}+ mins focused)` : '';
+        const tooltipText = tomatoes > 0 ? `${rawMinutes} mins (🍅 ${tomatoes})` : `${rawMinutes} mins`;
 
         html += `
           <div class="chart-col ${isToday ? 'today' : ''}">
             <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}" title="${badgeTitle}">${badgeHtml}</div>
-            <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
+            <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(18, 18, 18, 0.96) !important; z-index: 1000 !important;">${tooltipText}</div>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
             </div>
@@ -1546,7 +1549,8 @@ function renderWeeklyChart(activity) {
 
   let html = '';
   activity.forEach(item => {
-    const mins = parseFloat(item.focus_minutes || item.minutes) || 0;
+    const rawMinutes = (item.focus_minutes !== undefined) ? item.focus_minutes : ((item.minutes !== undefined) ? item.minutes : 0);
+    const mins = parseFloat(rawMinutes) || 0;
     // Fair Metric Rule: 1 Tomato = Every 25 minutes of cumulative focus time
     const tomatoes = Math.floor(mins / 25);
     const isToday = item.date === todayStr;
@@ -1565,11 +1569,12 @@ function renderWeeklyChart(activity) {
     const badgeVisible = tomatoes >= 1;
     const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
     const badgeTitle = badgeVisible ? `${tomatoes} Tomato${tomatoes > 1 ? 'es' : ''} (${tomatoes * 25}+ mins focused)` : '';
+    const tooltipText = tomatoes > 0 ? `${rawMinutes} mins (🍅 ${tomatoes})` : `${rawMinutes} mins`;
 
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
         <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}" title="${badgeTitle}">${badgeHtml}</div>
-        <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
+        <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(18, 18, 18, 0.96) !important; z-index: 1000 !important;">${tooltipText}</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>
