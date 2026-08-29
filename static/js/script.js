@@ -918,18 +918,29 @@ function updateStatusBadge() {
 
 function updateCycleIndicators() {
   const totalCycles = state.longBreakInterval || 4;
+  const currentMode = normalizeMode(state.currentMode);
+  const isLongBreak = currentMode === 'long_break';
+
   if (DOM.cycleLabel) {
-    DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${totalCycles}`;
+    if (isLongBreak) {
+      DOM.cycleLabel.textContent = `Long Break (Cycle ${state.cycleCount} of ${totalCycles})`;
+    } else {
+      DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${totalCycles}`;
+    }
   }
   
   if (DOM.cycleIndicator) {
     const dots = DOM.cycleIndicator.querySelectorAll('.cycle-dot');
     dots.forEach((dot, idx) => {
       dot.classList.remove('active', 'completed');
-      if (idx + 1 < state.cycleCount) {
+      if (isLongBreak && state.cycleCount >= totalCycles) {
         dot.classList.add('completed');
-      } else if (idx + 1 === state.cycleCount) {
-        dot.classList.add('active');
+      } else {
+        if (idx + 1 < state.cycleCount) {
+          dot.classList.add('completed');
+        } else if (idx + 1 === state.cycleCount) {
+          dot.classList.add('active');
+        }
       }
     });
   }
@@ -1131,6 +1142,7 @@ function switchMode(newMode, autoStart = false, bypassProtection = false, isUser
   updateModeTabsDisabledState(false);
   updateTimerDisplay();
   updateStatusBadge();
+  updateCycleIndicators();
 
   // Persist state upon mode transition
   saveTimerPersistence(autoStart);
@@ -1372,57 +1384,44 @@ async function handleTimerComplete() {
 function transitionToNextMode(isNaturalCompletion = true) {
   const current = normalizeMode(state.currentMode);
   const shouldAutoStart = isNaturalCompletion && (state.autoStartNextCycle ?? true);
+  const maxCycles = state.longBreakInterval || 4;
 
   if (current === 'pomodoro') {
-    // 1. Focus session completes: stay on SAME cycle number throughout the short break
-    localStorage.setItem('currentCycle', state.cycleCount.toString());
-    updateCycleIndicators();
-    switchMode('short_break', shouldAutoStart, true);
-  } else if (current === 'short_break') {
-    // 2. Short break finishes: advance currentCycle to next cycle; loop back to Cycle 1 after Cycle 4
-    const maxCycles = state.longBreakInterval || 4;
+    // 1. Focus session completes:
     if (state.cycleCount >= maxCycles) {
-      state.cycleCount = 1;
+      // 4th focus cycle finished -> Long Break!
+      // Keep cycle display showing the 4th cycle completed
+      localStorage.setItem('currentCycle', state.cycleCount.toString());
+      updateCycleIndicators();
+      switchMode('long_break', shouldAutoStart, true);
     } else {
-      state.cycleCount++;
+      // 1st, 2nd, or 3rd focus cycle finished -> Short Break
+      // Keep same cycle number during short break
+      localStorage.setItem('currentCycle', state.cycleCount.toString());
+      updateCycleIndicators();
+      switchMode('short_break', shouldAutoStart, true);
+    }
+  } else if (current === 'short_break') {
+    // 2. Short break completes:
+    // Advance cycle count to next cycle (e.g. from Cycle 1 to Cycle 2)
+    state.cycleCount++;
+    if (state.cycleCount > maxCycles) {
+      state.cycleCount = 1;
     }
     localStorage.setItem('currentCycle', state.cycleCount.toString());
     updateCycleIndicators();
     switchMode('pomodoro', shouldAutoStart, true);
   } else if (current === 'long_break') {
-    // If long break was manually completed, reset to cycle 1 focus and pause
+    // 3. Long break completes:
+    // Reset cycle count back to 1 and transition to Pomodoro
     state.cycleCount = 1;
     localStorage.setItem('currentCycle', state.cycleCount.toString());
     updateCycleIndicators();
-    switchMode('pomodoro', false, true);
-
-    state.isRunning = false;
-    state.currentMode = 'pomodoro';
-    state.totalDuration = getUserWorkDuration();
-    state.durations.pomodoro = state.totalDuration;
-    state.durations.work = state.totalDuration;
-    state.timeLeft = state.totalDuration;
-    state.sessionStartTime = null;
-
-    if (state.timerInterval) {
-      clearInterval(state.timerInterval);
-      state.timerInterval = null;
-    }
-
-    if (DOM.playIcon && DOM.pauseIcon && DOM.startPauseText && DOM.startPauseBtn) {
-      DOM.playIcon.style.display = 'inline-block';
-      DOM.pauseIcon.style.display = 'none';
-      DOM.startPauseText.textContent = 'Start';
-      DOM.startPauseBtn.classList.remove('running');
-    }
-
-    saveTimerPersistence(false);
-    updateModeTabs();
-    updateModeTabsDisabledState(false);
-    updateTimerDisplay();
-    updateStatusBadge();
-    updateCycleIndicators();
+    switchMode('pomodoro', shouldAutoStart, true);
   } else {
+    state.cycleCount = 1;
+    localStorage.setItem('currentCycle', state.cycleCount.toString());
+    updateCycleIndicators();
     switchMode('pomodoro', shouldAutoStart, true);
   }
 }
