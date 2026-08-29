@@ -4829,3 +4829,53 @@ body.zen-mode-active .timer-controls {
     transform: scale(1.015);
   }
 }
+
+/* Floating Audio Unlock Banner */
+#audio-unlock-banner,
+.audio-unlock-banner {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  border-radius: 9999px;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: bannerSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1), bannerFloat 2s ease-in-out infinite alternate;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+#audio-unlock-banner:hover,
+.audio-unlock-banner:hover {
+  transform: translateX(-50%) scale(1.03);
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.55);
+}
+
+@keyframes bannerSlideDown {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes bannerFloat {
+  0% {
+    box-shadow: 0 4px 14px rgba(217, 119, 6, 0.35);
+  }
+  100% {
+    box-shadow: 0 6px 22px rgba(217, 119, 6, 0.6);
+  }
+}
