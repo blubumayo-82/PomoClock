@@ -1222,7 +1222,7 @@ function restoreTimerFromStorage() {
       updateCycleIndicators();
       updateTimerDisplay();
       updateStatusBadge();
-      startTimer();
+      startTimer(true); // isAutoRestore = true: skip programmatic resumeAudioContext
       return true;
     } else {
       state.timeLeft = 0;
@@ -1265,8 +1265,10 @@ function restoreTimerFromStorage() {
   return true;
 }
 
-function switchMode(newMode, autoStart = false, bypassProtection = false) {
-  resumeAudioContext();
+function switchMode(newMode, autoStart = false, bypassProtection = false, isUserGesture = false) {
+  if (isUserGesture) {
+    resumeAudioContext();
+  }
   const normalizedMode = normalizeMode(newMode);
 
   // If clicking the same mode and timer is completely idle at initial duration, do nothing
@@ -1337,12 +1339,14 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
   saveTimerPersistence(autoStart);
 
   if (autoStart) {
-    startTimer();
+    startTimer(true);
   }
 }
 
-function startTimer() {
-  resumeAudioContext();
+function startTimer(isAutoRestore = false) {
+  if (!isAutoRestore) {
+    resumeAudioContext();
+  }
   if (state.isRunning) return;
 
   state.isRunning = true;
@@ -2921,10 +2925,19 @@ function adjustColorBrightness(hex, percent) {
 // ==========================================================================
 
 function setupEventListeners() {
-  // AudioContext Autoplay Unlock on user gestures
-  document.addEventListener('click', resumeAudioContext, { once: true });
-  document.addEventListener('touchstart', resumeAudioContext, { once: true });
-  document.addEventListener('keydown', resumeAudioContext, { once: true });
+  // Global First-Gesture AudioContext Unlock Listener
+  const unlockAudio = () => {
+    try {
+      const audioCtx = getAudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    } catch (_) {}
+    document.removeEventListener('pointerdown', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  };
+  document.addEventListener('pointerdown', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
 
   // Timer Controls
   if (DOM.startPauseBtn) DOM.startPauseBtn.addEventListener('click', toggleStartPause);
@@ -2938,9 +2951,9 @@ function setupEventListeners() {
   }
 
   // Mode Selection Tabs
-  if (DOM.tabPomodoro) DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro'));
-  if (DOM.tabShortBreak) DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break'));
-  if (DOM.tabLongBreak) DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break'));
+  if (DOM.tabPomodoro) DOM.tabPomodoro.addEventListener('click', () => switchMode('pomodoro', false, false, true));
+  if (DOM.tabShortBreak) DOM.tabShortBreak.addEventListener('click', () => switchMode('short_break', false, false, true));
+  if (DOM.tabLongBreak) DOM.tabLongBreak.addEventListener('click', () => switchMode('long_break', false, false, true));
 
   // Unified Task Queue Input (Auto-Active on typing if no active task)
   const taskInputElem = DOM.unifiedTaskInput || DOM.currentTaskInput;
