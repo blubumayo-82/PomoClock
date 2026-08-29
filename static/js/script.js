@@ -1293,8 +1293,9 @@ async function recordSession(payload) {
   // 1. Store in localStorage immediately for 100% hybrid persistence
   saveLocalSession(payload);
 
-  // 2. Instantly update UI statistics & chart locally
+  // 2. Instantly update UI statistics & chart locally and update cache
   const localStats = computeLocalStats();
+  localStorage.setItem('pomo_cached_stats', JSON.stringify({ success: true, stats: localStats }));
   renderStatistics(localStats);
 
   // 3. Send POST request to backend API to persist to PostgreSQL & SQLite
@@ -1329,31 +1330,54 @@ async function recordSession(payload) {
 function saveSession(payload) { return recordSession(payload); }
 function recordCompletedSession(payload) { return recordSession(payload); }
 
-async function fetchStatistics() {
-  // 1. Instantly render from local storage for 0ms initial load
+function loadCachedStats() {
+  try {
+    const cachedStatsRaw = localStorage.getItem('pomo_cached_stats');
+    if (cachedStatsRaw) {
+      const parsed = JSON.parse(cachedStatsRaw);
+      const stats = (parsed && parsed.stats) ? parsed.stats : parsed;
+      if (stats && (stats.total_focus_minutes !== undefined || stats.total_focus_hours !== undefined)) {
+        renderStatistics(stats);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('Error loading cached stats:', e);
+  }
+
+  // Fallback to local session computation
   const localStats = computeLocalStats();
   renderStatistics(localStats);
+  return false;
+}
+
+async function fetchStatistics() {
+  // 1. Instantly render from local storage / cache for 0ms initial load
+  loadCachedStats();
 
   // 2. Fetch authoritative database statistics directly from /api/user-stats or /api/stats
   try {
     const response = await fetch('/api/user-stats', { credentials: 'same-origin' });
-    if (!response.ok) {
-      const fallback = await fetch('/api/stats', { credentials: 'same-origin' });
-      if (!fallback.ok) throw new Error(`HTTP ${fallback.status}`);
-      const fbResult = await fallback.json();
-      if (fbResult.success && fbResult.stats) {
-        renderStatistics(fbResult.stats);
+    if (response.ok) {
+      const result = await response.json();
+      const stats = (result && result.stats) ? result.stats : result;
+      if (stats) {
+        localStorage.setItem('pomo_cached_stats', JSON.stringify(result));
+        renderStatistics(stats);
       }
     } else {
-      const result = await response.json();
-      if (result.success && result.stats) {
-        renderStatistics(result.stats);
-      } else if (result.stats) {
-        renderStatistics(result.stats);
+      const fallback = await fetch('/api/stats', { credentials: 'same-origin' });
+      if (fallback.ok) {
+        const fbResult = await fallback.json();
+        const fbStats = (fbResult && fbResult.stats) ? fbResult.stats : fbResult;
+        if (fbStats) {
+          localStorage.setItem('pomo_cached_stats', JSON.stringify(fbResult));
+          renderStatistics(fbStats);
+        }
       }
     }
   } catch (err) {
-    console.warn('Backend stats unavailable, using local calculation fallback:', err);
+    console.warn('Backend stats unavailable, using cached/local fallback:', err);
   }
 
   // Live weekly chart and recent sessions endpoints
@@ -1377,7 +1401,7 @@ async function fetchWeeklyStats() {
         DOM.chartWeekTotal.textContent = `${weeklyHours}h this week`;
       }
 
-      const maxMinutes = Math.max(...minutes, 60);
+      const maxMinutes = Math.max(...minutes, 25);
       const todayIndex = days.length - 1;
 
       let html = '';
@@ -1395,13 +1419,15 @@ async function fetchWeeklyStats() {
           barOpacity = 1;
         }
 
-        const count = Math.round(mins / 25);
-        const badgeHtml = mins >= 25 ? `🍅 ${count}` : '&nbsp;';
+        // Fair Metric Rule: 1 Tomato = Every 25 minutes of cumulative focus time
+        const tomatoes = Math.floor(mins / 25);
+        const badgeVisible = tomatoes >= 1;
+        const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
 
         html += `
           <div class="chart-col ${isToday ? 'today' : ''}">
-            <div class="chart-top-badge ${mins >= 25 ? 'active' : ''}">${badgeHtml}</div>
-            <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins</div>
+            <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}">${badgeHtml}</div>
+            <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
             </div>
@@ -1469,21 +1495,38 @@ async function fetchRecentSessions() {
 }
 
 function renderStatistics(stats) {
+  if (!stats) return;
   state.currentStats = stats;
-  DOM.statTotalHours.innerHTML = `${stats.total_focus_hours} <small>hrs</small>`;
-  DOM.statTotalMinutes.textContent = `${stats.total_focus_minutes} mins recorded`;
-  DOM.statCompletedCount.textContent = stats.completed_pomodoros;
-  DOM.statTotalSessions.textContent = `${stats.total_sessions} total sessions`;
-  DOM.statTodayMinutes.innerHTML = `${stats.today_focus_minutes} <small>min</small>`;
-  DOM.statTodaySessions.textContent = `${stats.today_pomodoros} sessions today`;
-  DOM.statStreakDays.innerHTML = `${stats.current_streak_days} <small>days</small>`;
 
-  const weekTotalMins = (stats.weekly_activity || []).reduce((acc, d) => acc + (parseFloat(d.focus_minutes) || 0), 0);
+  const totalHours = (stats.total_focus_hours !== undefined) 
+    ? stats.total_focus_hours 
+    : (Math.round(((stats.total_focus_minutes || 0) / 60) * 10) / 10);
+  const totalMins = stats.total_focus_minutes || 0;
+  const completedCount = (stats.completed_pomodoros !== undefined) ? stats.completed_pomodoros : 0;
+  const totalSessions = (stats.total_sessions !== undefined) ? stats.total_sessions : completedCount;
+  const todayMins = (stats.today_focus_minutes !== undefined) ? stats.today_focus_minutes : 0;
+  const todaySessions = (stats.today_pomodoros !== undefined) ? stats.today_pomodoros : 0;
+  const streakDays = (stats.current_streak_days !== undefined) ? stats.current_streak_days : 0;
+
+  if (DOM.statTotalHours) DOM.statTotalHours.innerHTML = `${totalHours} <small>hrs</small>`;
+  if (DOM.statTotalMinutes) DOM.statTotalMinutes.textContent = `${totalMins} mins recorded`;
+  if (DOM.statCompletedCount) DOM.statCompletedCount.textContent = completedCount;
+  if (DOM.statTotalSessions) DOM.statTotalSessions.textContent = `${totalSessions} total sessions`;
+  if (DOM.statTodayMinutes) DOM.statTodayMinutes.innerHTML = `${todayMins} <small>min</small>`;
+  if (DOM.statTodaySessions) DOM.statTodaySessions.textContent = `${todaySessions} sessions today`;
+  if (DOM.statStreakDays) DOM.statStreakDays.innerHTML = `${streakDays} <small>days</small>`;
+
+  const weeklyActivity = stats.weekly_activity || [];
+  const weekTotalMins = weeklyActivity.reduce((acc, d) => acc + (parseFloat(d.focus_minutes || d.minutes) || 0), 0);
   const weeklyHours = (weekTotalMins / 60).toFixed(1);
-  DOM.chartWeekTotal.textContent = `${weeklyHours}h this week`;
+  if (DOM.chartWeekTotal) DOM.chartWeekTotal.textContent = `${weeklyHours}h this week`;
 
-  renderWeeklyChart(stats.weekly_activity || []);
-  renderRecentSessions(stats.recent_sessions || []);
+  if (weeklyActivity.length > 0) {
+    renderWeeklyChart(weeklyActivity);
+  }
+  if (stats.recent_sessions && stats.recent_sessions.length > 0) {
+    renderRecentSessions(stats.recent_sessions);
+  }
 }
 
 function renderWeeklyChart(activity) {
@@ -1495,14 +1538,15 @@ function renderWeeklyChart(activity) {
     return;
   }
 
-  const recordedMins = activity.map(a => parseFloat(a.focus_minutes) || 0);
+  const recordedMins = activity.map(a => parseFloat(a.focus_minutes || a.minutes) || 0);
   const maxMinutes = Math.max(...recordedMins, 25);
   const todayStr = getLocalDateString();
 
   let html = '';
   activity.forEach(item => {
-    const mins = parseFloat(item.focus_minutes) || 0;
-    const count = parseInt(item.completed_count, 10) || 0;
+    const mins = parseFloat(item.focus_minutes || item.minutes) || 0;
+    // Fair Metric Rule: 1 Tomato = Every 25 minutes of cumulative focus time
+    const tomatoes = Math.floor(mins / 25);
     const isToday = item.date === todayStr;
     let heightPercent = 0;
     let minHeightPx = '0px';
@@ -1516,16 +1560,17 @@ function renderWeeklyChart(activity) {
       barOpacity = 1;
     }
 
-    const badgeHtml = count > 0 ? `🍅 ${count}` : '&nbsp;';
+    const badgeVisible = tomatoes >= 1;
+    const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
 
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
-        <div class="chart-top-badge ${count > 0 ? 'active' : ''}">${badgeHtml}</div>
-        <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${count} 🍅)</div>
+        <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}">${badgeHtml}</div>
+        <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>
-        <span class="chart-day-label">${item.day_name}</span>
+        <span class="chart-day-label">${item.day_name || item.day || ''}</span>
       </div>
     `;
   });
@@ -3629,6 +3674,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   loadStoredSettings();
   initTaskQueue();
+
+  // 1. Immediately populate stat cards, charts, and badges from cache to eliminate 0-stat flash
+  loadCachedStats();
 
   // Restore saved cycle, mode, timer state, and render UI ONCE
   restoreTimerFromStorage();
