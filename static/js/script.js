@@ -664,8 +664,9 @@ function updateStatusBadge() {
 }
 
 function updateCycleIndicators() {
+  const totalCycles = state.longBreakInterval || 4;
   if (DOM.cycleLabel) {
-    DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${state.longBreakInterval}`;
+    DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${totalCycles}`;
   }
   
   if (DOM.cycleIndicator) {
@@ -706,51 +707,112 @@ function updateModeTabsDisabledState(disabled) {
   });
 }
 
+function saveTimerPersistence(statusOverride = null) {
+  const currentStatus = statusOverride || (state.isRunning ? 'running' : 'paused');
+  const remainingSeconds = state.timeLeft;
+
+  localStorage.setItem('pomo_status', currentStatus);
+  localStorage.setItem('pomo_time_left', remainingSeconds.toString());
+  localStorage.setItem('pomo_mode', state.currentMode);
+  localStorage.setItem('pomo_cycle', state.cycleCount.toString());
+
+  // Supporting & legacy aliases
+  localStorage.setItem('currentCycle', state.cycleCount.toString());
+  localStorage.setItem('currentMode', state.currentMode);
+  localStorage.setItem('pomo_state', currentStatus);
+  localStorage.setItem('pomo_remaining_seconds', remainingSeconds.toString());
+  localStorage.setItem('timerStatus', currentStatus);
+  localStorage.setItem('totalDuration', state.totalDuration.toString());
+
+  if (currentStatus === 'running') {
+    localStorage.removeItem('isPaused');
+    localStorage.removeItem('pausedSecondsLeft');
+    const targetTimestamp = Date.now() + (remainingSeconds * 1000);
+    localStorage.setItem('pomo_target_end', targetTimestamp.toString());
+    localStorage.setItem('targetTimestamp', targetTimestamp.toString());
+  } else {
+    localStorage.setItem('isPaused', 'true');
+    localStorage.setItem('pausedSecondsLeft', remainingSeconds.toString());
+    localStorage.setItem('savedTimeLeft', remainingSeconds.toString());
+    localStorage.removeItem('pomo_target_end');
+    localStorage.removeItem('targetTimestamp');
+  }
+
+  if (state.sessionStartTime) {
+    localStorage.setItem('sessionStartTime', state.sessionStartTime);
+  }
+}
+
 function clearTimerPersistence() {
+  localStorage.removeItem('pomo_target_end');
   localStorage.removeItem('targetTimestamp');
   localStorage.removeItem('isPaused');
   localStorage.removeItem('pausedSecondsLeft');
-  localStorage.setItem('timerStatus', 'paused');
   localStorage.removeItem('savedTimeLeft');
+  localStorage.removeItem('pomo_remaining_seconds');
+  localStorage.removeItem('pomo_time_left');
+  localStorage.setItem('pomo_status', 'paused');
+  localStorage.setItem('pomo_state', 'paused');
+  localStorage.setItem('timerStatus', 'paused');
 }
 
 function restoreTimerFromStorage() {
-  const isPaused = localStorage.getItem('isPaused');
-  const pausedSecondsLeftStr = localStorage.getItem('pausedSecondsLeft');
-  const timerStatus = localStorage.getItem('timerStatus');
-  const targetTimestampStr = localStorage.getItem('targetTimestamp');
-  const storedMode = localStorage.getItem('currentMode');
+  const status = localStorage.getItem('pomo_status') || localStorage.getItem('pomo_state') || localStorage.getItem('timerStatus');
+  const savedSecondsRaw = localStorage.getItem('pomo_time_left') || localStorage.getItem('pomo_remaining_seconds') || localStorage.getItem('pausedSecondsLeft') || localStorage.getItem('savedTimeLeft');
+  const savedMode = localStorage.getItem('pomo_mode') || localStorage.getItem('currentMode');
+  const savedCycleRaw = localStorage.getItem('pomo_cycle') || localStorage.getItem('currentCycle');
+  const targetTimestampStr = localStorage.getItem('pomo_target_end') || localStorage.getItem('targetTimestamp');
   const storedTotalDuration = localStorage.getItem('totalDuration');
   const storedStartTime = localStorage.getItem('sessionStartTime');
-  const storedCycle = localStorage.getItem('currentCycle');
 
-  if (storedCycle) {
-    const parsedCycle = parseInt(storedCycle, 10);
+  // 1. Restore cycle
+  if (savedCycleRaw) {
+    const parsedCycle = parseInt(savedCycleRaw, 10);
     if (!isNaN(parsedCycle) && parsedCycle >= 1) {
       state.cycleCount = parsedCycle;
     }
   }
 
-  if (storedMode) {
-    state.currentMode = normalizeMode(storedMode);
+  // 2. Restore mode
+  if (savedMode) {
+    state.currentMode = normalizeMode(savedMode);
   }
+
+  // 3. Restore duration settings
   if (storedTotalDuration) {
     state.totalDuration = parseInt(storedTotalDuration, 10) || state.durations[state.currentMode] || 25 * 60;
+  } else {
+    if (state.currentMode === 'pomodoro') {
+      state.totalDuration = getUserWorkDuration();
+    } else if (state.currentMode === 'short_break') {
+      state.totalDuration = getUserShortBreakDuration();
+    } else if (state.currentMode === 'long_break') {
+      state.totalDuration = getUserLongBreakDuration();
+    }
+    state.durations[state.currentMode] = state.totalDuration;
   }
+
   if (storedStartTime) {
     state.sessionStartTime = storedStartTime;
   }
 
-  // 1. If paused before reload: restore paused state without starting interval
-  if (isPaused === 'true' && pausedSecondsLeftStr) {
-    const pausedSeconds = parseInt(pausedSecondsLeftStr, 10);
-    if (!isNaN(pausedSeconds)) {
-      state.timeLeft = Math.max(0, pausedSeconds);
+  // 4. Paused state: stay paused at the exact same second, cycle, and mode without starting interval
+  if (status === 'paused' || (status !== 'running' && savedSecondsRaw !== null)) {
+    const savedSeconds = parseInt(savedSecondsRaw, 10);
+    if (!isNaN(savedSeconds) && savedSeconds >= 0) {
+      state.timeLeft = savedSeconds;
       state.isRunning = false;
+
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+
       if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
       if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
       if (DOM.startPauseText) DOM.startPauseText.textContent = 'Start';
       if (DOM.startPauseBtn) DOM.startPauseBtn.classList.remove('running');
+
       updateModeTabs();
       updateModeTabsDisabledState(false);
       updateTimerDisplay();
@@ -760,8 +822,8 @@ function restoreTimerFromStorage() {
     }
   }
 
-  // 2. If running before reload: resume using target timestamp diff
-  if (timerStatus === 'running' && targetTimestampStr) {
+  // 5. Running state: resume using target timestamp diff
+  if (status === 'running' && targetTimestampStr) {
     const targetTimestamp = parseInt(targetTimestampStr, 10);
     if (!isNaN(targetTimestamp)) {
       const diff = Math.round((targetTimestamp - Date.now()) / 1000);
@@ -785,6 +847,11 @@ function restoreTimerFromStorage() {
     }
   }
 
+  // Fallback UI refresh
+  updateModeTabs();
+  updateModeTabsDisabledState(false);
+  updateTimerDisplay();
+  updateStatusBadge();
   updateCycleIndicators();
   return false;
 }
@@ -817,14 +884,13 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
     }
   }
 
-  // Clear running timer and persistence
+  // Clear running timer interval
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
   state.isRunning = false;
   state.sessionStartTime = null;
-  clearTimerPersistence();
 
   // Reset Start/Pause button UI to idle
   if (DOM.playIcon && DOM.pauseIcon && DOM.startPauseText && DOM.startPauseBtn) {
@@ -857,6 +923,9 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
   updateTimerDisplay();
   updateStatusBadge();
 
+  // Persist state upon mode transition
+  saveTimerPersistence(autoStart ? 'running' : 'paused');
+
   if (autoStart) {
     startTimer();
   }
@@ -878,19 +947,11 @@ function startTimer() {
   updateModeTabsDisabledState(true);
   updateStatusBadge();
 
-  // Clear paused state and calculate targetTimestamp for persistence
-  localStorage.removeItem('isPaused');
-  localStorage.removeItem('pausedSecondsLeft');
+  // Save running persistence state
+  saveTimerPersistence('running');
+
   const remainingSeconds = state.timeLeft;
   const targetTimestamp = Date.now() + (remainingSeconds * 1000);
-  localStorage.setItem('targetTimestamp', targetTimestamp.toString());
-  localStorage.setItem('timerStatus', 'running');
-  localStorage.setItem('currentMode', state.currentMode);
-  localStorage.setItem('totalDuration', state.totalDuration.toString());
-  localStorage.setItem('currentCycle', state.cycleCount.toString());
-  if (state.sessionStartTime) {
-    localStorage.setItem('sessionStartTime', state.sessionStartTime);
-  }
 
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
@@ -921,15 +982,8 @@ function pauseTimer() {
     state.timerInterval = null;
   }
 
-  // Save paused state to localStorage
-  localStorage.setItem('isPaused', 'true');
-  localStorage.setItem('timerStatus', 'paused');
-  localStorage.setItem('pausedSecondsLeft', state.timeLeft.toString());
-  localStorage.setItem('savedTimeLeft', state.timeLeft.toString());
-  localStorage.setItem('currentMode', state.currentMode);
-  localStorage.setItem('totalDuration', state.totalDuration.toString());
-  localStorage.setItem('currentCycle', state.cycleCount.toString());
-  localStorage.removeItem('targetTimestamp');
+  // Save paused persistence state
+  saveTimerPersistence('paused');
 
   if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
   if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
@@ -954,11 +1008,16 @@ function resetTimer() {
   pauseTimer();
 
   clearTimerPersistence();
+  localStorage.setItem('pomo_status', 'idle');
+  localStorage.removeItem('pomo_target_end');
+  localStorage.removeItem('targetTimestamp');
+  localStorage.removeItem('pomo_time_left');
+  localStorage.removeItem('pomo_cycle');
+  localStorage.removeItem('pomo_mode');
   localStorage.removeItem('currentCycle');
   localStorage.removeItem('isPaused');
   localStorage.removeItem('pausedSecondsLeft');
-  localStorage.removeItem('targetTimestamp');
-  localStorage.setItem('timerStatus', 'paused');
+  localStorage.removeItem('pomo_remaining_seconds');
 
   state.cycleCount = 1;
   state.currentMode = 'pomodoro';
@@ -967,6 +1026,8 @@ function resetTimer() {
   state.durations.work = state.totalDuration;
   state.timeLeft = state.totalDuration;
   state.sessionStartTime = null;
+
+  saveTimerPersistence('idle');
 
   updateModeTabs();
   updateModeTabsDisabledState(false);
@@ -1083,22 +1144,23 @@ function transitionToNextMode(isNaturalCompletion = true) {
   const shouldAutoStart = isNaturalCompletion && (state.autoStartNextCycle ?? true);
 
   if (current === 'pomodoro') {
-    if (state.cycleCount >= state.longBreakInterval) {
+    // 1. Focus session completes: stay on SAME cycle number throughout the short break
+    updateCycleIndicators();
+    switchMode('short_break', shouldAutoStart, true);
+  } else if (current === 'short_break') {
+    // 2. Short break finishes: advance currentCycle to next cycle; loop back to Cycle 1 after Cycle 4
+    const maxCycles = state.longBreakInterval || 4;
+    if (state.cycleCount >= maxCycles) {
       state.cycleCount = 1;
-      updateCycleIndicators();
-      switchMode('long_break', shouldAutoStart, true);
     } else {
       state.cycleCount++;
-      updateCycleIndicators();
-      switchMode('short_break', shouldAutoStart, true);
     }
+    updateCycleIndicators();
+    switchMode('pomodoro', shouldAutoStart, true);
   } else if (current === 'long_break') {
-    // 1. After a 'longBreak' finishes, do NOT automatically start the next work session.
-    // 2. Instead, transition the timer state back to 'work' ('pomodoro'), but pause it so the user must manually click the "Start" button to begin the next cycle.
-    // 3. When resetting the timer display for this next work session, do NOT fall back to the hardcoded default (like 25:00). It must reset to the user's custom configured work duration from their settings/preferences.
-    // 4. Ensure isRunning is set to false, the main button text updates to "Start", and the SVG circular progress ring resets cleanly to 100% full for the user's custom duration.
-    
-    // Explicitly transition to pomodoro with autoStart = false
+    // If long break was manually completed, reset to cycle 1 focus and pause
+    state.cycleCount = 1;
+    updateCycleIndicators();
     switchMode('pomodoro', false, true);
 
     state.isRunning = false;
@@ -1127,7 +1189,6 @@ function transitionToNextMode(isNaturalCompletion = true) {
     updateStatusBadge();
     updateCycleIndicators();
   } else {
-    // Short break finishes: transition to pomodoro/work, autoStart if enabled
     switchMode('pomodoro', shouldAutoStart, true);
   }
 }
@@ -2222,9 +2283,6 @@ function loadStoredSettings() {
     state.autoStartPomodoro = autoNextEnabled;
     state.soundType = savedSound;
     if (!isNaN(savedVolume)) state.soundVolume = savedVolume;
-
-    state.totalDuration = state.durations[state.currentMode];
-    state.timeLeft = state.totalDuration;
 
     // Defensive DOM assignments with null guards & optional chaining
     const pomoEl = DOM.settingPomodoro || document.getElementById('settingPomodoro');
@@ -3619,12 +3677,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   loadStoredSettings();
   initTaskQueue();
-  updateModeTabs();
-  updateCycleIndicators();
-  updateTimerDisplay();
-  updateStatusBadge();
 
-  // Restore running timer across page reloads if targetTimestamp exists
+  // Restore saved cycle, mode, timer state, and render UI ONCE
   restoreTimerFromStorage();
 
   // Check auth session, init Google Sign-In & load authoritative stats from database
