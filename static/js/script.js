@@ -1134,20 +1134,37 @@ async function recordSession(payload) {
   const localStats = computeLocalStats();
   renderStatistics(localStats);
 
-  // 3. Attempt server sync
+  // 3. Send POST request to backend API to persist to PostgreSQL & SQLite
   try {
+    const sessionBody = {
+      duration_minutes: payload.duration_minutes !== undefined ? payload.duration_minutes : 25,
+      mode: payload.mode || 'work',
+      start_time: payload.start_time || new Date().toISOString(),
+      end_time: payload.end_time || new Date().toISOString(),
+      status: payload.status || 'completed',
+      task_name: payload.task_name || 'Study Session'
+    };
+    if (payload.user_id) {
+      sessionBody.user_id = payload.user_id;
+    }
+
     const response = await fetch('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      credentials: 'same-origin',
+      body: JSON.stringify(sessionBody)
     });
     const data = await response.json();
     return data;
   } catch (err) {
-    console.warn('Backend unavailable; session preserved safely in local storage.');
+    console.warn('Backend unavailable; session preserved safely in local storage.', err);
     return { success: true, local_only: true };
   }
 }
+
+// Aliases for compatibility
+function saveSession(payload) { return recordSession(payload); }
+function recordCompletedSession(payload) { return recordSession(payload); }
 
 async function fetchStatistics() {
   // 1. Instantly render from local storage for 0ms initial load
@@ -1156,7 +1173,7 @@ async function fetchStatistics() {
 
   // 2. Fetch authoritative database statistics if available
   try {
-    const response = await fetch('/api/stats');
+    const response = await fetch('/api/stats', { credentials: 'same-origin' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
 
@@ -1175,7 +1192,7 @@ async function fetchStatistics() {
 async function fetchWeeklyStats() {
   if (!DOM.activityChart) return;
   try {
-    const res = await fetch('/api/stats/weekly');
+    const res = await fetch('/api/stats/weekly', { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.days && data.minutes) {
@@ -1212,7 +1229,7 @@ async function fetchWeeklyStats() {
         html += `
           <div class="chart-col ${isToday ? 'today' : ''}">
             <div class="chart-top-badge ${mins >= 25 ? 'active' : ''}">${badgeHtml}</div>
-            <div class="chart-tooltip">${mins} mins</div>
+            <div class="chart-tooltip" style="color: #ffffff !important; background: #1e1e1e !important;">${mins} mins</div>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
             </div>
@@ -1231,7 +1248,7 @@ async function fetchWeeklyStats() {
 async function fetchRecentSessions() {
   if (!DOM.historyTableBody) return;
   try {
-    const res = await fetch('/api/sessions/recent');
+    const res = await fetch('/api/sessions/recent', { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const sessions = Array.isArray(data) ? data : (data.sessions || []);
@@ -1332,7 +1349,7 @@ function renderWeeklyChart(activity) {
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
         <div class="chart-top-badge ${count > 0 ? 'active' : ''}">${badgeHtml}</div>
-        <div class="chart-tooltip">${mins} mins (${count} 🍅)</div>
+        <div class="chart-tooltip" style="color: #ffffff !important; background: #1e1e1e !important;">${mins} mins (${count} 🍅)</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>

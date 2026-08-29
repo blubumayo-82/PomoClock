@@ -111,6 +111,10 @@ class StudySession(db.Model):
     created_at = db.Column(db.String(50), default=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'))
 
 
+# Model alias for StudySession / Session
+Session = StudySession
+
+
 class DailyStreak(db.Model):
     __tablename__ = 'daily_streaks'
     id = db.Column(db.Integer, primary_key=True)
