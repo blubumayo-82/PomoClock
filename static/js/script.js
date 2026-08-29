@@ -37,12 +37,10 @@ const state = {
   // Audio settings
   soundEnabled: true,
   soundVolume: 0.8,
-  soundType: 'zen', // 'zen' | 'bell' | 'digital' | 'marimba' | 'beep'
-  audioContext: null,
+  soundType: 'zen',
   customSoundBlob: null,
   customSoundUrl: null,
   customSoundName: null,
-  customAudioElement: null,
 
   // Theme settings (Default: Classic Pomodoro)
   theme: 'pomodoro',
@@ -453,8 +451,6 @@ async function resetCustomSound() {
 }
 
 let activePreviewAudio = null;
-let activePreviewMasterGain = null;
-let activePreviewSynthTimeout = null;
 
 function updateTestSoundBtnState(isPlaying) {
   const testBtn = DOM.testSoundBtn || document.getElementById('testSoundBtn');
@@ -478,31 +474,14 @@ function stopSoundPreview() {
     } catch (_) {}
     activePreviewAudio = null;
   }
-  if (activePreviewMasterGain) {
-    try {
-      const ctx = getAudioContext();
-      if (ctx) {
-        activePreviewMasterGain.gain.setValueAtTime(0, ctx.currentTime);
-      }
-    } catch (_) {}
-    activePreviewMasterGain = null;
-  }
-  if (activePreviewSynthTimeout) {
-    clearTimeout(activePreviewSynthTimeout);
-    activePreviewSynthTimeout = null;
-  }
   updateTestSoundBtnState(false);
 }
 
-async function toggleSoundPreview() {
-  resumeAudioContext();
+function toggleSoundPreview() {
+  primeTimerAudio();
 
   // 1. If currently playing, stop and reset
   if (activePreviewAudio && !activePreviewAudio.paused) {
-    stopSoundPreview();
-    return;
-  }
-  if (activePreviewSynthTimeout || activePreviewMasterGain) {
     stopSoundPreview();
     return;
   }
@@ -511,227 +490,65 @@ async function toggleSoundPreview() {
   stopSoundPreview();
 
   const currentVolume = Math.max(0, Math.min(1, state.soundVolume));
+  const targetSrc = state.customSoundUrl || DEFAULT_ALARM_SOUND_SRC;
 
-  // 2. If custom uploaded sound exists, play via HTML5 Audio element
-  if (state.customSoundUrl) {
-    try {
-      activePreviewAudio = new Audio(state.customSoundUrl);
-      activePreviewAudio.volume = currentVolume;
-
-      activePreviewAudio.addEventListener('ended', () => {
-        stopSoundPreview();
-      });
-      activePreviewAudio.addEventListener('pause', () => {
-        updateTestSoundBtnState(false);
-      });
-      activePreviewAudio.addEventListener('error', (err) => {
-        console.warn('Audio preview error, falling back to synthesized chime:', err);
-        stopSoundPreview();
-        playSynthesizedPreviewChime(DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType);
-      });
-
-      const playPromise = activePreviewAudio.play();
-      updateTestSoundBtnState(true);
-
-      if (playPromise !== undefined) {
-        await playPromise.catch(err => {
-          console.warn('Audio play prevented:', err);
-          stopSoundPreview();
-        });
-      }
-      return;
-    } catch (err) {
-      console.warn('Error playing custom sound preview:', err);
-      stopSoundPreview();
-    }
-  }
-
-  // 3. Built-in synthesized chime preview
-  const soundType = DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType;
-  updateTestSoundBtnState(true);
-  playSynthesizedPreviewChime(soundType);
-}
-
-function playSynthesizedPreviewChime(type = state.soundType) {
   try {
-    const ctx = getAudioContext();
-    if (!ctx) {
-      updateTestSoundBtnState(false);
-      return;
-    }
+    activePreviewAudio = new Audio(targetSrc);
+    activePreviewAudio.volume = currentVolume;
 
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(e => console.warn(e));
-    }
-
-    const now = ctx.currentTime;
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(state.soundVolume, now);
-    masterGain.connect(ctx.destination);
-    activePreviewMasterGain = masterGain;
-
-    let durationMs = 4000;
-
-    if (type === 'zen') {
-      durationMs = 4000;
-      const freqs = [216, 432, 648, 864];
-      const gains = [0.6, 0.3, 0.15, 0.08];
-      freqs.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now);
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(gains[idx], now + 0.15);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
-        osc.connect(gainNode);
-        gainNode.connect(masterGain);
-        osc.start(now);
-        osc.stop(now + 4.0);
-      });
-    } else if (type === 'bell') {
-      durationMs = 2800;
-      const freqs = [523.25, 659.25, 783.99, 1046.50];
-      freqs.forEach((f, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(f, now + i * 0.08);
-        gain.gain.setValueAtTime(0, now + i * 0.08);
-        gain.gain.linearRampToValueAtTime(0.4, now + i * 0.08 + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 2.5);
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start(now + i * 0.08);
-        osc.stop(now + i * 0.08 + 2.6);
-      });
-    } else if (type === 'digital') {
-      durationMs = 1500;
-      const notes = [587.33, 739.99, 880.00, 1174.66];
-      notes.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-        gain.gain.setValueAtTime(0.3, now + idx * 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.35);
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start(now + idx * 0.1);
-        osc.stop(now + idx * 0.1 + 0.4);
-      });
-    } else if (type === 'marimba') {
-      durationMs = 1200;
-      const freqs = [440, 554.37, 659.25];
-      freqs.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-        gain.gain.setValueAtTime(0.5, now + idx * 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
-        osc.connect(gain);
-        gain.connect(masterGain);
-        osc.start(now + idx * 0.12);
-        osc.stop(now + idx * 0.12 + 0.85);
-      });
-    } else {
-      // Classic Beep
-      durationMs = 600;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(880, now);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.start(now);
-      osc.stop(now + 0.45);
-    }
-
-    activePreviewSynthTimeout = setTimeout(() => {
+    activePreviewAudio.addEventListener('ended', () => {
       stopSoundPreview();
-    }, durationMs);
+    });
+    activePreviewAudio.addEventListener('pause', () => {
+      updateTestSoundBtnState(false);
+    });
+    activePreviewAudio.addEventListener('error', (err) => {
+      console.log('Audio preview error:', err);
+      stopSoundPreview();
+    });
+
+    const playPromise = activePreviewAudio.play();
+    updateTestSoundBtnState(true);
+
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.log('Audio play prevented:', err);
+        stopSoundPreview();
+      });
+    }
   } catch (err) {
-    console.warn('Audio synth preview note:', err);
+    console.log('Error playing preview:', err);
     stopSoundPreview();
   }
 }
 
 // Dedicated Timer Alarm Audio Instance
 const DEFAULT_ALARM_SOUND_SRC = '/static/sounds/bell.wav';
-const alarmAudio = new Audio(DEFAULT_ALARM_SOUND_SRC);
-alarmAudio.preload = 'auto';
+const timerAlarm = new Audio(DEFAULT_ALARM_SOUND_SRC);
+timerAlarm.preload = 'auto';
 if (typeof window !== 'undefined') {
-  window.alarmAudio = alarmAudio;
+  window.timerAlarm = timerAlarm;
+  window.alarmAudio = timerAlarm;
 }
 
-let sharedAudioCtx = null;
-function getSharedAudioContext() {
-  if (!sharedAudioCtx) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) sharedAudioCtx = new AudioContextClass();
-  }
-  return sharedAudioCtx;
-}
-
-function getAudioContext() {
-  return getSharedAudioContext();
-}
-
-function unlockUserMedia() {
-  const ctx = getSharedAudioContext();
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
-  }
-  // Prime audio element
-  if (window.alarmAudio) {
-    window.alarmAudio.volume = Math.max(0, Math.min(1, state.soundVolume));
-    window.alarmAudio.play().then(() => {
-      window.alarmAudio.pause();
-      window.alarmAudio.currentTime = 0;
-    }).catch(() => {});
-  }
-  // Remove sound prompt banner if visible
-  const banner = document.getElementById('audio-unlock-banner');
-  if (banner) banner.remove();
-
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('pointerdown', unlockUserMedia);
-    window.removeEventListener('keydown', unlockUserMedia);
-    window.removeEventListener('click', unlockUserMedia);
-    window.removeEventListener('touchstart', unlockUserMedia);
-  }
+function primeTimerAudio() {
+  try {
+    if (timerAlarm && timerAlarm.paused && timerAlarm.currentTime === 0) {
+      timerAlarm.muted = true;
+      timerAlarm.play().then(() => {
+        timerAlarm.pause();
+        timerAlarm.currentTime = 0;
+        timerAlarm.muted = false;
+      }).catch(() => {
+        timerAlarm.muted = false;
+      });
+    }
+  } catch (_) {}
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('pointerdown', unlockUserMedia, { passive: true });
-  window.addEventListener('keydown', unlockUserMedia, { passive: true });
-  window.addEventListener('click', unlockUserMedia, { passive: true });
-  window.addEventListener('touchstart', unlockUserMedia, { passive: true });
-}
-
-function primeAudio() {
-  unlockUserMedia();
-}
-
-function showAudioUnlockBanner() {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById('audio-unlock-banner')) return;
-  if (typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive) {
-    return;
-  }
-
-  const banner = document.createElement('div');
-  banner.id = 'audio-unlock-banner';
-  banner.className = 'audio-unlock-banner';
-  banner.innerHTML = '🔔 Click anywhere to enable alarm sound';
-  banner.addEventListener('click', (e) => {
-    e.stopPropagation();
-    unlockUserMedia();
-  });
-  document.body.appendChild(banner);
+  window.addEventListener('pointerdown', primeTimerAudio, { passive: true, once: true });
+  window.addEventListener('keydown', primeTimerAudio, { passive: true, once: true });
 }
 
 let completionAlertInterval = null;
@@ -783,170 +600,23 @@ function triggerVisualCompletionAlert(mode = state.currentMode) {
   ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(e => document.addEventListener(e, clearAlertOnInteraction, { once: true, passive: true }));
 }
 
-function resumeAudioContext() {
-  unlockUserMedia();
-  try {
-    const audioCtx = getSharedAudioContext();
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
-    }
-    if (alarmAudio) {
-      alarmAudio.volume = state.soundVolume;
-    }
-    if (activePreviewAudio) {
-      activePreviewAudio.volume = state.soundVolume;
-    }
-  } catch (_) {}
-}
-
-async function playChimeSound(type = state.soundType) {
+function playChimeSound() {
   if (!state.soundEnabled || state.soundVolume <= 0) return;
 
   const currentVolume = Math.max(0, Math.min(1, state.soundVolume));
   const targetSrc = state.customSoundUrl || DEFAULT_ALARM_SOUND_SRC;
 
-  if (!alarmAudio.src || !alarmAudio.src.includes(targetSrc)) {
-    alarmAudio.src = targetSrc;
+  if (!timerAlarm.src || !timerAlarm.src.includes(targetSrc)) {
+    timerAlarm.src = targetSrc;
   }
-  alarmAudio.volume = currentVolume;
-  alarmAudio.muted = false;
+  timerAlarm.volume = currentVolume;
+  timerAlarm.muted = false;
 
   try {
-    alarmAudio.currentTime = 0;
-    const playPromise = alarmAudio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(err => {
-        console.warn('HTML5 alarm play was prevented, falling back to Web Audio synthesis:', err);
-        playSynthesizedChime(type);
-      });
-      return;
-    }
-  } catch (e) {
-    console.warn('Error playing alarm audio, falling back to Web Audio synthesis:', e);
-    await playSynthesizedChime(type);
-  }
-}
-
-function runBeepSequence(ctx, type = state.soundType) {
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  const masterGain = ctx.createGain();
-  masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, state.soundVolume)), now);
-  masterGain.connect(ctx.destination);
-
-  if (type === 'zen') {
-    const freqs = [216, 432, 648, 864];
-    const gains = [0.6, 0.3, 0.15, 0.08];
-    
-    freqs.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(gains[idx], now + 0.15);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
-
-      osc.connect(gainNode);
-      gainNode.connect(masterGain);
-
-      osc.start(now);
-      osc.stop(now + 4.0);
-    });
-  } else if (type === 'bell') {
-    // Pleasant bell harmonics (base: 587.33Hz, 880Hz, and harmonics with smooth gain fade-outs)
-    const freqs = [587.33, 880.0, 1174.66, 1760.0];
-    const gains = [0.5, 0.35, 0.15, 0.08];
-    freqs.forEach((f, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(f, now + i * 0.05);
-
-      gain.gain.setValueAtTime(0, now + i * 0.05);
-      gain.gain.linearRampToValueAtTime(gains[i], now + i * 0.05 + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 2.5);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + i * 0.05);
-      osc.stop(now + i * 0.05 + 2.6);
-    });
-  } else if (type === 'digital') {
-    const notes = [587.33, 739.99, 880.00, 1174.66];
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
-
-      gain.gain.setValueAtTime(0.3, now + idx * 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.35);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + idx * 0.1);
-      osc.stop(now + idx * 0.1 + 0.4);
-    });
-  } else if (type === 'marimba') {
-    const freqs = [440, 554.37, 659.25, 880];
-    freqs.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-
-      gain.gain.setValueAtTime(0.5, now + idx * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + idx * 0.12);
-      osc.stop(now + idx * 0.12 + 0.85);
-    });
-  } else {
-    // Default dual harmonic bell chime (587Hz & 880Hz sine tones with gain fade-outs)
-    [587.33, 880.0].forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-
-      gain.gain.setValueAtTime(0, now + idx * 0.08);
-      gain.gain.linearRampToValueAtTime(0.35, now + idx * 0.08 + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 1.8);
-
-      osc.connect(gain);
-      gain.connect(masterGain);
-
-      osc.start(now + idx * 0.08);
-      osc.stop(now + idx * 0.08 + 1.9);
-    });
-  }
-}
-
-async function playSynthesizedChime(type = state.soundType) {
-  if (!state.soundEnabled || state.soundVolume <= 0) return;
-
-  const ctx = getSharedAudioContext();
-  if (!ctx) {
-    triggerVisualCompletionAlert();
-    return;
-  }
-
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      runBeepSequence(ctx, type);
-    }).catch(err => {
-      console.warn('AudioContext resume prevented:', err);
-      triggerVisualCompletionAlert();
-    });
-  } else {
-    runBeepSequence(ctx, type);
+    timerAlarm.currentTime = 0;
+    timerAlarm.play().catch(e => console.log('Audio autoplay deferred:', e.message));
+  } catch (err) {
+    console.log('Playback error:', err);
   }
 }
 
@@ -1349,12 +1019,7 @@ function restoreTimerFromStorage() {
       updateCycleIndicators();
       updateTimerDisplay();
       updateStatusBadge();
-      startTimer(true); // isAutoRestore = true: skip programmatic resumeAudioContext
-      
-      // If timer is running on restored page load and user hasn't interacted yet, show gesture banner
-      if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
-        showAudioUnlockBanner();
-      }
+      startTimer(true);
       return true;
     } else {
       state.timeLeft = 0;
@@ -1399,7 +1064,7 @@ function restoreTimerFromStorage() {
 
 function switchMode(newMode, autoStart = false, bypassProtection = false, isUserGesture = false) {
   if (isUserGesture) {
-    resumeAudioContext();
+    primeTimerAudio();
   }
   const normalizedMode = normalizeMode(newMode);
 
@@ -1477,7 +1142,7 @@ function switchMode(newMode, autoStart = false, bypassProtection = false, isUser
 
 function startTimer(isAutoRestore = false) {
   if (!isAutoRestore) {
-    resumeAudioContext();
+    primeTimerAudio();
   }
   if (state.isRunning) return;
 
@@ -1543,7 +1208,7 @@ function pauseTimer() {
 }
 
 function toggleStartPause() {
-  resumeAudioContext();
+  primeTimerAudio();
   if (state.isRunning) {
     pauseTimer();
   } else {
@@ -1552,7 +1217,7 @@ function toggleStartPause() {
 }
 
 function resetTimer() {
-  resumeAudioContext();
+  primeTimerAudio();
   const wasRunning = state.isRunning;
   pauseTimer();
 
@@ -1585,7 +1250,7 @@ function resetTimer() {
 }
 
 function skipSession() {
-  resumeAudioContext();
+  primeTimerAudio();
   const previousMode = state.currentMode;
   pauseTimer();
   clearTimerPersistence();
@@ -1620,11 +1285,20 @@ async function handleTimerComplete() {
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
 
-  const activeTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
-  state.currentTask = activeTask;
-
-  // 1. Play audio chime on all completed sessions (Pomodoro, Short Break, Long Break)
-  await playChimeSound();
+  // 1. Play audio alarm on all completed sessions (Pomodoro, Short Break, Long Break)
+  if (state.soundEnabled && state.soundVolume > 0) {
+    try {
+      const targetSrc = state.customSoundUrl || DEFAULT_ALARM_SOUND_SRC;
+      if (!timerAlarm.src || !timerAlarm.src.includes(targetSrc)) {
+        timerAlarm.src = targetSrc;
+      }
+      timerAlarm.currentTime = 0;
+      timerAlarm.volume = Math.max(0, Math.min(1, state.soundVolume));
+      timerAlarm.play().catch(e => console.log('Audio autoplay deferred:', e.message));
+    } catch (err) {
+      console.log('Playback error:', err);
+    }
+  }
 
   // 2. Desktop notification
   showDesktopNotification(completedMode);
@@ -3056,9 +2730,9 @@ function adjustColorBrightness(hex, percent) {
 // ==========================================================================
 
 function setupEventListeners() {
-  // Global First-Gesture AudioContext & HTML5 Audio Unlock Primer
+  // Global First-Gesture Audio Unlock Primer
   ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
-    window.addEventListener(evt, primeAudio, { passive: true, once: true })
+    window.addEventListener(evt, primeTimerAudio, { passive: true, once: true })
   );
 
   // Timer Controls
@@ -3359,15 +3033,11 @@ function setupEventListeners() {
     DOM.settingVolume.addEventListener('input', (e) => {
       if (DOM.volumePercentLabel) DOM.volumePercentLabel.textContent = `${e.target.value}%`;
       state.soundVolume = parseInt(e.target.value, 10) / 100;
-      if (state.customAudioElement) {
-        state.customAudioElement.volume = state.soundVolume;
+      if (timerAlarm) {
+        timerAlarm.volume = state.soundVolume;
       }
       if (activePreviewAudio) {
         activePreviewAudio.volume = state.soundVolume;
-      }
-      if (activePreviewMasterGain) {
-        const ctx = getAudioContext();
-        if (ctx) activePreviewMasterGain.gain.setValueAtTime(state.soundVolume, ctx.currentTime);
       }
     });
   }
@@ -3396,13 +3066,13 @@ function setupEventListeners() {
 
   if (uploadBtn && fileInput) {
     uploadBtn.addEventListener('click', () => {
-      resumeAudioContext();
+      primeTimerAudio();
       fileInput.click();
     });
   }
 
   const handleFileInputChange = (e) => {
-    resumeAudioContext();
+    primeTimerAudio();
     if (e.target.files && e.target.files[0]) {
       handleCustomSoundUpload(e.target.files[0]);
     }
@@ -3417,7 +3087,7 @@ function setupEventListeners() {
 
   if (resetSoundBtn) {
     resetSoundBtn.addEventListener('click', () => {
-      resumeAudioContext();
+      primeTimerAudio();
       resetCustomSound();
     });
   }
