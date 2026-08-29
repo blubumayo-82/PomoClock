@@ -350,11 +350,10 @@ async function loadCustomSound() {
       state.customSoundName = record.name || 'Custom Alarm';
       state.customSoundUrl = URL.createObjectURL(record.blob);
 
-      if (!state.customAudioElement) {
-        state.customAudioElement = new Audio();
+      if (typeof alarmAudio !== 'undefined' && alarmAudio) {
+        alarmAudio.src = state.customSoundUrl;
+        alarmAudio.volume = state.soundVolume;
       }
-      state.customAudioElement.src = state.customSoundUrl;
-      state.customAudioElement.volume = state.soundVolume;
 
       updateCustomSoundUI();
       return true;
@@ -415,11 +414,10 @@ async function handleCustomSoundUpload(file) {
     state.customSoundName = file.name;
     state.customSoundUrl = URL.createObjectURL(file);
 
-    if (!state.customAudioElement) {
-      state.customAudioElement = new Audio();
+    if (typeof alarmAudio !== 'undefined' && alarmAudio) {
+      alarmAudio.src = state.customSoundUrl;
+      alarmAudio.volume = state.soundVolume;
     }
-    state.customAudioElement.src = state.customSoundUrl;
-    state.customAudioElement.volume = state.soundVolume;
 
     updateCustomSoundUI();
     showToast(`🎵 Custom sound "${file.name}" saved!`, 'success');
@@ -442,8 +440,9 @@ async function resetCustomSound() {
     state.customSoundBlob = null;
     state.customSoundUrl = null;
     state.customSoundName = null;
-    if (state.customAudioElement) {
-      state.customAudioElement.src = '';
+    if (typeof alarmAudio !== 'undefined' && alarmAudio) {
+      alarmAudio.src = DEFAULT_ALARM_SOUND_SRC;
+      alarmAudio.volume = state.soundVolume;
     }
     updateCustomSoundUI();
     showToast('Reset to default chime sound', 'info');
@@ -660,44 +659,49 @@ function playSynthesizedPreviewChime(type = state.soundType) {
   }
 }
 
-// Global Audio Engine Gesture Unlocker
-let audioUnlocked = false;
+// Dedicated Timer Alarm Audio Instance
+const DEFAULT_ALARM_SOUND_SRC = '/static/sounds/bell.wav';
+const alarmAudio = new Audio(DEFAULT_ALARM_SOUND_SRC);
+alarmAudio.preload = 'auto';
 
-function unlockAudio() {
-  if (audioUnlocked) return;
+let audioPrimed = false;
 
+function primeAudio() {
+  // 1. Resume Web Audio AudioContext if created
   try {
     const audioCtx = getAudioContext();
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
+  } catch (_) {}
 
-    const chime = state.customAudioElement || activePreviewAudio;
-    if (chime && chime.src) {
-      const prevMuted = chime.muted;
-      chime.muted = true;
-      chime.play().then(() => {
-        chime.pause();
-        chime.currentTime = 0;
-        chime.muted = prevMuted;
+  // 2. Prime HTML5 alarm audio with a muted micro-play
+  if (audioPrimed) return;
+  try {
+    const targetSrc = state.customSoundUrl || DEFAULT_ALARM_SOUND_SRC;
+    if (!alarmAudio.src || !alarmAudio.src.includes(targetSrc)) {
+      alarmAudio.src = targetSrc;
+    }
+    alarmAudio.volume = Math.max(0, Math.min(1, state.soundVolume));
+    const prevMuted = alarmAudio.muted;
+    alarmAudio.muted = true;
+    const p = alarmAudio.play();
+    if (p !== undefined) {
+      p.then(() => {
+        alarmAudio.pause();
+        alarmAudio.currentTime = 0;
+        alarmAudio.muted = prevMuted;
+        audioPrimed = true;
       }).catch(() => {});
     }
   } catch (_) {}
-
-  audioUnlocked = true;
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('pointerdown', unlockAudio);
-    window.removeEventListener('keydown', unlockAudio);
-    window.removeEventListener('click', unlockAudio);
-    window.removeEventListener('touchstart', unlockAudio);
-  }
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('pointerdown', unlockAudio, { passive: true });
-  window.addEventListener('keydown', unlockAudio, { passive: true });
-  window.addEventListener('click', unlockAudio, { passive: true });
-  window.addEventListener('touchstart', unlockAudio, { passive: true });
+  window.addEventListener('pointerdown', primeAudio, { passive: true });
+  window.addEventListener('keydown', primeAudio, { passive: true });
+  window.addEventListener('click', primeAudio, { passive: true });
+  window.addEventListener('touchstart', primeAudio, { passive: true });
 }
 
 let completionAlertInterval = null;
@@ -760,13 +764,14 @@ function getAudioContext() {
 }
 
 function resumeAudioContext() {
+  primeAudio();
   try {
     const audioCtx = getAudioContext();
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
-    if (state.customAudioElement) {
-      state.customAudioElement.volume = state.soundVolume;
+    if (alarmAudio) {
+      alarmAudio.volume = state.soundVolume;
     }
     if (activePreviewAudio) {
       activePreviewAudio.volume = state.soundVolume;
@@ -777,42 +782,49 @@ function resumeAudioContext() {
 async function playChimeSound(type = state.soundType) {
   if (!state.soundEnabled || state.soundVolume <= 0) return;
 
-  // 1. If custom uploaded sound exists, play via HTML5 Audio element
-  if (state.customSoundUrl) {
-    try {
-      if (!state.customAudioElement) {
-        state.customAudioElement = new Audio(state.customSoundUrl);
-      } else {
-        state.customAudioElement.src = state.customSoundUrl;
-      }
-      state.customAudioElement.currentTime = 0;
-      state.customAudioElement.volume = Math.max(0, Math.min(1, state.soundVolume));
-      const playPromise = state.customAudioElement.play();
-      if (playPromise !== undefined) {
-        await playPromise.catch(err => {
-          console.debug('Custom audio playback awaiting user gesture; using visual alert:', err);
-          triggerVisualCompletionAlert();
-        });
-      }
-      return;
-    } catch (err) {
-      console.debug('Custom audio element error; using visual alert:', err);
-      triggerVisualCompletionAlert();
+  const currentVolume = Math.max(0, Math.min(1, state.soundVolume));
+  const targetSrc = state.customSoundUrl || DEFAULT_ALARM_SOUND_SRC;
+
+  if (!alarmAudio.src || !alarmAudio.src.includes(targetSrc)) {
+    alarmAudio.src = targetSrc;
+  }
+  alarmAudio.volume = currentVolume;
+  alarmAudio.muted = false;
+
+  try {
+    alarmAudio.currentTime = 0;
+    const playPromise = alarmAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('HTML5 alarm play was prevented, falling back to Web Audio synthesis:', err);
+        playSynthesizedChime(type);
+      });
       return;
     }
+  } catch (e) {
+    console.warn('Error playing alarm audio, falling back to Web Audio synthesis:', e);
+    await playSynthesizedChime(type);
   }
-
-  // 2. Synthesized Web Audio Chime Fallback
-  await playSynthesizedChime(type);
 }
 
 async function playSynthesizedChime(type = state.soundType) {
+  if (!state.soundEnabled || state.soundVolume <= 0) return;
+
   try {
     const ctx = getAudioContext();
-    if (!ctx || ctx.state === 'suspended') {
-      console.debug('AudioContext is suspended awaiting user interaction; skipping synthesis.');
+    if (!ctx) {
       triggerVisualCompletionAlert();
       return;
+    }
+
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+      } catch (err) {
+        console.warn('AudioContext resume was prevented:', err);
+        triggerVisualCompletionAlert();
+        return;
+      }
     }
 
     const now = ctx.currentTime;
@@ -3013,9 +3025,9 @@ function adjustColorBrightness(hex, percent) {
 // ==========================================================================
 
 function setupEventListeners() {
-  // Global First-Gesture AudioContext Unlock Listener
+  // Global First-Gesture AudioContext & HTML5 Audio Unlock Primer
   ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
-    window.addEventListener(evt, unlockAudio, { passive: true, once: true })
+    window.addEventListener(evt, primeAudio, { passive: true, once: true })
   );
 
   // Timer Controls
