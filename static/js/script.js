@@ -1657,7 +1657,8 @@ async function fetchWeeklyStats() {
 
       let html = '';
       days.forEach((day, index) => {
-        const mins = minutes[index] || 0;
+        const rawMinutes = (minutes[index] !== undefined && minutes[index] !== null) ? minutes[index] : 0;
+        const mins = parseFloat(rawMinutes) || 0;
         const isToday = index === todayIndex;
         let heightPercent = 0;
         let minHeightPx = '0px';
@@ -1671,8 +1672,6 @@ async function fetchWeeklyStats() {
         }
 
         // Fair Metric Rule: 1 Tomato = Every 25 minutes of cumulative focus time
-        const rawMinutes = (minutes[index] !== undefined && minutes[index] !== null) ? minutes[index] : 0;
-        const mins = parseFloat(rawMinutes) || 0;
         const tomatoes = Math.floor(mins / 25);
         const badgeVisible = tomatoes >= 1;
         const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
