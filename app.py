@@ -1094,6 +1094,7 @@ def clear_sessions():
 # ----------------------------------------------------------------------
 
 @app.route('/api/stats', methods=['GET'])
+@app.route('/api/user-stats', methods=['GET'])
 def get_statistics():
     """
     Calculates study statistics for current user/guest:

@@ -703,6 +703,53 @@ function updateModeTabsDisabledState(disabled) {
   });
 }
 
+function clearTimerPersistence() {
+  localStorage.removeItem('targetTimestamp');
+  localStorage.setItem('timerStatus', 'paused');
+  localStorage.removeItem('savedTimeLeft');
+}
+
+function restoreTimerFromStorage() {
+  const timerStatus = localStorage.getItem('timerStatus');
+  const targetTimestampStr = localStorage.getItem('targetTimestamp');
+  const storedMode = localStorage.getItem('currentMode');
+  const storedTotalDuration = localStorage.getItem('totalDuration');
+  const storedStartTime = localStorage.getItem('sessionStartTime');
+
+  if (timerStatus === 'running' && targetTimestampStr) {
+    const targetTimestamp = parseInt(targetTimestampStr, 10);
+    if (!isNaN(targetTimestamp)) {
+      const diff = Math.round((targetTimestamp - Date.now()) / 1000);
+
+      if (storedMode) {
+        state.currentMode = normalizeMode(storedMode);
+      }
+      if (storedTotalDuration) {
+        state.totalDuration = parseInt(storedTotalDuration, 10) || state.durations[state.currentMode] || 25 * 60;
+      }
+      if (storedStartTime) {
+        state.sessionStartTime = storedStartTime;
+      }
+
+      if (diff > 0) {
+        state.timeLeft = diff;
+        updateModeTabs();
+        updateTimerDisplay();
+        startTimer();
+        return true;
+      } else {
+        state.timeLeft = 0;
+        updateModeTabs();
+        updateTimerDisplay();
+        clearTimerPersistence();
+        handleTimerComplete();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function switchMode(newMode, autoStart = false, bypassProtection = false) {
   const normalizedMode = normalizeMode(newMode);
 
@@ -726,19 +773,19 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
     const confirmSwitch = window.confirm(
       "A session is currently in progress. Switching modes will reset your current timer. Are you sure you want to switch?"
     );
-
     if (!confirmSwitch) {
-      return; // Cancelled: keep the current mode and active/paused timer intact
+      return; // Cancelled: keep current mode intact
     }
   }
 
-  // If confirmed or idle, stop the active timer interval and reset elapsed state
+  // Clear running timer and persistence
   if (state.timerInterval) {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
   state.isRunning = false;
   state.sessionStartTime = null;
+  clearTimerPersistence();
 
   // Reset Start/Pause button UI to idle
   if (DOM.playIcon && DOM.pauseIcon && DOM.startPauseText && DOM.startPauseBtn) {
@@ -780,7 +827,7 @@ function startTimer() {
   if (state.isRunning) return;
 
   state.isRunning = true;
-  state.sessionStartTime = new Date().toISOString();
+  state.sessionStartTime = state.sessionStartTime || new Date().toISOString();
 
   // Switch play/pause icon & text
   if (DOM.playIcon) DOM.playIcon.style.display = 'none';
@@ -792,11 +839,23 @@ function startTimer() {
   updateModeTabsDisabledState(true);
   updateStatusBadge();
 
-  // Drift-free interval timer based on real timestamps
-  const expectedEnd = Date.now() + state.timeLeft * 1000;
+  // Calculate targetTimestamp and store in localStorage for refresh persistence
+  const remainingSeconds = state.timeLeft;
+  const targetTimestamp = Date.now() + (remainingSeconds * 1000);
+  localStorage.setItem('targetTimestamp', targetTimestamp.toString());
+  localStorage.setItem('timerStatus', 'running');
+  localStorage.setItem('currentMode', state.currentMode);
+  localStorage.setItem('totalDuration', state.totalDuration.toString());
+  if (state.sessionStartTime) {
+    localStorage.setItem('sessionStartTime', state.sessionStartTime);
+  }
+
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+  }
 
   state.timerInterval = setInterval(() => {
-    const remainingMs = expectedEnd - Date.now();
+    const remainingMs = targetTimestamp - Date.now();
     const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
 
     state.timeLeft = remainingSecs;
@@ -805,6 +864,7 @@ function startTimer() {
     if (state.timeLeft <= 0) {
       clearInterval(state.timerInterval);
       state.timerInterval = null;
+      clearTimerPersistence();
       handleTimerComplete();
     }
   }, 250);
@@ -818,6 +878,11 @@ function pauseTimer() {
     clearInterval(state.timerInterval);
     state.timerInterval = null;
   }
+
+  // Update persistence state to paused
+  localStorage.setItem('timerStatus', 'paused');
+  localStorage.removeItem('targetTimestamp');
+  localStorage.setItem('savedTimeLeft', state.timeLeft.toString());
 
   if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
   if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
@@ -841,6 +906,7 @@ function resetTimer() {
   const wasRunning = state.isRunning;
   pauseTimer();
 
+  clearTimerPersistence();
   state.timeLeft = state.totalDuration;
   state.sessionStartTime = null;
   updateModeTabsDisabledState(false);
@@ -855,6 +921,7 @@ function resetTimer() {
 function skipSession() {
   const previousMode = state.currentMode;
   pauseTimer();
+  clearTimerPersistence();
 
   const activeTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
   state.currentTask = activeTask;
@@ -878,10 +945,11 @@ function skipSession() {
 
 async function handleTimerComplete() {
   pauseTimer();
+  clearTimerPersistence();
   const completedMode = state.currentMode;
   const isWork = (completedMode === 'pomodoro' || completedMode === 'work' || completedMode === 'focus');
   const sessionMode = isWork ? 'work' : completedMode;
-  const durationMins = Math.round((state.totalDuration / 60) * 10) / 10;
+  const sessionMinutes = Math.round((state.totalDuration / 60) * 10) / 10;
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
 
@@ -897,7 +965,7 @@ async function handleTimerComplete() {
   // 3. Record session in database & localStorage
   await recordSession({
     mode: sessionMode,
-    duration_minutes: durationMins,
+    duration_minutes: sessionMinutes,
     start_time: startTime,
     end_time: endTime,
     status: 'completed',
@@ -907,7 +975,7 @@ async function handleTimerComplete() {
   // 4. Confetti & Celebration for completed pomodoro
   if (isWork) {
     triggerConfettiBurst();
-    showToast(`🎉 Great job! Completed ${durationMins}m focus session.`, 'success');
+    showToast(`🎉 Great job! Completed ${sessionMinutes}m focus session.`, 'success');
     
     // Automatically increment multi-task queue target progress
     if (typeof incrementActiveTaskProgress === 'function') {
@@ -1171,14 +1239,23 @@ async function fetchStatistics() {
   const localStats = computeLocalStats();
   renderStatistics(localStats);
 
-  // 2. Fetch authoritative database statistics if available
+  // 2. Fetch authoritative database statistics directly from /api/user-stats or /api/stats
   try {
-    const response = await fetch('/api/stats', { credentials: 'same-origin' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.json();
-
-    if (result.success && result.stats) {
-      renderStatistics(result.stats);
+    const response = await fetch('/api/user-stats', { credentials: 'same-origin' });
+    if (!response.ok) {
+      const fallback = await fetch('/api/stats', { credentials: 'same-origin' });
+      if (!fallback.ok) throw new Error(`HTTP ${fallback.status}`);
+      const fbResult = await fallback.json();
+      if (fbResult.success && fbResult.stats) {
+        renderStatistics(fbResult.stats);
+      }
+    } else {
+      const result = await response.json();
+      if (result.success && result.stats) {
+        renderStatistics(result.stats);
+      } else if (result.stats) {
+        renderStatistics(result.stats);
+      }
     }
   } catch (err) {
     console.warn('Backend stats unavailable, using local calculation fallback:', err);
@@ -1229,7 +1306,7 @@ async function fetchWeeklyStats() {
         html += `
           <div class="chart-col ${isToday ? 'today' : ''}">
             <div class="chart-top-badge ${mins >= 25 ? 'active' : ''}">${badgeHtml}</div>
-            <div class="chart-tooltip" style="color: #ffffff !important; background: #1e1e1e !important;">${mins} mins</div>
+            <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins</div>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
             </div>
@@ -1349,7 +1426,7 @@ function renderWeeklyChart(activity) {
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
         <div class="chart-top-badge ${count > 0 ? 'active' : ''}">${badgeHtml}</div>
-        <div class="chart-tooltip" style="color: #ffffff !important; background: #1e1e1e !important;">${mins} mins (${count} 🍅)</div>
+        <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${count} 🍅)</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
         </div>
@@ -3464,6 +3541,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCycleIndicators();
   updateTimerDisplay();
   updateStatusBadge();
+
+  // Restore running timer across page reloads if targetTimestamp exists
+  restoreTimerFromStorage();
 
   // Check auth session, init Google Sign-In & load authoritative stats from database
   await checkAuthStatus();
