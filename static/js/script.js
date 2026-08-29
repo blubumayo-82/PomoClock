@@ -434,6 +434,7 @@ async function handleCustomSoundUpload(file) {
 
 async function resetCustomSound() {
   try {
+    stopSoundPreview();
     await deleteCustomSoundFromDB();
     if (state.customSoundUrl) {
       URL.revokeObjectURL(state.customSoundUrl);
@@ -446,9 +447,216 @@ async function resetCustomSound() {
     }
     updateCustomSoundUI();
     showToast('Reset to default chime sound', 'info');
-    playChimeSound();
+    toggleSoundPreview();
   } catch (err) {
     console.error('Failed to reset custom sound:', err);
+  }
+}
+
+let activePreviewAudio = null;
+let activePreviewMasterGain = null;
+let activePreviewSynthTimeout = null;
+
+function updateTestSoundBtnState(isPlaying) {
+  const testBtn = DOM.testSoundBtn || document.getElementById('testSoundBtn');
+  if (!testBtn) return;
+  if (isPlaying) {
+    testBtn.innerHTML = '⏹ Stop Sound';
+    testBtn.classList.add('playing', 'active-preview');
+    testBtn.setAttribute('title', 'Stop Sound Preview');
+  } else {
+    testBtn.innerHTML = '▶ Test Sound';
+    testBtn.classList.remove('playing', 'active-preview');
+    testBtn.setAttribute('title', 'Test Active Alarm Sound');
+  }
+}
+
+function stopSoundPreview() {
+  if (activePreviewAudio) {
+    try {
+      activePreviewAudio.pause();
+      activePreviewAudio.currentTime = 0;
+    } catch (_) {}
+    activePreviewAudio = null;
+  }
+  if (activePreviewMasterGain) {
+    try {
+      const ctx = getAudioContext();
+      if (ctx) {
+        activePreviewMasterGain.gain.setValueAtTime(0, ctx.currentTime);
+      }
+    } catch (_) {}
+    activePreviewMasterGain = null;
+  }
+  if (activePreviewSynthTimeout) {
+    clearTimeout(activePreviewSynthTimeout);
+    activePreviewSynthTimeout = null;
+  }
+  updateTestSoundBtnState(false);
+}
+
+async function toggleSoundPreview() {
+  resumeAudioContext();
+
+  // 1. If currently playing, stop and reset
+  if (activePreviewAudio && !activePreviewAudio.paused) {
+    stopSoundPreview();
+    return;
+  }
+  if (activePreviewSynthTimeout || activePreviewMasterGain) {
+    stopSoundPreview();
+    return;
+  }
+
+  // Stop any lingering audio first
+  stopSoundPreview();
+
+  const currentVolume = Math.max(0, Math.min(1, state.soundVolume));
+
+  // 2. If custom uploaded sound exists, play via HTML5 Audio element
+  if (state.customSoundUrl) {
+    try {
+      activePreviewAudio = new Audio(state.customSoundUrl);
+      activePreviewAudio.volume = currentVolume;
+
+      activePreviewAudio.addEventListener('ended', () => {
+        stopSoundPreview();
+      });
+      activePreviewAudio.addEventListener('pause', () => {
+        updateTestSoundBtnState(false);
+      });
+      activePreviewAudio.addEventListener('error', (err) => {
+        console.warn('Audio preview error, falling back to synthesized chime:', err);
+        stopSoundPreview();
+        playSynthesizedPreviewChime(DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType);
+      });
+
+      const playPromise = activePreviewAudio.play();
+      updateTestSoundBtnState(true);
+
+      if (playPromise !== undefined) {
+        await playPromise.catch(err => {
+          console.warn('Audio play prevented:', err);
+          stopSoundPreview();
+        });
+      }
+      return;
+    } catch (err) {
+      console.warn('Error playing custom sound preview:', err);
+      stopSoundPreview();
+    }
+  }
+
+  // 3. Built-in synthesized chime preview
+  const soundType = DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType;
+  updateTestSoundBtnState(true);
+  playSynthesizedPreviewChime(soundType);
+}
+
+function playSynthesizedPreviewChime(type = state.soundType) {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) {
+      updateTestSoundBtnState(false);
+      return;
+    }
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(e => console.warn(e));
+    }
+
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(state.soundVolume, now);
+    masterGain.connect(ctx.destination);
+    activePreviewMasterGain = masterGain;
+
+    let durationMs = 4000;
+
+    if (type === 'zen') {
+      durationMs = 4000;
+      const freqs = [216, 432, 648, 864];
+      const gains = [0.6, 0.3, 0.15, 0.08];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(gains[idx], now + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
+        osc.connect(gainNode);
+        gainNode.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + 4.0);
+      });
+    } else if (type === 'bell') {
+      durationMs = 2800;
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now + i * 0.08);
+        gain.gain.setValueAtTime(0, now + i * 0.08);
+        gain.gain.linearRampToValueAtTime(0.4, now + i * 0.08 + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 2.5);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 2.6);
+      });
+    } else if (type === 'digital') {
+      durationMs = 1500;
+      const notes = [587.33, 739.99, 880.00, 1174.66];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+        gain.gain.setValueAtTime(0.3, now + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.35);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.4);
+      });
+    } else if (type === 'marimba') {
+      durationMs = 1200;
+      const freqs = [440, 554.37, 659.25];
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+        gain.gain.setValueAtTime(0.5, now + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.85);
+      });
+    } else {
+      // Classic Beep
+      durationMs = 600;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, now);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    }
+
+    activePreviewSynthTimeout = setTimeout(() => {
+      stopSoundPreview();
+    }, durationMs);
+  } catch (err) {
+    console.warn('Audio synth preview note:', err);
+    stopSoundPreview();
   }
 }
 
@@ -470,6 +678,9 @@ function resumeAudioContext() {
     }
     if (state.customAudioElement) {
       state.customAudioElement.volume = state.soundVolume;
+    }
+    if (activePreviewAudio) {
+      activePreviewAudio.volume = state.soundVolume;
     }
   } catch (err) {
     console.warn('AudioContext unlock note:', err);
@@ -2655,6 +2866,9 @@ function openModal(modal, triggerElement = null) {
 function closeModal(modal) {
   if (!modal) return;
 
+  // Stop any active preview sound
+  stopSoundPreview();
+
   // If focus is currently inside the modal being hidden, blur it or return to trigger
   if (document.activeElement && modal.contains(document.activeElement)) {
     document.activeElement.blur();
@@ -3013,16 +3227,31 @@ function setupEventListeners() {
       if (state.customAudioElement) {
         state.customAudioElement.volume = state.soundVolume;
       }
+      if (activePreviewAudio) {
+        activePreviewAudio.volume = state.soundVolume;
+      }
+      if (activePreviewMasterGain) {
+        const ctx = getAudioContext();
+        if (ctx) activePreviewMasterGain.gain.setValueAtTime(state.soundVolume, ctx.currentTime);
+      }
+    });
+  }
+
+  if (DOM.settingSoundType) {
+    DOM.settingSoundType.addEventListener('change', () => {
+      stopSoundPreview();
     });
   }
 
   if (DOM.testSoundBtn) {
-    DOM.testSoundBtn.addEventListener('click', () => {
-      resumeAudioContext();
-      const soundType = DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType;
-      playChimeSound(soundType);
-    });
+    DOM.testSoundBtn.addEventListener('click', toggleSoundPreview);
   }
+
+  // Safety cleanup: stop sound preview on tab switch / window unload
+  window.addEventListener('beforeunload', stopSoundPreview);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopSoundPreview();
+  });
 
   // Custom Sound Upload & Reset Handlers
   const uploadBtn = DOM.uploadCustomSoundBtn || document.getElementById('uploadCustomSoundBtn');
