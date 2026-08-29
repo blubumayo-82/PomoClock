@@ -78,6 +78,11 @@ const MODE_CONFIG = {
     icon: '🌴'
   }
 };
+// Aliases for mode configuration lookups
+MODE_CONFIG.work = MODE_CONFIG.pomodoro;
+MODE_CONFIG.focus = MODE_CONFIG.pomodoro;
+MODE_CONFIG.shortBreak = MODE_CONFIG.short_break;
+MODE_CONFIG.longBreak = MODE_CONFIG.long_break;
 
 
 // ==========================================================================
@@ -440,29 +445,164 @@ function formatTime(seconds) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function normalizeMode(mode) {
+  if (!mode) return 'pomodoro';
+  const m = mode.toString().toLowerCase().replace('-', '_');
+  if (m === 'work' || m === 'focus' || m === 'pomodoro') return 'pomodoro';
+  if (m === 'shortbreak' || m === 'short_break' || m === 'short') return 'short_break';
+  if (m === 'longbreak' || m === 'long_break' || m === 'long') return 'long_break';
+  return mode;
+}
+
+function getUserWorkDuration() {
+  // 1. Check global or window userSettings if defined (e.g. userSettings.workTime, workDuration, etc.)
+  if (typeof userSettings !== 'undefined' && userSettings) {
+    const customTime = userSettings.workTime ?? userSettings.workDuration ?? userSettings.pomodoro ?? userSettings.work;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed <= 180 ? parsed * 60 : parsed;
+      }
+    }
+  }
+  if (typeof window !== 'undefined' && window.userSettings) {
+    const customTime = window.userSettings.workTime ?? window.userSettings.workDuration ?? window.userSettings.pomodoro ?? window.userSettings.work;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed <= 180 ? parsed * 60 : parsed;
+      }
+    }
+  }
+
+  // 2. Check state.durations
+  if (state && state.durations) {
+    const dur = state.durations.pomodoro || state.durations.work;
+    if (dur && dur > 0) return dur;
+  }
+
+  // 3. Check localStorage preferences
+  try {
+    const savedPomo = parseInt(
+      localStorage.getItem('pomohaven_dur_pomo') ||
+      localStorage.getItem('pomoclock_dur_pomo') ||
+      localStorage.getItem('focusflow_dur_pomo'),
+      10
+    );
+    if (!isNaN(savedPomo) && savedPomo > 0) {
+      return savedPomo * 60;
+    }
+  } catch (e) {}
+
+  // 4. Check DOM settings modal input
+  const pomoInput = DOM.settingPomodoro || (typeof document !== 'undefined' ? document.getElementById('settingPomodoro') : null);
+  if (pomoInput && pomoInput.value) {
+    const val = parseInt(pomoInput.value, 10);
+    if (!isNaN(val) && val > 0) {
+      return val * 60;
+    }
+  }
+
+  return 25 * 60;
+}
+
+function getUserShortBreakDuration() {
+  if (typeof userSettings !== 'undefined' && userSettings) {
+    const customTime = userSettings.shortBreakTime ?? userSettings.shortBreakDuration ?? userSettings.short_break ?? userSettings.shortBreak;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed <= 180 ? parsed * 60 : parsed;
+    }
+  }
+  if (typeof window !== 'undefined' && window.userSettings) {
+    const customTime = window.userSettings.shortBreakTime ?? window.userSettings.shortBreakDuration ?? window.userSettings.short_break ?? window.userSettings.shortBreak;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed <= 180 ? parsed * 60 : parsed;
+    }
+  }
+  if (state && state.durations && (state.durations.short_break || state.durations.shortBreak)) {
+    const dur = state.durations.short_break || state.durations.shortBreak;
+    if (dur && dur > 0) return dur;
+  }
+  try {
+    const saved = parseInt(
+      localStorage.getItem('pomohaven_dur_short') ||
+      localStorage.getItem('pomoclock_dur_short') ||
+      localStorage.getItem('focusflow_dur_short'),
+      10
+    );
+    if (!isNaN(saved) && saved > 0) return saved * 60;
+  } catch (e) {}
+  const shortInput = DOM.settingShortBreak || (typeof document !== 'undefined' ? document.getElementById('settingShortBreak') : null);
+  if (shortInput && shortInput.value) {
+    const val = parseInt(shortInput.value, 10);
+    if (!isNaN(val) && val > 0) return val * 60;
+  }
+  return 5 * 60;
+}
+
+function getUserLongBreakDuration() {
+  if (typeof userSettings !== 'undefined' && userSettings) {
+    const customTime = userSettings.longBreakTime ?? userSettings.longBreakDuration ?? userSettings.long_break ?? userSettings.longBreak;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed <= 180 ? parsed * 60 : parsed;
+    }
+  }
+  if (typeof window !== 'undefined' && window.userSettings) {
+    const customTime = window.userSettings.longBreakTime ?? window.userSettings.longBreakDuration ?? window.userSettings.long_break ?? window.userSettings.longBreak;
+    if (customTime !== undefined && customTime !== null) {
+      const parsed = parseInt(customTime, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed <= 180 ? parsed * 60 : parsed;
+    }
+  }
+  if (state && state.durations && (state.durations.long_break || state.durations.longBreak)) {
+    const dur = state.durations.long_break || state.durations.longBreak;
+    if (dur && dur > 0) return dur;
+  }
+  try {
+    const saved = parseInt(
+      localStorage.getItem('pomohaven_dur_long') ||
+      localStorage.getItem('pomoclock_dur_long') ||
+      localStorage.getItem('focusflow_dur_long'),
+      10
+    );
+    if (!isNaN(saved) && saved > 0) return saved * 60;
+  } catch (e) {}
+  const longInput = DOM.settingLongBreak || (typeof document !== 'undefined' ? document.getElementById('settingLongBreak') : null);
+  if (longInput && longInput.value) {
+    const val = parseInt(longInput.value, 10);
+    if (!isNaN(val) && val > 0) return val * 60;
+  }
+  return 15 * 60;
+}
+
 function calculateSessionEta() {
   if (!DOM.etaText) return;
 
   const totalCycles = state.longBreakInterval || 4;
   const currentCycle = state.cycleCount || 1;
-  const currentMode = state.currentMode || 'pomodoro';
+  const currentMode = normalizeMode(state.currentMode || 'pomodoro');
   const remainingCurrentSecs = Math.max(0, state.timeLeft);
 
   let totalRemainingSecs = remainingCurrentSecs;
+  const pomoDuration = state.durations.pomodoro || getUserWorkDuration();
+  const shortBreakDuration = state.durations.short_break || getUserShortBreakDuration();
 
   if (currentMode === 'pomodoro') {
     // Remaining subsequent pomodoros in this 4-cycle block
     const remainingSubsequentPomos = Math.max(0, totalCycles - currentCycle);
     // Remaining short breaks in this 4-cycle block
     const remainingShortBreaks = Math.max(0, totalCycles - currentCycle);
-    totalRemainingSecs += (remainingSubsequentPomos * state.durations.pomodoro) +
-                          (remainingShortBreaks * state.durations.short_break);
+    totalRemainingSecs += (remainingSubsequentPomos * pomoDuration) +
+                          (remainingShortBreaks * shortBreakDuration);
   } else if (currentMode === 'short_break') {
     // Current short break is active. Remaining pomodoros to complete the 4-cycle block:
     const remainingPomos = Math.max(0, totalCycles - currentCycle + 1);
     const remainingShortBreaks = Math.max(0, remainingPomos - 1);
-    totalRemainingSecs += (remainingPomos * state.durations.pomodoro) +
-                          (remainingShortBreaks * state.durations.short_break);
+    totalRemainingSecs += (remainingPomos * pomoDuration) +
+                          (remainingShortBreaks * shortBreakDuration);
   } else if (currentMode === 'long_break') {
     totalRemainingSecs = remainingCurrentSecs;
   }
@@ -484,15 +624,16 @@ function calculateSessionEta() {
 
 function updateTimerDisplay() {
   const formatted = formatTime(state.timeLeft);
-  DOM.timeDisplay.textContent = formatted;
+  if (DOM.timeDisplay) DOM.timeDisplay.textContent = formatted;
 
   // Dynamic Browser Tab Title formatting:
   // - When running: (MM:SS) PomoHaven (e.g., (24:59) PomoHaven)
   // - When paused/idle: PomoHaven - Cozy & Deep Study Flow
   // - When break active: ☕ Break Time! - PomoHaven (or 🌴 Long Break! - PomoHaven)
+  const normCurrent = normalizeMode(state.currentMode);
   if (state.isRunning) {
     document.title = `(${formatted}) PomoHaven`;
-  } else if (state.currentMode === 'short_break' || state.currentMode === 'long_break') {
+  } else if (normCurrent === 'short_break' || normCurrent === 'long_break') {
     document.title = `☕ Break Time! - PomoHaven`;
   } else {
     document.title = `PomoHaven - Cozy & Deep Study Flow`;
@@ -510,38 +651,45 @@ function updateTimerDisplay() {
 }
 
 function updateStatusBadge() {
-  const config = MODE_CONFIG[state.currentMode];
-  DOM.statusBadge.textContent = state.isRunning ? config.statusText : config.readyText;
-  
-  if (state.isRunning) {
-    DOM.statusBadge.classList.add('running');
-  } else {
-    DOM.statusBadge.classList.remove('running');
+  const normCurrent = normalizeMode(state.currentMode);
+  const config = MODE_CONFIG[normCurrent] || MODE_CONFIG.pomodoro;
+  if (DOM.statusBadge) {
+    DOM.statusBadge.textContent = state.isRunning ? config.statusText : config.readyText;
+    if (state.isRunning) {
+      DOM.statusBadge.classList.add('running');
+    } else {
+      DOM.statusBadge.classList.remove('running');
+    }
   }
 }
 
 function updateCycleIndicators() {
-  DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${state.longBreakInterval}`;
+  if (DOM.cycleLabel) {
+    DOM.cycleLabel.textContent = `Cycle ${state.cycleCount} of ${state.longBreakInterval}`;
+  }
   
-  const dots = DOM.cycleIndicator.querySelectorAll('.cycle-dot');
-  dots.forEach((dot, idx) => {
-    dot.classList.remove('active', 'completed');
-    if (idx + 1 < state.cycleCount) {
-      dot.classList.add('completed');
-    } else if (idx + 1 === state.cycleCount) {
-      dot.classList.add('active');
-    }
-  });
+  if (DOM.cycleIndicator) {
+    const dots = DOM.cycleIndicator.querySelectorAll('.cycle-dot');
+    dots.forEach((dot, idx) => {
+      dot.classList.remove('active', 'completed');
+      if (idx + 1 < state.cycleCount) {
+        dot.classList.add('completed');
+      } else if (idx + 1 === state.cycleCount) {
+        dot.classList.add('active');
+      }
+    });
+  }
 
   calculateSessionEta();
 }
 
 function updateModeTabs() {
   const modes = ['pomodoro', 'short_break', 'long_break'];
+  const normCurrent = normalizeMode(state.currentMode);
   modes.forEach(mode => {
     const tab = DOM['tab' + mode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')];
     if (tab) {
-      tab.classList.toggle('active', state.currentMode === mode);
+      tab.classList.toggle('active', normCurrent === mode);
     }
   });
 }
@@ -556,8 +704,10 @@ function updateModeTabsDisabledState(disabled) {
 }
 
 function switchMode(newMode, autoStart = false, bypassProtection = false) {
+  const normalizedMode = normalizeMode(newMode);
+
   // If clicking the same mode and timer is completely idle at initial duration, do nothing
-  if (newMode === state.currentMode && !state.isRunning && state.timeLeft === state.totalDuration) {
+  if (normalizedMode === state.currentMode && !state.isRunning && state.timeLeft === state.totalDuration) {
     return;
   }
 
@@ -565,7 +715,7 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
   const isSessionInProgress = state.isRunning || state.timeLeft < state.totalDuration;
 
   if (!bypassProtection && isSessionInProgress) {
-    const targetTab = DOM['tab' + newMode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')];
+    const targetTab = DOM['tab' + normalizedMode.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')];
     if (targetTab) {
       targetTab.classList.remove('tab-warning-pulse');
       void targetTab.offsetWidth; // Force DOM reflow to retrigger animation
@@ -598,8 +748,22 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
     DOM.startPauseBtn.classList.remove('running');
   }
 
-  state.currentMode = newMode;
-  state.totalDuration = state.durations[newMode] || 25 * 60;
+  state.currentMode = normalizedMode;
+
+  if (normalizedMode === 'pomodoro') {
+    state.totalDuration = getUserWorkDuration();
+    state.durations.pomodoro = state.totalDuration;
+    state.durations.work = state.totalDuration;
+  } else if (normalizedMode === 'short_break') {
+    state.totalDuration = getUserShortBreakDuration();
+    state.durations.short_break = state.totalDuration;
+  } else if (normalizedMode === 'long_break') {
+    state.totalDuration = getUserLongBreakDuration();
+    state.durations.long_break = state.totalDuration;
+  } else {
+    state.totalDuration = state.durations[normalizedMode] || 25 * 60;
+  }
+
   state.timeLeft = state.totalDuration;
 
   updateModeTabs();
@@ -619,10 +783,10 @@ function startTimer() {
   state.sessionStartTime = new Date().toISOString();
 
   // Switch play/pause icon & text
-  DOM.playIcon.style.display = 'none';
-  DOM.pauseIcon.style.display = 'inline-block';
-  DOM.startPauseText.textContent = 'Pause';
-  DOM.startPauseBtn.classList.add('running');
+  if (DOM.playIcon) DOM.playIcon.style.display = 'none';
+  if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'inline-block';
+  if (DOM.startPauseText) DOM.startPauseText.textContent = 'Pause';
+  if (DOM.startPauseBtn) DOM.startPauseBtn.classList.add('running');
 
   // Disable mode tabs while timer is running
   updateModeTabsDisabledState(true);
@@ -655,10 +819,10 @@ function pauseTimer() {
     state.timerInterval = null;
   }
 
-  DOM.playIcon.style.display = 'inline-block';
-  DOM.pauseIcon.style.display = 'none';
-  DOM.startPauseText.textContent = 'Start';
-  DOM.startPauseBtn.classList.remove('running');
+  if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
+  if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
+  if (DOM.startPauseText) DOM.startPauseText.textContent = 'Start';
+  if (DOM.startPauseBtn) DOM.startPauseBtn.classList.remove('running');
 
   // Re-enable mode tabs when timer is paused
   updateModeTabsDisabledState(false);
@@ -763,8 +927,10 @@ async function handleTimerComplete() {
 }
 
 function transitionToNextMode(isNaturalCompletion = true) {
+  const current = normalizeMode(state.currentMode);
   const shouldAutoStart = isNaturalCompletion && (state.autoStartNextCycle ?? true);
-  if (state.currentMode === 'pomodoro') {
+
+  if (current === 'pomodoro') {
     if (state.cycleCount >= state.longBreakInterval) {
       state.cycleCount = 1;
       updateCycleIndicators();
@@ -774,7 +940,42 @@ function transitionToNextMode(isNaturalCompletion = true) {
       updateCycleIndicators();
       switchMode('short_break', shouldAutoStart, true);
     }
+  } else if (current === 'long_break') {
+    // 1. After a 'longBreak' finishes, do NOT automatically start the next work session.
+    // 2. Instead, transition the timer state back to 'work' ('pomodoro'), but pause it so the user must manually click the "Start" button to begin the next cycle.
+    // 3. When resetting the timer display for this next work session, do NOT fall back to the hardcoded default (like 25:00). It must reset to the user's custom configured work duration from their settings/preferences.
+    // 4. Ensure isRunning is set to false, the main button text updates to "Start", and the SVG circular progress ring resets cleanly to 100% full for the user's custom duration.
+    
+    // Explicitly transition to pomodoro with autoStart = false
+    switchMode('pomodoro', false, true);
+
+    state.isRunning = false;
+    state.currentMode = 'pomodoro';
+    state.totalDuration = getUserWorkDuration();
+    state.durations.pomodoro = state.totalDuration;
+    state.durations.work = state.totalDuration;
+    state.timeLeft = state.totalDuration;
+    state.sessionStartTime = null;
+
+    if (state.timerInterval) {
+      clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
+
+    if (DOM.playIcon && DOM.pauseIcon && DOM.startPauseText && DOM.startPauseBtn) {
+      DOM.playIcon.style.display = 'inline-block';
+      DOM.pauseIcon.style.display = 'none';
+      DOM.startPauseText.textContent = 'Start';
+      DOM.startPauseBtn.classList.remove('running');
+    }
+
+    updateModeTabs();
+    updateModeTabsDisabledState(false);
+    updateTimerDisplay();
+    updateStatusBadge();
+    updateCycleIndicators();
   } else {
+    // Short break finishes: transition to pomodoro/work, autoStart if enabled
     switchMode('pomodoro', shouldAutoStart, true);
   }
 }

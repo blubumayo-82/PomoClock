@@ -55,7 +55,7 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn(b'https://pomohaven.com/', response.data)
         self.assertIn(b'G-5X56TCFQ65', response.data)
         self.assertIn(b'style.css?v=33.0', response.data)
-        self.assertIn(b'script.js?v=33.0', response.data)
+        self.assertIn(b'script.js?v=34.0', response.data)
         self.assertIn(b'Privacy & Terms', response.data)
         self.assertIn(b'privacyModal', response.data)
         self.assertIn(b'Data Collection & Authentication', response.data)
