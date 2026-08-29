@@ -663,37 +663,41 @@ function playSynthesizedPreviewChime(type = state.soundType) {
 // Global Audio Engine Gesture Unlocker
 let audioUnlocked = false;
 
-function unlockAudioEngine() {
+function unlockAudio() {
   if (audioUnlocked) return;
 
-  // 1. Resume AudioContext if present
-  const audioCtx = getAudioContext();
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
-  }
+  try {
+    const audioCtx = getAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
 
-  // 2. Prime HTML Audio elements with a muted play
-  const chime = state.customAudioElement || activePreviewAudio || (typeof document !== 'undefined' ? document.getElementById('timer-sound') : null);
-  if (chime && chime.src) {
-    const prevMuted = chime.muted;
-    chime.muted = true;
-    chime.play().then(() => {
-      chime.pause();
-      chime.currentTime = 0;
-      chime.muted = prevMuted;
-    }).catch(() => {});
-  }
+    const chime = state.customAudioElement || activePreviewAudio;
+    if (chime && chime.src) {
+      const prevMuted = chime.muted;
+      chime.muted = true;
+      chime.play().then(() => {
+        chime.pause();
+        chime.currentTime = 0;
+        chime.muted = prevMuted;
+      }).catch(() => {});
+    }
+  } catch (_) {}
 
   audioUnlocked = true;
-  ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
-    document.removeEventListener(evt, unlockAudioEngine)
-  );
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('pointerdown', unlockAudio);
+    window.removeEventListener('keydown', unlockAudio);
+    window.removeEventListener('click', unlockAudio);
+    window.removeEventListener('touchstart', unlockAudio);
+  }
 }
 
-if (typeof document !== 'undefined') {
-  ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
-    document.addEventListener(evt, unlockAudioEngine, { passive: true })
-  );
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio, { passive: true });
+  window.addEventListener('click', unlockAudio, { passive: true });
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
 }
 
 let completionAlertInterval = null;
@@ -740,9 +744,9 @@ function triggerVisualCompletionAlert(mode = state.currentMode) {
       completionAlertInterval = null;
       document.title = originalTitle;
     }
-    ['click', 'keydown', 'touchstart'].forEach(e => document.removeEventListener(e, clearAlertOnInteraction));
+    ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(e => document.removeEventListener(e, clearAlertOnInteraction));
   };
-  ['click', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, clearAlertOnInteraction, { once: true, passive: true }));
+  ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(e => document.addEventListener(e, clearAlertOnInteraction, { once: true, passive: true }));
 }
 
 function getAudioContext() {
@@ -759,7 +763,7 @@ function resumeAudioContext() {
   try {
     const audioCtx = getAudioContext();
     if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(err => console.warn('AudioContext resume failed:', err));
+      audioCtx.resume().catch(() => {});
     }
     if (state.customAudioElement) {
       state.customAudioElement.volume = state.soundVolume;
@@ -767,9 +771,7 @@ function resumeAudioContext() {
     if (activePreviewAudio) {
       activePreviewAudio.volume = state.soundVolume;
     }
-  } catch (err) {
-    console.warn('AudioContext unlock note:', err);
-  }
+  } catch (_) {}
 }
 
 async function playChimeSound(type = state.soundType) {
@@ -788,13 +790,13 @@ async function playChimeSound(type = state.soundType) {
       const playPromise = state.customAudioElement.play();
       if (playPromise !== undefined) {
         await playPromise.catch(err => {
-          console.warn('Custom audio playback blocked by autoplay policy:', err);
+          console.debug('Custom audio playback awaiting user gesture; using visual alert:', err);
           triggerVisualCompletionAlert();
         });
       }
       return;
     } catch (err) {
-      console.warn('Custom audio element error:', err);
+      console.debug('Custom audio element error; using visual alert:', err);
       triggerVisualCompletionAlert();
       return;
     }
@@ -808,7 +810,7 @@ async function playSynthesizedChime(type = state.soundType) {
   try {
     const ctx = getAudioContext();
     if (!ctx || ctx.state === 'suspended') {
-      console.warn('AudioContext is suspended awaiting user interaction; skipping synthesis.');
+      console.debug('AudioContext is suspended awaiting user interaction; skipping synthesis.');
       triggerVisualCompletionAlert();
       return;
     }
@@ -1476,7 +1478,6 @@ function startTimer(isAutoRestore = false) {
 }
 
 function pauseTimer() {
-  resumeAudioContext();
   if (!state.isRunning) return;
 
   state.isRunning = false;
@@ -3014,7 +3015,7 @@ function adjustColorBrightness(hex, percent) {
 function setupEventListeners() {
   // Global First-Gesture AudioContext Unlock Listener
   ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
-    document.addEventListener(evt, unlockAudioEngine, { passive: true, once: true })
+    window.addEventListener(evt, unlockAudio, { passive: true, once: true })
   );
 
   // Timer Controls
