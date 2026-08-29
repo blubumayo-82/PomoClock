@@ -1423,10 +1423,11 @@ async function fetchWeeklyStats() {
         const tomatoes = Math.floor(mins / 25);
         const badgeVisible = tomatoes >= 1;
         const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
+        const badgeTitle = badgeVisible ? `${tomatoes} Tomato${tomatoes > 1 ? 'es' : ''} (${tomatoes * 25}+ mins focused)` : '';
 
         html += `
           <div class="chart-col ${isToday ? 'today' : ''}">
-            <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}">${badgeHtml}</div>
+            <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}" title="${badgeTitle}">${badgeHtml}</div>
             <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
             <div class="chart-bar-wrap">
               <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
@@ -1502,8 +1503,9 @@ function renderStatistics(stats) {
     ? stats.total_focus_hours 
     : (Math.round(((stats.total_focus_minutes || 0) / 60) * 10) / 10);
   const totalMins = stats.total_focus_minutes || 0;
-  const completedCount = (stats.completed_pomodoros !== undefined) ? stats.completed_pomodoros : 0;
-  const totalSessions = (stats.total_sessions !== undefined) ? stats.total_sessions : completedCount;
+  const completedCount = (stats.completed_pomodoros !== undefined) 
+    ? stats.completed_pomodoros 
+    : Math.floor(totalMins / 25);
   const todayMins = (stats.today_focus_minutes !== undefined) ? stats.today_focus_minutes : 0;
   const todaySessions = (stats.today_pomodoros !== undefined) ? stats.today_pomodoros : 0;
   const streakDays = (stats.current_streak_days !== undefined) ? stats.current_streak_days : 0;
@@ -1511,7 +1513,7 @@ function renderStatistics(stats) {
   if (DOM.statTotalHours) DOM.statTotalHours.innerHTML = `${totalHours} <small>hrs</small>`;
   if (DOM.statTotalMinutes) DOM.statTotalMinutes.textContent = `${totalMins} mins recorded`;
   if (DOM.statCompletedCount) DOM.statCompletedCount.textContent = completedCount;
-  if (DOM.statTotalSessions) DOM.statTotalSessions.textContent = `${totalSessions} total sessions`;
+  if (DOM.statTotalSessions) DOM.statTotalSessions.textContent = `1 🍅 = 25m focus`;
   if (DOM.statTodayMinutes) DOM.statTodayMinutes.innerHTML = `${todayMins} <small>min</small>`;
   if (DOM.statTodaySessions) DOM.statTodaySessions.textContent = `${todaySessions} sessions today`;
   if (DOM.statStreakDays) DOM.statStreakDays.innerHTML = `${streakDays} <small>days</small>`;
@@ -1562,10 +1564,11 @@ function renderWeeklyChart(activity) {
 
     const badgeVisible = tomatoes >= 1;
     const badgeHtml = badgeVisible ? `🍅 ${tomatoes}` : '';
+    const badgeTitle = badgeVisible ? `${tomatoes} Tomato${tomatoes > 1 ? 'es' : ''} (${tomatoes * 25}+ mins focused)` : '';
 
     html += `
       <div class="chart-col ${isToday ? 'today' : ''}">
-        <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}">${badgeHtml}</div>
+        <div class="chart-top-badge ${badgeVisible ? 'active' : ''}" style="${badgeVisible ? '' : 'display: none;'}" title="${badgeTitle}">${badgeHtml}</div>
         <div class="chart-tooltip" style="color: #ffffff !important; background: rgba(20, 20, 20, 0.95) !important; z-index: 1000 !important;">${mins} mins (${tomatoes} 🍅)</div>
         <div class="chart-bar-wrap">
           <div class="chart-bar" style="height: ${heightPercent}%; min-height: ${minHeightPx}; opacity: ${barOpacity};"></div>
