@@ -660,6 +660,91 @@ function playSynthesizedPreviewChime(type = state.soundType) {
   }
 }
 
+// Global Audio Engine Gesture Unlocker
+let audioUnlocked = false;
+
+function unlockAudioEngine() {
+  if (audioUnlocked) return;
+
+  // 1. Resume AudioContext if present
+  const audioCtx = getAudioContext();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+
+  // 2. Prime HTML Audio elements with a muted play
+  const chime = state.customAudioElement || activePreviewAudio || (typeof document !== 'undefined' ? document.getElementById('timer-sound') : null);
+  if (chime && chime.src) {
+    const prevMuted = chime.muted;
+    chime.muted = true;
+    chime.play().then(() => {
+      chime.pause();
+      chime.currentTime = 0;
+      chime.muted = prevMuted;
+    }).catch(() => {});
+  }
+
+  audioUnlocked = true;
+  ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
+    document.removeEventListener(evt, unlockAudioEngine)
+  );
+}
+
+if (typeof document !== 'undefined') {
+  ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
+    document.addEventListener(evt, unlockAudioEngine, { passive: true })
+  );
+}
+
+let completionAlertInterval = null;
+
+function triggerVisualCompletionAlert(mode = state.currentMode) {
+  // 1. Pulse timer container / card
+  const timerCard = document.querySelector('.timer-card') || document.querySelector('.timer-section') || document.getElementById('timerCard');
+  if (timerCard) {
+    timerCard.classList.remove('timer-completion-pulse');
+    void timerCard.offsetWidth; // Force reflow
+    timerCard.classList.add('timer-completion-pulse');
+    setTimeout(() => {
+      if (timerCard) timerCard.classList.remove('timer-completion-pulse');
+    }, 4500);
+  }
+
+  // 2. Tab Title Flashing Alert
+  if (completionAlertInterval) {
+    clearInterval(completionAlertInterval);
+    completionAlertInterval = null;
+  }
+
+  const isWork = (mode === 'pomodoro' || mode === 'work' || mode === 'focus');
+  const alertTitle = isWork ? '🍅 Focus Complete!' : '☕ Break Finished!';
+  const originalTitle = 'PomoHaven - Cozy & Deep Study Flow';
+  
+  let toggle = false;
+  let count = 0;
+  completionAlertInterval = setInterval(() => {
+    document.title = toggle ? `🔔 ${alertTitle}` : `✨ ${alertTitle}`;
+    toggle = !toggle;
+    count++;
+    if (count > 10) {
+      clearInterval(completionAlertInterval);
+      completionAlertInterval = null;
+      document.title = originalTitle;
+    }
+  }, 700);
+
+  // Clear alert immediately on user interaction
+  const clearAlertOnInteraction = () => {
+    if (completionAlertInterval) {
+      clearInterval(completionAlertInterval);
+      completionAlertInterval = null;
+      document.title = originalTitle;
+    }
+    ['click', 'keydown', 'touchstart'].forEach(e => document.removeEventListener(e, clearAlertOnInteraction));
+  };
+  ['click', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, clearAlertOnInteraction, { once: true, passive: true }));
+}
+
 function getAudioContext() {
   if (!state.audioContext) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -703,13 +788,15 @@ async function playChimeSound(type = state.soundType) {
       const playPromise = state.customAudioElement.play();
       if (playPromise !== undefined) {
         await playPromise.catch(err => {
-          console.warn('Custom audio playback issue, falling back to synthesized chime:', err);
-          playSynthesizedChime(type);
+          console.warn('Custom audio playback blocked by autoplay policy:', err);
+          triggerVisualCompletionAlert();
         });
       }
       return;
     } catch (err) {
-      console.warn('Custom audio element error, falling back to synthesized chime:', err);
+      console.warn('Custom audio element error:', err);
+      triggerVisualCompletionAlert();
+      return;
     }
   }
 
@@ -720,10 +807,10 @@ async function playChimeSound(type = state.soundType) {
 async function playSynthesizedChime(type = state.soundType) {
   try {
     const ctx = getAudioContext();
-    if (!ctx) return;
-
-    if (ctx.state === 'suspended') {
-      await ctx.resume().catch(err => console.warn('AudioContext resume failed in playSynthesizedChime:', err));
+    if (!ctx || ctx.state === 'suspended') {
+      console.warn('AudioContext is suspended awaiting user interaction; skipping synthesis.');
+      triggerVisualCompletionAlert();
+      return;
     }
 
     const now = ctx.currentTime;
@@ -2926,18 +3013,9 @@ function adjustColorBrightness(hex, percent) {
 
 function setupEventListeners() {
   // Global First-Gesture AudioContext Unlock Listener
-  const unlockAudio = () => {
-    try {
-      const audioCtx = getAudioContext();
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => {});
-      }
-    } catch (_) {}
-    document.removeEventListener('pointerdown', unlockAudio);
-    document.removeEventListener('keydown', unlockAudio);
-  };
-  document.addEventListener('pointerdown', unlockAudio);
-  document.addEventListener('keydown', unlockAudio);
+  ['click', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => 
+    document.addEventListener(evt, unlockAudioEngine, { passive: true, once: true })
+  );
 
   // Timer Controls
   if (DOM.startPauseBtn) DOM.startPauseBtn.addEventListener('click', toggleStartPause);
