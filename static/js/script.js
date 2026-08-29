@@ -39,6 +39,10 @@ const state = {
   soundVolume: 0.8,
   soundType: 'zen', // 'zen' | 'bell' | 'digital' | 'marimba' | 'beep'
   audioContext: null,
+  customSoundBlob: null,
+  customSoundUrl: null,
+  customSoundName: null,
+  customAudioElement: null,
 
   // Theme settings (Default: Classic Pomodoro)
   theme: 'pomodoro',
@@ -213,6 +217,10 @@ const DOM = {
   settingVolume: document.getElementById('settingVolume'),
   volumePercentLabel: document.getElementById('volumePercentLabel'),
   testSoundBtn: document.getElementById('testSoundBtn'),
+  customSoundInput: document.getElementById('customSoundInput') || document.getElementById('custom-sound-input'),
+  uploadCustomSoundBtn: document.getElementById('uploadCustomSoundBtn'),
+  resetCustomSoundBtn: document.getElementById('resetCustomSoundBtn'),
+  customSoundName: document.getElementById('customSoundName'),
   requestNotificationBtn: document.getElementById('requestNotificationBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
@@ -251,25 +259,262 @@ const DOM = {
 
 
 // ==========================================================================
-// 3. Audio Chime Synthesizer (Web Audio API)
+// 3. Audio Chime Synthesizer & IndexedDB Custom Sound Engine
 // ==========================================================================
+
+const IDB_CONFIG = {
+  dbName: 'PomoHavenStorage',
+  version: 1,
+  storeName: 'settings',
+  key: 'custom_alarm_sound'
+};
+
+function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      return reject(new Error('IndexedDB not supported'));
+    }
+    const request = window.indexedDB.open(IDB_CONFIG.dbName, IDB_CONFIG.version);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(IDB_CONFIG.storeName)) {
+        db.createObjectStore(IDB_CONFIG.storeName);
+      }
+    };
+    request.onsuccess = (event) => {
+      resolve(event.target.result);
+    };
+    request.onerror = (event) => {
+      reject(event.target.error);
+    };
+  });
+}
+
+async function saveCustomSoundToDB(blob, name) {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_CONFIG.storeName, 'readwrite');
+      const store = tx.objectStore(IDB_CONFIG.storeName);
+      const data = { blob, name, type: blob.type, updatedAt: Date.now() };
+      const req = store.put(data, IDB_CONFIG.key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.error('Failed to save sound to IndexedDB:', err);
+    throw err;
+  }
+}
+
+async function getCustomSoundFromDB() {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_CONFIG.storeName, 'readonly');
+      const store = tx.objectStore(IDB_CONFIG.storeName);
+      const req = store.get(IDB_CONFIG.key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.warn('Failed to retrieve sound from IndexedDB:', err);
+    return null;
+  }
+}
+
+async function deleteCustomSoundFromDB() {
+  try {
+    const db = await openIndexedDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_CONFIG.storeName, 'readwrite');
+      const store = tx.objectStore(IDB_CONFIG.storeName);
+      const req = store.delete(IDB_CONFIG.key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } catch (err) {
+    console.error('Failed to delete sound from IndexedDB:', err);
+    throw err;
+  }
+}
+
+async function loadCustomSound() {
+  try {
+    const record = await getCustomSoundFromDB();
+    if (record && record.blob) {
+      if (state.customSoundUrl) {
+        URL.revokeObjectURL(state.customSoundUrl);
+      }
+      state.customSoundBlob = record.blob;
+      state.customSoundName = record.name || 'Custom Alarm';
+      state.customSoundUrl = URL.createObjectURL(record.blob);
+
+      if (!state.customAudioElement) {
+        state.customAudioElement = new Audio();
+      }
+      state.customAudioElement.src = state.customSoundUrl;
+      state.customAudioElement.volume = state.soundVolume;
+
+      updateCustomSoundUI();
+      return true;
+    }
+  } catch (err) {
+    console.warn('Error loading custom sound:', err);
+  }
+  updateCustomSoundUI();
+  return false;
+}
+
+function updateCustomSoundUI() {
+  const nameElem = DOM.customSoundName || document.getElementById('customSoundName');
+  const resetBtn = DOM.resetCustomSoundBtn || document.getElementById('resetCustomSoundBtn');
+  const statusElem = document.getElementById('customSoundStatus');
+
+  if (state.customSoundUrl && state.customSoundName) {
+    if (nameElem) {
+      nameElem.textContent = `🎵 ${state.customSoundName}`;
+      nameElem.classList.add('has-custom');
+    }
+    if (resetBtn) resetBtn.style.display = 'inline-flex';
+    if (statusElem) statusElem.textContent = 'Active custom sound file loaded';
+  } else {
+    if (nameElem) {
+      nameElem.textContent = 'Default Sound (Zen)';
+      nameElem.classList.remove('has-custom');
+    }
+    if (resetBtn) resetBtn.style.display = 'none';
+    if (statusElem) statusElem.textContent = 'Upload your own .mp3, .wav, or .ogg file (max 10MB)';
+  }
+}
+
+async function handleCustomSoundUpload(file) {
+  if (!file) return;
+
+  // Validate file size <= 10MB
+  const maxBytes = 10 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('⚠️ File too large! Maximum allowed size is 10MB.', 'error');
+    return;
+  }
+
+  // Validate audio type
+  if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/i)) {
+    showToast('⚠️ Please select a valid audio file (.mp3, .wav, .ogg, .m4a).', 'error');
+    return;
+  }
+
+  try {
+    await saveCustomSoundToDB(file, file.name);
+
+    if (state.customSoundUrl) {
+      URL.revokeObjectURL(state.customSoundUrl);
+    }
+
+    state.customSoundBlob = file;
+    state.customSoundName = file.name;
+    state.customSoundUrl = URL.createObjectURL(file);
+
+    if (!state.customAudioElement) {
+      state.customAudioElement = new Audio();
+    }
+    state.customAudioElement.src = state.customSoundUrl;
+    state.customAudioElement.volume = state.soundVolume;
+
+    updateCustomSoundUI();
+    showToast(`🎵 Custom sound "${file.name}" saved!`, 'success');
+
+    // Trigger brief preview play
+    playChimeSound();
+  } catch (err) {
+    console.error('Error saving custom sound:', err);
+    showToast('⚠️ Failed to save custom sound. Please try again.', 'error');
+  }
+}
+
+async function resetCustomSound() {
+  try {
+    await deleteCustomSoundFromDB();
+    if (state.customSoundUrl) {
+      URL.revokeObjectURL(state.customSoundUrl);
+    }
+    state.customSoundBlob = null;
+    state.customSoundUrl = null;
+    state.customSoundName = null;
+    if (state.customAudioElement) {
+      state.customAudioElement.src = '';
+    }
+    updateCustomSoundUI();
+    showToast('Reset to default chime sound', 'info');
+    playChimeSound();
+  } catch (err) {
+    console.error('Failed to reset custom sound:', err);
+  }
+}
 
 function getAudioContext() {
   if (!state.audioContext) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    state.audioContext = new AudioCtx();
-  }
-  if (state.audioContext.state === 'suspended') {
-    state.audioContext.resume();
+    if (AudioCtx) {
+      state.audioContext = new AudioCtx();
+    }
   }
   return state.audioContext;
 }
 
-function playChimeSound(type = state.soundType) {
+function resumeAudioContext() {
+  try {
+    const audioCtx = getAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(err => console.warn('AudioContext resume failed:', err));
+    }
+    if (state.customAudioElement) {
+      state.customAudioElement.volume = state.soundVolume;
+    }
+  } catch (err) {
+    console.warn('AudioContext unlock note:', err);
+  }
+}
+
+async function playChimeSound(type = state.soundType) {
   if (!state.soundEnabled || state.soundVolume <= 0) return;
 
+  // 1. If custom uploaded sound exists, play via HTML5 Audio element
+  if (state.customSoundUrl) {
+    try {
+      if (!state.customAudioElement) {
+        state.customAudioElement = new Audio(state.customSoundUrl);
+      } else {
+        state.customAudioElement.src = state.customSoundUrl;
+      }
+      state.customAudioElement.currentTime = 0;
+      state.customAudioElement.volume = Math.max(0, Math.min(1, state.soundVolume));
+      const playPromise = state.customAudioElement.play();
+      if (playPromise !== undefined) {
+        await playPromise.catch(err => {
+          console.warn('Custom audio playback issue, falling back to synthesized chime:', err);
+          playSynthesizedChime(type);
+        });
+      }
+      return;
+    } catch (err) {
+      console.warn('Custom audio element error, falling back to synthesized chime:', err);
+    }
+  }
+
+  // 2. Synthesized Web Audio Chime Fallback
+  await playSynthesizedChime(type);
+}
+
+async function playSynthesizedChime(type = state.soundType) {
   try {
     const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === 'suspended') {
+      await ctx.resume().catch(err => console.warn('AudioContext resume failed in playSynthesizedChime:', err));
+    }
+
     const now = ctx.currentTime;
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(state.soundVolume, now);
@@ -810,6 +1055,7 @@ function restoreTimerFromStorage() {
 }
 
 function switchMode(newMode, autoStart = false, bypassProtection = false) {
+  resumeAudioContext();
   const normalizedMode = normalizeMode(newMode);
 
   // If clicking the same mode and timer is completely idle at initial duration, do nothing
@@ -885,6 +1131,7 @@ function switchMode(newMode, autoStart = false, bypassProtection = false) {
 }
 
 function startTimer() {
+  resumeAudioContext();
   if (state.isRunning) return;
 
   state.isRunning = true;
@@ -927,6 +1174,7 @@ function startTimer() {
 }
 
 function pauseTimer() {
+  resumeAudioContext();
   if (!state.isRunning) return;
 
   state.isRunning = false;
@@ -949,6 +1197,7 @@ function pauseTimer() {
 }
 
 function toggleStartPause() {
+  resumeAudioContext();
   if (state.isRunning) {
     pauseTimer();
   } else {
@@ -957,6 +1206,7 @@ function toggleStartPause() {
 }
 
 function resetTimer() {
+  resumeAudioContext();
   const wasRunning = state.isRunning;
   pauseTimer();
 
@@ -989,6 +1239,7 @@ function resetTimer() {
 }
 
 function skipSession() {
+  resumeAudioContext();
   const previousMode = state.currentMode;
   pauseTimer();
   clearTimerPersistence();
@@ -1026,8 +1277,8 @@ async function handleTimerComplete() {
   const activeTask = (DOM.currentTaskInput ? DOM.currentTaskInput.value.trim() : state.currentTask) || '';
   state.currentTask = activeTask;
 
-  // 1. Play audio chime
-  playChimeSound();
+  // 1. Play audio chime on all completed sessions (Pomodoro, Short Break, Long Break)
+  await playChimeSound();
 
   // 2. Desktop notification
   showDesktopNotification(completedMode);
@@ -2457,6 +2708,11 @@ function adjustColorBrightness(hex, percent) {
 // ==========================================================================
 
 function setupEventListeners() {
+  // AudioContext Autoplay Unlock on user gestures
+  document.addEventListener('click', resumeAudioContext, { once: true });
+  document.addEventListener('touchstart', resumeAudioContext, { once: true });
+  document.addEventListener('keydown', resumeAudioContext, { once: true });
+
   // Timer Controls
   if (DOM.startPauseBtn) DOM.startPauseBtn.addEventListener('click', toggleStartPause);
   if (DOM.resetBtn) DOM.resetBtn.addEventListener('click', resetTimer);
@@ -2755,13 +3011,51 @@ function setupEventListeners() {
     DOM.settingVolume.addEventListener('input', (e) => {
       if (DOM.volumePercentLabel) DOM.volumePercentLabel.textContent = `${e.target.value}%`;
       state.soundVolume = parseInt(e.target.value, 10) / 100;
+      if (state.customAudioElement) {
+        state.customAudioElement.volume = state.soundVolume;
+      }
     });
   }
 
   if (DOM.testSoundBtn) {
     DOM.testSoundBtn.addEventListener('click', () => {
+      resumeAudioContext();
       const soundType = DOM.settingSoundType ? DOM.settingSoundType.value : state.soundType;
       playChimeSound(soundType);
+    });
+  }
+
+  // Custom Sound Upload & Reset Handlers
+  const uploadBtn = DOM.uploadCustomSoundBtn || document.getElementById('uploadCustomSoundBtn');
+  const fileInput = DOM.customSoundInput || document.getElementById('customSoundInput') || document.getElementById('custom-sound-input');
+  const fileInputAlt = document.getElementById('custom-sound-input');
+  const resetSoundBtn = DOM.resetCustomSoundBtn || document.getElementById('resetCustomSoundBtn');
+
+  if (uploadBtn && fileInput) {
+    uploadBtn.addEventListener('click', () => {
+      resumeAudioContext();
+      fileInput.click();
+    });
+  }
+
+  const handleFileInputChange = (e) => {
+    resumeAudioContext();
+    if (e.target.files && e.target.files[0]) {
+      handleCustomSoundUpload(e.target.files[0]);
+    }
+  };
+
+  if (fileInput) {
+    fileInput.addEventListener('change', handleFileInputChange);
+  }
+  if (fileInputAlt && fileInputAlt !== fileInput) {
+    fileInputAlt.addEventListener('change', handleFileInputChange);
+  }
+
+  if (resetSoundBtn) {
+    resetSoundBtn.addEventListener('click', () => {
+      resumeAudioContext();
+      resetCustomSound();
     });
   }
 
@@ -3681,6 +3975,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupEventListeners();
   loadStoredSettings();
+  await loadCustomSound();
   initTaskQueue();
 
   // 1. Immediately populate stat cards, charts, and badges from cache to eliminate 0-stat flash
