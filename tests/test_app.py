@@ -54,8 +54,8 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn(b'YOUR COZY FOCUS HAVEN', response.data)
         self.assertIn(b'https://pomohaven.com/', response.data)
         self.assertIn(b'G-5X56TCFQ65', response.data)
-        self.assertIn(b'style.css?v=33.0', response.data)
-        self.assertIn(b'script.js?v=34.0', response.data)
+        self.assertIn(b'style.css?v=35.0', response.data)
+        self.assertIn(b'script.js?v=35.0', response.data)
         self.assertIn(b'Privacy & Terms', response.data)
         self.assertIn(b'privacyModal', response.data)
         self.assertIn(b'Data Collection & Authentication', response.data)
@@ -303,6 +303,51 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertEqual(stats['today_pomodoros'], 2)
         self.assertEqual(len(stats['weekly_activity']), 7)
         self.assertEqual(len(stats['recent_sessions']), 3)
+
+    def test_work_mode_and_daily_streaks_persistence(self):
+        """Test recording session with mode='work' persists to sessions and daily_streaks via /api/log-session."""
+        # 1. Register a user
+        reg_payload = {
+            "username": "streak_master",
+            "email": "streak@study.edu",
+            "password": "strongPassword123"
+        }
+        res_reg = self.client.post('/api/auth/register', data=json.dumps(reg_payload), content_type='application/json')
+        self.assertEqual(res_reg.status_code, 201)
+
+        now = datetime.now(timezone.utc)
+        start_time = now.isoformat()
+        end_time = (now + timedelta(minutes=30)).isoformat()
+
+        # 2. Record completed work session via /api/log-session alias
+        payload = {
+            "mode": "work",
+            "duration_minutes": 30.0,
+            "start_time": start_time,
+            "end_time": end_time,
+            "status": "completed",
+            "task_name": "Deep Work on Project"
+        }
+        res_session = self.client.post('/api/log-session', data=json.dumps(payload), content_type='application/json')
+        self.assertEqual(res_session.status_code, 201)
+        data_session = json.loads(res_session.data)
+        self.assertTrue(data_session.get('success'))
+        self.assertEqual(data_session['session']['mode'], 'work')
+
+        # 3. Verify statistics reflect the work session
+        res_stats = self.client.get('/api/stats')
+        self.assertEqual(res_stats.status_code, 200)
+        data_stats = json.loads(res_stats.data)
+        self.assertEqual(data_stats['stats']['total_focus_minutes'], 30.0)
+        self.assertEqual(data_stats['stats']['completed_pomodoros'], 1)
+        self.assertEqual(data_stats['stats']['current_streak_days'], 1)
+
+        # 4. Verify daily_streaks table contains the updated streak record
+        with flask_app.app.app_context():
+            streak = flask_app.DailyStreak.query.filter_by(date=start_time[:10]).first()
+            self.assertIsNotNone(streak)
+            self.assertEqual(streak.pomodoro_count, 1)
+            self.assertEqual(streak.total_minutes, 30.0)
 
     def test_get_and_save_preferences(self):
         """Test getting and saving user preferences."""

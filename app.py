@@ -750,20 +750,67 @@ def health_check():
     }), 200
 
 
+def update_daily_streak_record(cursor, user_id, date_str, duration_minutes):
+    """
+    Updates or inserts a daily streak row in the SQLite daily_streaks table
+    for the specified user (or guest) and date.
+    """
+    try:
+        if user_id:
+            cursor.execute("""
+                SELECT id, pomodoro_count, total_minutes 
+                FROM daily_streaks 
+                WHERE user_id = ? AND date = ?
+            """, (user_id, date_str))
+        else:
+            cursor.execute("""
+                SELECT id, pomodoro_count, total_minutes 
+                FROM daily_streaks 
+                WHERE user_id IS NULL AND date = ?
+            """, (date_str,))
+        
+        row = cursor.fetchone()
+        if row:
+            streak_id = row['id']
+            cursor.execute("""
+                UPDATE daily_streaks 
+                SET pomodoro_count = pomodoro_count + 1,
+                    total_minutes = total_minutes + ?
+                WHERE id = ?
+            """, (duration_minutes, streak_id))
+        else:
+            cursor.execute("""
+                INSERT INTO daily_streaks (user_id, date, pomodoro_count, total_minutes)
+                VALUES (?, ?, 1, ?)
+            """, (user_id, date_str, duration_minutes))
+    except Exception as err:
+        app.logger.warning(f"Error updating SQLite daily_streaks: {err}")
+
+
 @app.route('/api/sessions', methods=['POST'])
+@app.route('/api/log-session', methods=['POST'])
 def record_session():
     """
     Records a completed, skipped, or interrupted timer session.
     Automatically attaches user_id if authenticated, or logs as guest.
+    Persists to PostgreSQL (via SQLAlchemy) and SQLite, updating daily_streaks.
     """
     data = request.get_json()
     if not data:
         return jsonify({"success": False, "error": "Invalid or missing JSON payload"}), 400
 
-    mode = data.get('mode', 'pomodoro')
-    allowed_modes = ['pomodoro', 'short_break', 'long_break']
-    if mode not in allowed_modes:
+    raw_mode = (data.get('mode') or 'pomodoro').lower().replace('-', '_')
+    allowed_modes = ['pomodoro', 'work', 'focus', 'short_break', 'shortbreak', 'long_break', 'longbreak']
+    if raw_mode not in allowed_modes:
         return jsonify({"success": False, "error": f"Invalid mode. Allowed: {allowed_modes}"}), 400
+
+    mode = raw_mode
+    if mode in ['work', 'focus']:
+        mode = 'work'
+    elif mode == 'shortbreak':
+        mode = 'short_break'
+    elif mode == 'longbreak':
+        mode = 'long_break'
 
     try:
         duration_minutes = float(data.get('duration_minutes', 25.0))
@@ -781,36 +828,77 @@ def record_session():
         status = 'completed'
 
     task_name = (data.get('task_name') or 'Study Session').strip()[:100]
-    user_id = get_current_user_id() or data.get('user_id')
+    user_id = session.get('user_id') or get_current_user_id() or data.get('user_id')
 
+    session_id = None
+    date_str = start_time[:10] if start_time and len(start_time) >= 10 else datetime.now().strftime('%Y-%m-%d')
+
+    # 1. Persist to PostgreSQL / SQLAlchemy
     try:
-        db = get_db()
-        cursor = db.cursor()
+        sess_obj = StudySession(
+            user_id=user_id,
+            mode=mode,
+            duration_minutes=duration_minutes,
+            start_time=start_time,
+            end_time=end_time,
+            status=status,
+            task_name=task_name
+        )
+        db.session.add(sess_obj)
+
+        if mode in ['pomodoro', 'work', 'focus'] and status == 'completed':
+            streak = DailyStreak.query.filter_by(user_id=user_id, date=date_str).first()
+            if streak:
+                streak.pomodoro_count = (streak.pomodoro_count or 0) + 1
+                streak.total_minutes = (streak.total_minutes or 0.0) + duration_minutes
+            else:
+                streak = DailyStreak(
+                    user_id=user_id,
+                    date=date_str,
+                    pomodoro_count=1,
+                    total_minutes=duration_minutes
+                )
+                db.session.add(streak)
+
+        db.session.commit()
+        session_id = sess_obj.id
+    except Exception as sa_err:
+        db.session.rollback()
+        app.logger.warning(f"SQLAlchemy persistence note: {sa_err}")
+
+    # 2. Persist to SQLite
+    try:
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
         cursor.execute("""
             INSERT INTO sessions (user_id, mode, duration_minutes, start_time, end_time, status, task_name)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (user_id, mode, duration_minutes, start_time, end_time, status, task_name))
-        db.commit()
+        
+        if not session_id:
+            session_id = cursor.lastrowid
 
-        session_id = cursor.lastrowid
+        if mode in ['pomodoro', 'work', 'focus'] and status == 'completed':
+            update_daily_streak_record(cursor, user_id, date_str, duration_minutes)
 
-        return jsonify({
-            "success": True,
-            "message": "Session recorded successfully",
-            "session": {
-                "id": session_id,
-                "user_id": user_id,
-                "mode": mode,
-                "duration_minutes": duration_minutes,
-                "start_time": start_time,
-                "end_time": end_time,
-                "status": status,
-                "task_name": task_name
-            }
-        }), 201
+        sqlite_conn.commit()
+    except Exception as sqlite_err:
+        app.logger.warning(f"SQLite insertion note: {sqlite_err}")
 
-    except Exception as err:
-        return jsonify({"success": False, "error": f"Database insertion error: {str(err)}"}), 500
+    return jsonify({
+        "success": True,
+        "message": "Session recorded successfully",
+        "session": {
+            "id": session_id,
+            "user_id": user_id,
+            "mode": mode,
+            "duration_minutes": duration_minutes,
+            "start_time": start_time,
+            "end_time": end_time,
+            "status": status,
+            "task_name": task_name
+        }
+    }), 201
 
 
 @app.route('/api/sessions/batch', methods=['POST'])
@@ -824,41 +912,85 @@ def batch_sync_sessions():
         return jsonify({"success": False, "error": "Expected a JSON object with a 'sessions' array"}), 400
 
     sessions_to_sync = data.get('sessions')
-    user_id = get_current_user_id()
-
-    db = get_db()
-    cursor = db.cursor()
+    user_id = session.get('user_id') or get_current_user_id()
     synced_count = 0
 
     try:
         for item in sessions_to_sync:
             mode = item.get('mode', 'pomodoro')
+            if mode in ['work', 'focus']:
+                mode = 'work'
             duration = float(item.get('duration_minutes', 25.0))
             start_time = item.get('start_time') or datetime.now(timezone.utc).isoformat()
             end_time = item.get('end_time') or start_time
             status = item.get('status', 'completed')
             task_name = (item.get('task_name') or 'Study Session').strip()[:100]
+            date_str = start_time[:10] if start_time and len(start_time) >= 10 else datetime.now().strftime('%Y-%m-%d')
 
-            # Check if this exact session already exists to avoid duplicate entries
-            if user_id:
-                cursor.execute("""
-                    SELECT id FROM sessions 
-                    WHERE user_id = ? AND start_time = ? AND mode = ?
-                """, (user_id, start_time, mode))
-            else:
-                cursor.execute("""
-                    SELECT id FROM sessions 
-                    WHERE user_id IS NULL AND start_time = ? AND mode = ?
-                """, (start_time, mode))
+            # SQLAlchemy check
+            existing = StudySession.query.filter_by(user_id=user_id, start_time=start_time, mode=mode).first()
+            if not existing:
+                sess_obj = StudySession(
+                    user_id=user_id,
+                    mode=mode,
+                    duration_minutes=duration,
+                    start_time=start_time,
+                    end_time=end_time,
+                    status=status,
+                    task_name=task_name
+                )
+                db.session.add(sess_obj)
 
-            if not cursor.fetchone():
-                cursor.execute("""
-                    INSERT INTO sessions (user_id, mode, duration_minutes, start_time, end_time, status, task_name)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (user_id, mode, duration, start_time, end_time, status, task_name))
+                if mode in ['pomodoro', 'work', 'focus'] and status == 'completed':
+                    streak = DailyStreak.query.filter_by(user_id=user_id, date=date_str).first()
+                    if streak:
+                        streak.pomodoro_count = (streak.pomodoro_count or 0) + 1
+                        streak.total_minutes = (streak.total_minutes or 0.0) + duration
+                    else:
+                        streak = DailyStreak(user_id=user_id, date=date_str, pomodoro_count=1, total_minutes=duration)
+                        db.session.add(streak)
                 synced_count += 1
 
-        db.commit()
+        db.session.commit()
+
+        # SQLite sync
+        try:
+            sqlite_conn = get_db()
+            cursor = sqlite_conn.cursor()
+            for item in sessions_to_sync:
+                mode = item.get('mode', 'pomodoro')
+                if mode in ['work', 'focus']:
+                    mode = 'work'
+                duration = float(item.get('duration_minutes', 25.0))
+                start_time = item.get('start_time') or datetime.now(timezone.utc).isoformat()
+                end_time = item.get('end_time') or start_time
+                status = item.get('status', 'completed')
+                task_name = (item.get('task_name') or 'Study Session').strip()[:100]
+                date_str = start_time[:10] if start_time and len(start_time) >= 10 else datetime.now().strftime('%Y-%m-%d')
+
+                if user_id:
+                    cursor.execute("""
+                        SELECT id FROM sessions 
+                        WHERE user_id = ? AND start_time = ? AND mode = ?
+                    """, (user_id, start_time, mode))
+                else:
+                    cursor.execute("""
+                        SELECT id FROM sessions 
+                        WHERE user_id IS NULL AND start_time = ? AND mode = ?
+                    """, (start_time, mode))
+
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO sessions (user_id, mode, duration_minutes, start_time, end_time, status, task_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (user_id, mode, duration, start_time, end_time, status, task_name))
+                    if mode in ['pomodoro', 'work', 'focus'] and status == 'completed':
+                        update_daily_streak_record(cursor, user_id, date_str, duration)
+
+            sqlite_conn.commit()
+        except Exception:
+            pass
+
         return jsonify({
             "success": True,
             "message": f"Successfully synced {synced_count} sessions",
@@ -866,6 +998,7 @@ def batch_sync_sessions():
         }), 200
 
     except Exception as err:
+        db.session.rollback()
         return jsonify({"success": False, "error": f"Failed to batch sync sessions: {str(err)}"}), 500
 
 
@@ -878,7 +1011,7 @@ def get_sessions():
         limit = min(int(request.args.get('limit', 50)), 200)
         mode = request.args.get('mode')
         status = request.args.get('status')
-        user_id = get_current_user_id()
+        user_id = session.get('user_id') or get_current_user_id()
 
         query = "SELECT * FROM sessions"
         conditions = []
@@ -891,8 +1024,11 @@ def get_sessions():
             conditions.append("user_id IS NULL")
 
         if mode:
-            conditions.append("mode = ?")
-            params.append(mode)
+            if mode in ['pomodoro', 'work', 'focus']:
+                conditions.append("mode IN ('pomodoro', 'work', 'focus')")
+            else:
+                conditions.append("mode = ?")
+                params.append(mode)
         if status:
             conditions.append("status = ?")
             params.append(status)
@@ -903,8 +1039,8 @@ def get_sessions():
         query += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
 
-        db = get_db()
-        cursor = db.cursor()
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
         cursor.execute(query, params)
         rows = cursor.fetchall()
 
@@ -917,18 +1053,33 @@ def get_sessions():
 
 @app.route('/api/sessions', methods=['DELETE'])
 def clear_sessions():
-    """Clears all session logs for the current user/guest."""
+    """Clears all session logs and daily streaks for the current user/guest."""
     try:
-        user_id = get_current_user_id()
-        db = get_db()
-        cursor = db.cursor()
+        user_id = session.get('user_id') or get_current_user_id()
 
+        # Clear SQLAlchemy records
+        try:
+            if user_id:
+                StudySession.query.filter_by(user_id=user_id).delete()
+                DailyStreak.query.filter_by(user_id=user_id).delete()
+            else:
+                StudySession.query.filter(StudySession.user_id.is_(None)).delete()
+                DailyStreak.query.filter(DailyStreak.user_id.is_(None)).delete()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # Clear SQLite records
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
         if user_id:
             cursor.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            cursor.execute("DELETE FROM daily_streaks WHERE user_id = ?", (user_id,))
         else:
             cursor.execute("DELETE FROM sessions WHERE user_id IS NULL")
+            cursor.execute("DELETE FROM daily_streaks WHERE user_id IS NULL")
 
-        db.commit()
+        sqlite_conn.commit()
         return jsonify({"success": True, "message": "Session history cleared."}), 200
     except Exception as err:
         return jsonify({"success": False, "error": f"Failed to clear sessions: {str(err)}"}), 500
@@ -943,16 +1094,17 @@ def get_statistics():
     """
     Calculates study statistics for current user/guest:
       - Total study hours and total minutes
-      - Completed Pomodoro count
+      - Completed Pomodoro / Work count
       - Total sessions count (all modes)
       - Today's study minutes and pomodoro count
       - 7-day daily activity breakdown for charts
       - Recent session logs
+      - Daily streak calculation
     """
     try:
-        user_id = get_current_user_id()
-        db = get_db()
-        cursor = db.cursor()
+        user_id = session.get('user_id') or get_current_user_id()
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
 
         user_filter = "user_id = ?" if user_id else "user_id IS NULL"
         user_params = (user_id,) if user_id else ()
@@ -962,7 +1114,7 @@ def get_statistics():
             SELECT COALESCE(SUM(duration_minutes), 0) AS total_minutes,
                    COUNT(*) AS completed_pomodoros
             FROM sessions
-            WHERE {user_filter} AND mode = 'pomodoro' AND status = 'completed'
+            WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed'
         """, user_params)
         total_row = cursor.fetchone()
         total_focus_minutes = round(float(total_row['total_minutes']), 1)
@@ -981,7 +1133,7 @@ def get_statistics():
                    COUNT(*) AS today_pomodoros
             FROM sessions
             WHERE {user_filter}
-              AND mode = 'pomodoro' 
+              AND mode IN ('pomodoro', 'work', 'focus') 
               AND status = 'completed' 
               AND start_time LIKE ?
         """, today_params)
@@ -1003,7 +1155,7 @@ def get_statistics():
                        COUNT(*) AS day_count
                 FROM sessions
                 WHERE {user_filter}
-                  AND mode = 'pomodoro'
+                  AND mode IN ('pomodoro', 'work', 'focus')
                   AND status = 'completed'
                   AND start_time LIKE ?
             """, day_params)
@@ -1032,7 +1184,7 @@ def get_statistics():
         check_params = user_params + (f"{test_day.strftime('%Y-%m-%d')}%",)
         cursor.execute(f"""
             SELECT COUNT(*) AS c FROM sessions 
-            WHERE {user_filter} AND mode = 'pomodoro' AND status = 'completed' AND start_time LIKE ?
+            WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed' AND start_time LIKE ?
         """, check_params)
         today_has_activity = cursor.fetchone()['c'] > 0
 
@@ -1046,7 +1198,7 @@ def get_statistics():
             past_params = user_params + (f"{past_str}%",)
             cursor.execute(f"""
                 SELECT COUNT(*) AS c FROM sessions 
-                WHERE {user_filter} AND mode = 'pomodoro' AND status = 'completed' AND start_time LIKE ?
+                WHERE {user_filter} AND mode IN ('pomodoro', 'work', 'focus') AND status = 'completed' AND start_time LIKE ?
             """, past_params)
             if cursor.fetchone()['c'] > 0:
                 streak_days += 1
@@ -1087,8 +1239,8 @@ def get_weekly_stats():
     """
     try:
         user_id = session.get('user_id') or get_current_user_id()
-        db = get_db()
-        cursor = db.cursor()
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
 
         user_filter = "user_id = ?" if user_id else "user_id IS NULL"
         user_params = (user_id,) if user_id else ()
@@ -1108,7 +1260,7 @@ def get_weekly_stats():
                 SELECT COALESCE(SUM(duration_minutes), 0) AS day_minutes
                 FROM sessions
                 WHERE {user_filter}
-                  AND mode = 'pomodoro' 
+                  AND mode IN ('pomodoro', 'work', 'focus') 
                   AND status = 'completed' 
                   AND start_time LIKE ?
             """, day_params)
@@ -1139,8 +1291,8 @@ def get_recent_sessions():
     """
     try:
         user_id = session.get('user_id') or get_current_user_id()
-        db = get_db()
-        cursor = db.cursor()
+        sqlite_conn = get_db()
+        cursor = sqlite_conn.cursor()
 
         user_filter = "user_id = ?" if user_id else "user_id IS NULL"
         user_params = (user_id,) if user_id else ()

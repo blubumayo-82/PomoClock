@@ -879,6 +879,8 @@ function skipSession() {
 async function handleTimerComplete() {
   pauseTimer();
   const completedMode = state.currentMode;
+  const isWork = (completedMode === 'pomodoro' || completedMode === 'work' || completedMode === 'focus');
+  const sessionMode = isWork ? 'work' : completedMode;
   const durationMins = Math.round((state.totalDuration / 60) * 10) / 10;
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
@@ -892,18 +894,18 @@ async function handleTimerComplete() {
   // 2. Desktop notification
   showDesktopNotification(completedMode);
 
-  // 3. Record session in SQLite database & localStorage
+  // 3. Record session in database & localStorage
   await recordSession({
-    mode: completedMode,
+    mode: sessionMode,
     duration_minutes: durationMins,
     start_time: startTime,
     end_time: endTime,
     status: 'completed',
-    task_name: activeTask || (completedMode === 'pomodoro' ? 'Focus Session' : 'Break Time')
+    task_name: activeTask || (isWork ? 'Focus Session' : 'Break Time')
   });
 
   // 4. Confetti & Celebration for completed pomodoro
-  if (completedMode === 'pomodoro') {
+  if (isWork) {
     triggerConfettiBurst();
     showToast(`🎉 Great job! Completed ${durationMins}m focus session.`, 'success');
     
@@ -917,7 +919,7 @@ async function handleTimerComplete() {
     showToast(`⚡ Break finished! Ready for another round?`, 'info');
   }
 
-  // 5. Refresh analytics
+  // 5. Refresh analytics directly from database
   await fetchStatistics();
   await fetchWeeklyStats();
   await fetchRecentSessions();
@@ -3433,7 +3435,7 @@ function exportSessionsToCsv() {
 // 18. App Initialization
 // ==========================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   if (DOM.progressCircle) {
     DOM.progressCircle.style.strokeDasharray = CIRCUMFERENCE;
   }
@@ -3446,10 +3448,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTimerDisplay();
   updateStatusBadge();
 
-  // Check auth session, init Google Sign-In & load statistics
-  checkAuthStatus();
+  // Check auth session, init Google Sign-In & load authoritative stats from database
+  await checkAuthStatus();
   initGoogleSignIn();
-  fetchStatistics();
+  await fetchStatistics();
 
   // Check for first-time user tour & pulse
   checkFirstTimeUser();
