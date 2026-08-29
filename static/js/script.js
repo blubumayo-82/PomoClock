@@ -680,6 +680,9 @@ function updateCycleIndicators() {
     });
   }
 
+  // Persist currentCycle in localStorage whenever cycle updates
+  localStorage.setItem('currentCycle', state.cycleCount.toString());
+
   calculateSessionEta();
 }
 
@@ -705,41 +708,75 @@ function updateModeTabsDisabledState(disabled) {
 
 function clearTimerPersistence() {
   localStorage.removeItem('targetTimestamp');
+  localStorage.removeItem('isPaused');
+  localStorage.removeItem('pausedSecondsLeft');
   localStorage.setItem('timerStatus', 'paused');
   localStorage.removeItem('savedTimeLeft');
 }
 
 function restoreTimerFromStorage() {
+  const isPaused = localStorage.getItem('isPaused');
+  const pausedSecondsLeftStr = localStorage.getItem('pausedSecondsLeft');
   const timerStatus = localStorage.getItem('timerStatus');
   const targetTimestampStr = localStorage.getItem('targetTimestamp');
   const storedMode = localStorage.getItem('currentMode');
   const storedTotalDuration = localStorage.getItem('totalDuration');
   const storedStartTime = localStorage.getItem('sessionStartTime');
+  const storedCycle = localStorage.getItem('currentCycle');
 
+  if (storedCycle) {
+    const parsedCycle = parseInt(storedCycle, 10);
+    if (!isNaN(parsedCycle) && parsedCycle >= 1) {
+      state.cycleCount = parsedCycle;
+    }
+  }
+
+  if (storedMode) {
+    state.currentMode = normalizeMode(storedMode);
+  }
+  if (storedTotalDuration) {
+    state.totalDuration = parseInt(storedTotalDuration, 10) || state.durations[state.currentMode] || 25 * 60;
+  }
+  if (storedStartTime) {
+    state.sessionStartTime = storedStartTime;
+  }
+
+  // 1. If paused before reload: restore paused state without starting interval
+  if (isPaused === 'true' && pausedSecondsLeftStr) {
+    const pausedSeconds = parseInt(pausedSecondsLeftStr, 10);
+    if (!isNaN(pausedSeconds)) {
+      state.timeLeft = Math.max(0, pausedSeconds);
+      state.isRunning = false;
+      if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
+      if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
+      if (DOM.startPauseText) DOM.startPauseText.textContent = 'Start';
+      if (DOM.startPauseBtn) DOM.startPauseBtn.classList.remove('running');
+      updateModeTabs();
+      updateModeTabsDisabledState(false);
+      updateTimerDisplay();
+      updateStatusBadge();
+      updateCycleIndicators();
+      return true;
+    }
+  }
+
+  // 2. If running before reload: resume using target timestamp diff
   if (timerStatus === 'running' && targetTimestampStr) {
     const targetTimestamp = parseInt(targetTimestampStr, 10);
     if (!isNaN(targetTimestamp)) {
       const diff = Math.round((targetTimestamp - Date.now()) / 1000);
 
-      if (storedMode) {
-        state.currentMode = normalizeMode(storedMode);
-      }
-      if (storedTotalDuration) {
-        state.totalDuration = parseInt(storedTotalDuration, 10) || state.durations[state.currentMode] || 25 * 60;
-      }
-      if (storedStartTime) {
-        state.sessionStartTime = storedStartTime;
-      }
-
       if (diff > 0) {
         state.timeLeft = diff;
         updateModeTabs();
+        updateCycleIndicators();
         updateTimerDisplay();
         startTimer();
         return true;
       } else {
         state.timeLeft = 0;
         updateModeTabs();
+        updateCycleIndicators();
         updateTimerDisplay();
         clearTimerPersistence();
         handleTimerComplete();
@@ -747,6 +784,8 @@ function restoreTimerFromStorage() {
       }
     }
   }
+
+  updateCycleIndicators();
   return false;
 }
 
@@ -839,13 +878,16 @@ function startTimer() {
   updateModeTabsDisabledState(true);
   updateStatusBadge();
 
-  // Calculate targetTimestamp and store in localStorage for refresh persistence
+  // Clear paused state and calculate targetTimestamp for persistence
+  localStorage.removeItem('isPaused');
+  localStorage.removeItem('pausedSecondsLeft');
   const remainingSeconds = state.timeLeft;
   const targetTimestamp = Date.now() + (remainingSeconds * 1000);
   localStorage.setItem('targetTimestamp', targetTimestamp.toString());
   localStorage.setItem('timerStatus', 'running');
   localStorage.setItem('currentMode', state.currentMode);
   localStorage.setItem('totalDuration', state.totalDuration.toString());
+  localStorage.setItem('currentCycle', state.cycleCount.toString());
   if (state.sessionStartTime) {
     localStorage.setItem('sessionStartTime', state.sessionStartTime);
   }
@@ -879,10 +921,15 @@ function pauseTimer() {
     state.timerInterval = null;
   }
 
-  // Update persistence state to paused
+  // Save paused state to localStorage
+  localStorage.setItem('isPaused', 'true');
   localStorage.setItem('timerStatus', 'paused');
-  localStorage.removeItem('targetTimestamp');
+  localStorage.setItem('pausedSecondsLeft', state.timeLeft.toString());
   localStorage.setItem('savedTimeLeft', state.timeLeft.toString());
+  localStorage.setItem('currentMode', state.currentMode);
+  localStorage.setItem('totalDuration', state.totalDuration.toString());
+  localStorage.setItem('currentCycle', state.cycleCount.toString());
+  localStorage.removeItem('targetTimestamp');
 
   if (DOM.playIcon) DOM.playIcon.style.display = 'inline-block';
   if (DOM.pauseIcon) DOM.pauseIcon.style.display = 'none';
@@ -907,11 +954,25 @@ function resetTimer() {
   pauseTimer();
 
   clearTimerPersistence();
+  localStorage.removeItem('currentCycle');
+  localStorage.removeItem('isPaused');
+  localStorage.removeItem('pausedSecondsLeft');
+  localStorage.removeItem('targetTimestamp');
+  localStorage.setItem('timerStatus', 'paused');
+
+  state.cycleCount = 1;
+  state.currentMode = 'pomodoro';
+  state.totalDuration = getUserWorkDuration();
+  state.durations.pomodoro = state.totalDuration;
+  state.durations.work = state.totalDuration;
   state.timeLeft = state.totalDuration;
   state.sessionStartTime = null;
+
+  updateModeTabs();
   updateModeTabsDisabledState(false);
   updateTimerDisplay();
   updateStatusBadge();
+  updateCycleIndicators();
 
   if (wasRunning) {
     showToast('Timer reset', 'info');
@@ -949,7 +1010,7 @@ async function handleTimerComplete() {
   const completedMode = state.currentMode;
   const isWork = (completedMode === 'pomodoro' || completedMode === 'work' || completedMode === 'focus');
   const sessionMode = isWork ? 'work' : completedMode;
-  const sessionMinutes = Math.round((state.totalDuration / 60) * 10) / 10;
+  const durationInMinutes = Math.round((state.totalDuration / 60) * 10) / 10;
   const startTime = state.sessionStartTime || new Date(Date.now() - state.totalDuration * 1000).toISOString();
   const endTime = new Date().toISOString();
 
@@ -962,10 +1023,31 @@ async function handleTimerComplete() {
   // 2. Desktop notification
   showDesktopNotification(completedMode);
 
-  // 3. Record session in database & localStorage
-  await recordSession({
+  // 3. Explicit fetch POST request to save the session to PostgreSQL backend
+  fetch('/api/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({
+      duration_minutes: durationInMinutes,
+      mode: sessionMode,
+      start_time: startTime,
+      end_time: endTime,
+      status: 'completed',
+      task_name: activeTask || (isWork ? 'Focus Session' : 'Break Time')
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log('Session synced to Postgres:', data);
+    fetchStatistics();
+  })
+  .catch(err => console.error('Error syncing session:', err));
+
+  // Also save in localStorage for hybrid persistence
+  saveLocalSession({
+    duration_minutes: durationInMinutes,
     mode: sessionMode,
-    duration_minutes: sessionMinutes,
     start_time: startTime,
     end_time: endTime,
     status: 'completed',
@@ -975,7 +1057,7 @@ async function handleTimerComplete() {
   // 4. Confetti & Celebration for completed pomodoro
   if (isWork) {
     triggerConfettiBurst();
-    showToast(`🎉 Great job! Completed ${sessionMinutes}m focus session.`, 'success');
+    showToast(`🎉 Great job! Completed ${durationInMinutes}m focus session.`, 'success');
     
     // Automatically increment multi-task queue target progress
     if (typeof incrementActiveTaskProgress === 'function') {
