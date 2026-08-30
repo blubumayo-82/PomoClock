@@ -55,7 +55,7 @@ class PomodoroAppTestCase(unittest.TestCase):
         self.assertIn(b'https://pomohaven.com/', response.data)
         self.assertIn(b'G-5X56TCFQ65', response.data)
         self.assertIn(b'style.css?v=18.0', response.data)
-        self.assertIn(b'script.js?v=18.0', response.data)
+        self.assertIn(b'script.js?v=18.1', response.data)
         self.assertIn(b'Privacy & Terms', response.data)
         self.assertIn(b'privacyModal', response.data)
         self.assertIn(b'Data Collection & Authentication', response.data)
@@ -663,6 +663,33 @@ class PomodoroAppTestCase(unittest.TestCase):
         data_sessions_a = json.loads(res_sessions_a.data)
         self.assertEqual(data_sessions_a['count'], 1)
         self.assertEqual(data_sessions_a['sessions'][0]['task_name'], "Alpha Focus")
+
+    def test_completed_tomatoes_earned_from_focus_minutes(self):
+        """Verify 150 minutes across 30 short sessions equals 6 earned tomatoes (150 // 25)."""
+        now = datetime.now()
+        # Insert 30 short focus sessions of 5 minutes each = 150 minutes total
+        for i in range(30):
+            self.client.post('/api/sessions', data=json.dumps({
+                "mode": "pomodoro",
+                "duration_minutes": 5.0,
+                "start_time": now.isoformat(),
+                "status": "completed",
+                "task_name": f"Short Interval {i+1}"
+            }), content_type='application/json')
+
+        # Check /api/stats and /api/user-stats
+        res_stats = self.client.get('/api/stats')
+        self.assertEqual(res_stats.status_code, 200)
+        data_stats = json.loads(res_stats.data)
+        self.assertEqual(data_stats['stats']['total_focus_minutes'], 150.0)
+        self.assertEqual(data_stats['stats']['completed_pomodoros'], 6)
+        self.assertEqual(data_stats['stats']['total_sessions'], 30)
+
+        res_user_stats = self.client.get('/api/user-stats')
+        self.assertEqual(res_user_stats.status_code, 200)
+        data_user_stats = json.loads(res_user_stats.data)
+        self.assertEqual(data_user_stats['stats']['total_focus_minutes'], 150.0)
+        self.assertEqual(data_user_stats['stats']['completed_pomodoros'], 6)
 
 
 if __name__ == '__main__':

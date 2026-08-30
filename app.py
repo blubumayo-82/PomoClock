@@ -1128,7 +1128,7 @@ def get_statistics():
             ).all()
 
             total_focus_minutes = round(sum(float(s.duration_minutes or 0) for s in focus_sessions), 1)
-            completed_pomodoros = len(focus_sessions)
+            completed_pomodoros = int(total_focus_minutes // 25)
             total_focus_hours = round(total_focus_minutes / 60.0, 2)
 
             all_sessions = query.all()
@@ -1237,8 +1237,7 @@ def get_statistics():
 
         # 1. Total Focus Time
         cursor.execute(f"""
-            SELECT COALESCE(SUM(duration_minutes), 0) AS total_minutes,
-                   COUNT(*) AS completed_pomodoros
+            SELECT COALESCE(SUM(duration_minutes), 0) AS total_minutes
             FROM sessions
             WHERE {user_filter} 
               AND mode IN ('pomodoro', 'work', 'focus') 
@@ -1246,7 +1245,7 @@ def get_statistics():
         """, user_params)
         total_row = cursor.fetchone()
         total_focus_minutes = round(float(total_row['total_minutes']), 1)
-        completed_pomodoros = int(total_row['completed_pomodoros'])
+        completed_pomodoros = int(total_focus_minutes // 25)
         total_focus_hours = round(total_focus_minutes / 60.0, 2)
 
         # 2. Total Sessions Count

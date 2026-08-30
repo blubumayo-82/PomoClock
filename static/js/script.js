@@ -1480,10 +1480,11 @@ function getSessionLocalDateString(startTimeStr) {
 
 function computeLocalStats() {
   const sessions = getLocalSessions();
-  const completedPomodoros = sessions.filter(s => s.mode === 'pomodoro' && s.status === 'completed');
+  const completedPomodoros = sessions.filter(s => (s.mode === 'pomodoro' || s.mode === 'work' || s.mode === 'focus') && (s.status === 'completed' || !s.status));
   const totalFocusMinutes = completedPomodoros.reduce((acc, s) => acc + (parseFloat(s.duration_minutes) || 0), 0);
   const totalFocusHours = Math.round((totalFocusMinutes / 60) * 100) / 100;
   const totalSessions = sessions.length;
+  const totalTomatoes = Math.floor(totalFocusMinutes / 25);
 
   const todayStr = getLocalDateString();
   const todayPomodoros = completedPomodoros.filter(s => getSessionLocalDateString(s.start_time) === todayStr);
@@ -1531,7 +1532,7 @@ function computeLocalStats() {
   return {
     total_focus_minutes: Math.round(totalFocusMinutes * 10) / 10,
     total_focus_hours: totalFocusHours,
-    completed_pomodoros: completedPomodoros.length,
+    completed_pomodoros: totalTomatoes,
     total_sessions: totalSessions,
     today_focus_minutes: Math.round(todayFocusMinutes * 10) / 10,
     today_pomodoros: todayPomodoros.length,
@@ -1782,20 +1783,21 @@ function renderStatistics(stats) {
   if (!stats) return;
   state.currentStats = stats;
 
+  const totalFocusMinutes = (stats.total_focus_minutes !== undefined) 
+    ? (parseFloat(stats.total_focus_minutes) || 0) 
+    : ((parseFloat(stats.total_focus_hours) || 0) * 60);
   const totalHours = (stats.total_focus_hours !== undefined) 
     ? stats.total_focus_hours 
-    : (Math.round(((stats.total_focus_minutes || 0) / 60) * 10) / 10);
-  const totalMins = stats.total_focus_minutes || 0;
-  const completedCount = (stats.completed_pomodoros !== undefined) 
-    ? stats.completed_pomodoros 
-    : Math.floor(totalMins / 25);
+    : (Math.round((totalFocusMinutes / 60) * 10) / 10);
+  const totalMins = stats.total_focus_minutes !== undefined ? stats.total_focus_minutes : totalFocusMinutes;
+  const totalTomatoes = Math.floor(totalFocusMinutes / 25);
   const todayMins = (stats.today_focus_minutes !== undefined) ? stats.today_focus_minutes : 0;
   const todaySessions = (stats.today_pomodoros !== undefined) ? stats.today_pomodoros : 0;
   const streakDays = (stats.current_streak_days !== undefined) ? stats.current_streak_days : 0;
 
   if (DOM.statTotalHours) DOM.statTotalHours.innerHTML = `${totalHours} <small>hrs</small>`;
   if (DOM.statTotalMinutes) DOM.statTotalMinutes.textContent = `${totalMins} mins recorded`;
-  if (DOM.statCompletedCount) DOM.statCompletedCount.textContent = completedCount;
+  if (DOM.statCompletedCount) DOM.statCompletedCount.textContent = totalTomatoes;
   if (DOM.statTotalSessions) DOM.statTotalSessions.textContent = `1 🍅 = 25m focus`;
   if (DOM.statTodayMinutes) DOM.statTodayMinutes.innerHTML = `${todayMins} <small>min</small>`;
   if (DOM.statTodaySessions) DOM.statTodaySessions.textContent = `${todaySessions} sessions today`;
@@ -3862,10 +3864,11 @@ async function exportShareableFocusCard() {
 
   const compCountElem = document.getElementById('shareCompletedCount');
   if (compCountElem) {
-    const compVal = stats.completed_pomodoros !== undefined 
-      ? stats.completed_pomodoros 
-      : (DOM.statCompletedCount ? DOM.statCompletedCount.textContent.trim() : '0');
-    compCountElem.textContent = `${compVal} pomos`;
+    const totalFocusMinutes = (stats.total_focus_minutes !== undefined) 
+      ? (parseFloat(stats.total_focus_minutes) || 0) 
+      : (DOM.statTotalMinutes ? (parseFloat(DOM.statTotalMinutes.textContent) || 0) : 0);
+    const totalTomatoes = Math.floor(totalFocusMinutes / 25);
+    compCountElem.textContent = `${totalTomatoes} pomos`;
   }
 
   // 4. Populate weekly focus activity summary badge & 7-day single-row column chart (100% sync with live site)
